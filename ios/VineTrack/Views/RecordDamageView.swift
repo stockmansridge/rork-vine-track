@@ -157,6 +157,32 @@ struct RecordDamageView: View {
             .mapStyle(.hybrid)
             .frame(height: 350)
             .clipShape(.rect(cornerRadius: 14))
+            .overlay(alignment: .topTrailing) {
+                VStack(spacing: 0) {
+                    Button {
+                        zoomMap(zoomIn: true)
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 36, height: 36)
+                    }
+                    Divider()
+                    Button {
+                        zoomMap(zoomIn: false)
+                    } label: {
+                        Image(systemName: "minus")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 36, height: 36)
+                    }
+                }
+                .background(.ultraThinMaterial)
+                .clipShape(.rect(cornerRadius: 8))
+                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                .padding(10)
+            }
+            .onMapCameraChange { context in
+                visibleRegion = context.region
+            }
             .onTapGesture { screenCoord in
                 guard draggingIndex == nil else { return }
                 if let coordinate = proxy.convert(screenCoord, from: .local) {
@@ -372,6 +398,18 @@ struct RecordDamageView: View {
     }
 
     // MARK: - Helpers
+
+    private func zoomMap(zoomIn: Bool) {
+        guard let region = visibleRegion else { return }
+        let factor: Double = zoomIn ? 0.5 : 2.0
+        let newSpan = MKCoordinateSpan(
+            latitudeDelta: min(region.span.latitudeDelta * factor, 180),
+            longitudeDelta: min(region.span.longitudeDelta * factor, 360)
+        )
+        withAnimation(.snappy(duration: 0.3)) {
+            mapPosition = .region(MKCoordinateRegion(center: region.center, span: newSpan))
+        }
+    }
 
     private func fitMapToPaddock() {
         let points = paddock.polygonPoints
