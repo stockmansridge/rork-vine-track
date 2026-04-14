@@ -281,54 +281,67 @@ class YieldEstimationViewModel {
 
     private func generateSitesOnRows(paddock: Paddock, totalSamples: Int, startIndex: Int) -> [SampleSite] {
         let rows = paddock.rows
-        guard !rows.isEmpty else { return [] }
+        let polygon = paddock.polygonPoints
+        guard !rows.isEmpty, polygon.count >= 3 else { return [] }
 
         let mPerDegLat = 111_320.0
-        let centroidLat = paddock.polygonPoints.isEmpty ? 0 : paddock.polygonPoints.map(\.latitude).reduce(0, +) / Double(paddock.polygonPoints.count)
+        let centroidLat = polygon.map(\.latitude).reduce(0, +) / Double(polygon.count)
         let mPerDegLon = 111_320.0 * cos(centroidLat * .pi / 180.0)
 
-        struct RowWithLength {
+        struct ClippedSegment {
             let row: PaddockRow
+            let startLat: Double
+            let startLon: Double
+            let endLat: Double
+            let endLon: Double
             let length: Double
         }
 
-        let rowsWithLength: [RowWithLength] = rows.compactMap { row in
-            let dLat = (row.endPoint.latitude - row.startPoint.latitude) * mPerDegLat
-            let dLon = (row.endPoint.longitude - row.startPoint.longitude) * mPerDegLon
-            let length = sqrt(dLat * dLat + dLon * dLon)
-            guard length > 0 else { return nil }
-            return RowWithLength(row: row, length: length)
+        var clippedSegments: [ClippedSegment] = []
+
+        for row in rows {
+            let segments = clipRowToPolygon(row: row, polygon: polygon)
+            for seg in segments {
+                let dLat = (seg.endLat - seg.startLat) * mPerDegLat
+                let dLon = (seg.endLon - seg.startLon) * mPerDegLon
+                let length = sqrt(dLat * dLat + dLon * dLon)
+                guard length > 0.5 else { continue }
+                clippedSegments.append(ClippedSegment(
+                    row: row,
+                    startLat: seg.startLat, startLon: seg.startLon,
+                    endLat: seg.endLat, endLon: seg.endLon,
+                    length: length
+                ))
+            }
         }
 
-        guard !rowsWithLength.isEmpty else { return [] }
+        guard !clippedSegments.isEmpty else { return [] }
 
-        let totalRowLength = rowsWithLength.reduce(0.0) { $0 + $1.length }
-        guard totalRowLength > 0 else { return [] }
+        let totalLength = clippedSegments.reduce(0.0) { $0 + $1.length }
+        guard totalLength > 0 else { return [] }
 
-        let spacingMetres = totalRowLength / Double(totalSamples + 1)
+        let spacingMetres = totalLength / Double(totalSamples + 1)
 
         var sites: [SampleSite] = []
         var accumulatedDistance: Double = 0
         var nextSiteDistance = spacingMetres
         var siteIndex = startIndex
 
-        for rowData in rowsWithLength {
-            let row = rowData.row
-            let rowLength = rowData.length
-            let rowStartDist = accumulatedDistance
-            let rowEndDist = accumulatedDistance + rowLength
+        for seg in clippedSegments {
+            let segStartDist = accumulatedDistance
+            let segEndDist = accumulatedDistance + seg.length
 
-            while nextSiteDistance <= rowEndDist && sites.count < totalSamples {
-                let distAlongRow = nextSiteDistance - rowStartDist
-                let fraction = distAlongRow / rowLength
+            while nextSiteDistance <= segEndDist && sites.count < totalSamples {
+                let distAlong = nextSiteDistance - segStartDist
+                let fraction = distAlong / seg.length
 
-                let lat = row.startPoint.latitude + fraction * (row.endPoint.latitude - row.startPoint.latitude)
-                let lon = row.startPoint.longitude + fraction * (row.endPoint.longitude - row.startPoint.longitude)
+                let lat = seg.startLat + fraction * (seg.endLat - seg.startLat)
+                let lon = seg.startLon + fraction * (seg.endLon - seg.startLon)
 
                 let site = SampleSite(
                     paddockId: paddock.id,
                     paddockName: paddock.name,
-                    rowNumber: row.number,
+                    rowNumber: seg.row.number,
                     latitude: lat,
                     longitude: lon,
                     siteIndex: siteIndex
@@ -338,23 +351,22 @@ class YieldEstimationViewModel {
                 nextSiteDistance += spacingMetres
             }
 
-            accumulatedDistance = rowEndDist
+            accumulatedDistance = segEndDist
         }
 
         if sites.count < totalSamples {
             let remaining = totalSamples - sites.count
-            let rowCount = rowsWithLength.count
+            let segCount = clippedSegments.count
             for i in 0..<remaining {
-                let rowData = rowsWithLength[i % rowCount]
-                let row = rowData.row
-                let fraction = Double.random(in: 0.15...0.85)
-                let lat = row.startPoint.latitude + fraction * (row.endPoint.latitude - row.startPoint.latitude)
-                let lon = row.startPoint.longitude + fraction * (row.endPoint.longitude - row.startPoint.longitude)
+                let seg = clippedSegments[i % segCount]
+                let fraction = Double(i + 1) / Double(remaining + 1)
+                let lat = seg.startLat + fraction * (seg.endLat - seg.startLat)
+                let lon = seg.startLon + fraction * (seg.endLon - seg.startLon)
 
                 let site = SampleSite(
                     paddockId: paddock.id,
                     paddockName: paddock.name,
-                    rowNumber: row.number,
+                    rowNumber: seg.row.number,
                     latitude: lat,
                     longitude: lon,
                     siteIndex: siteIndex
@@ -365,5 +377,84 @@ class YieldEstimationViewModel {
         }
 
         return sites
+    }
+
+    private struct RowSegment {
+        let startLat: Double
+        let startLon: Double
+        let endLat: Double
+        let endLon: Double
+    }
+
+    private func clipRowToPolygon(row: PaddockRow, polygon: [CoordinatePoint]) -> [RowSegment] {
+        let ax = row.startPoint.longitude
+        let ay = row.startPoint.latitude
+        let bx = row.endPoint.longitude
+        let by = row.endPoint.latitude
+        let dx = bx - ax
+        let dy = by - ay
+
+        var tValues: [Double] = [0.0, 1.0]
+
+        let n = polygon.count
+        for i in 0..<n {
+            let j = (i + 1) % n
+            let cx = polygon[i].longitude
+            let cy = polygon[i].latitude
+            let ex = polygon[j].longitude - cx
+            let ey = polygon[j].latitude - cy
+
+            let denom = dx * ey - dy * ex
+            guard abs(denom) > 1e-15 else { continue }
+
+            let t = ((cx - ax) * ey - (cy - ay) * ex) / denom
+            let u = ((cx - ax) * dy - (cy - ay) * dx) / denom
+
+            if u >= 0 && u <= 1 && t > -0.001 && t < 1.001 {
+                tValues.append(min(max(t, 0), 1))
+            }
+        }
+
+        tValues.sort()
+
+        var segments: [RowSegment] = []
+        for i in 0..<(tValues.count - 1) {
+            let t0 = tValues[i]
+            let t1 = tValues[i + 1]
+            guard t1 - t0 > 1e-10 else { continue }
+
+            let midT = (t0 + t1) / 2.0
+            let midLat = ay + midT * dy
+            let midLon = ax + midT * dx
+
+            if pointInPolygon(lat: midLat, lon: midLon, polygon: polygon) {
+                segments.append(RowSegment(
+                    startLat: ay + t0 * dy, startLon: ax + t0 * dx,
+                    endLat: ay + t1 * dy, endLon: ax + t1 * dx
+                ))
+            }
+        }
+
+        return segments
+    }
+
+    private func pointInPolygon(lat: Double, lon: Double, polygon: [CoordinatePoint]) -> Bool {
+        let n = polygon.count
+        guard n >= 3 else { return false }
+        var inside = false
+        var j = n - 1
+        for i in 0..<n {
+            let yi = polygon[i].latitude
+            let xi = polygon[i].longitude
+            let yj = polygon[j].latitude
+            let xj = polygon[j].longitude
+
+            if ((yi > lat) != (yj > lat)) &&
+                (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) {
+                inside.toggle()
+            }
+            j = i
+        }
+        return inside
     }
 }
