@@ -502,8 +502,7 @@ struct StatDetailSheet: View {
         List {
             Section {
                 HStack(spacing: 12) {
-                    Image(systemName: "leaf.fill")
-                        .font(.title2)
+                    GrapeLeafIcon(size: 22)
                         .foregroundStyle(.mint)
                         .frame(width: 44, height: 44)
                         .background(Color.mint.opacity(0.12), in: .rect(cornerRadius: 10))
@@ -521,7 +520,7 @@ struct StatDetailSheet: View {
             Section("\(allVineyards.count) vineyard\(allVineyards.count == 1 ? "" : "s")") {
                 ForEach(allVineyards, id: \.name) { vineyard in
                     HStack(spacing: 12) {
-                        Image(systemName: "leaf.fill")
+                        GrapeLeafIcon(size: 16)
                             .foregroundStyle(VineyardTheme.leafGreen)
                             .frame(width: 32, height: 32)
                             .background(VineyardTheme.leafGreen.opacity(0.1), in: Circle())
@@ -583,8 +582,7 @@ struct StatUserRow: View {
                     }
                 case .avgVineyards:
                     HStack(spacing: 3) {
-                        Image(systemName: "leaf.fill")
-                            .font(.system(size: 10))
+                        GrapeLeafIcon(size: 10)
                             .foregroundStyle(VineyardTheme.leafGreen)
                         Text("\(user.vineyard_count)")
                             .font(.caption.weight(.semibold))
@@ -684,9 +682,8 @@ struct AdminUserDetailSheet: View {
                     } else {
                         ForEach(user.vineyardList, id: \.self) { name in
                             HStack(spacing: 10) {
-                                Image(systemName: "leaf.fill")
+                                GrapeLeafIcon(size: 14)
                                     .foregroundStyle(VineyardTheme.leafGreen)
-                                    .font(.subheadline)
                                 Text(name)
                             }
                         }

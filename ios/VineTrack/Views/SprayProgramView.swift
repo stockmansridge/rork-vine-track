@@ -431,7 +431,7 @@ struct SprayProgramView: View {
                     }
 
                     if let paddockName = trip?.paddockName, !paddockName.isEmpty {
-                        Label(paddockName, systemImage: "leaf")
+                        Label { Text(paddockName) } icon: { GrapeLeafIcon(size: 12) }
                             .font(.caption)
                             .foregroundStyle(VineyardTheme.olive)
                     }
@@ -608,7 +608,7 @@ struct SprayProgramDetailSheet: View {
                 .foregroundStyle(record.sprayReference.isEmpty ? .primary : .secondary)
 
             if let trip = trip, !trip.paddockName.isEmpty {
-                Label(trip.paddockName, systemImage: "leaf")
+                Label { Text(trip.paddockName) } icon: { GrapeLeafIcon(size: 14) }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

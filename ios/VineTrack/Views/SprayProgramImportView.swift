@@ -106,7 +106,7 @@ struct SprayProgramImportView: View {
                             }
 
                             if !row.blockName.isEmpty {
-                                Label(row.blockName, systemImage: "leaf")
+                                Label { Text(row.blockName) } icon: { GrapeLeafIcon(size: 12) }
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

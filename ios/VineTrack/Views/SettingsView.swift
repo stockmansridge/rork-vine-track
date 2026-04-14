@@ -241,8 +241,7 @@ struct SettingsView: View {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(VineyardTheme.leafGreen.gradient)
                             .frame(width: 32, height: 32)
-                        Image(systemName: "leaf.fill")
-                            .font(.subheadline.weight(.semibold))
+                        GrapeLeafIcon(size: 16)
                             .foregroundStyle(.white)
                     }
                     VStack(alignment: .leading, spacing: 2) {

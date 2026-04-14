@@ -286,7 +286,7 @@ private struct SprayTripProgramRow: View {
                 }
 
                 if let paddockName = trip?.paddockName, !paddockName.isEmpty {
-                    Label(paddockName, systemImage: "leaf")
+                    Label { Text(paddockName) } icon: { GrapeLeafIcon(size: 12) }
                         .font(.caption)
                         .foregroundStyle(VineyardTheme.olive)
                 }

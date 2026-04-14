@@ -199,7 +199,7 @@ struct SprayCalculatorView: View {
                 }
             } label: {
                 HStack {
-                    SectionHeader(title: "Paddocks", icon: "leaf")
+                    PaddockSectionHeader(title: "Paddocks")
                     Spacer()
                     if !selectedPaddockIds.isEmpty {
                         Text("\(selectedPaddockIds.count) selected")
