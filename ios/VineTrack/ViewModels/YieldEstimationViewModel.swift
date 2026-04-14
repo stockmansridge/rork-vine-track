@@ -114,25 +114,44 @@ class YieldEstimationViewModel {
     }
 
     private func sortSitesForPath(sites: [SampleSite], paddock: Paddock) -> [SampleSite] {
+        let mPerDegLat = 111_320.0
+        let centroidLat = paddock.polygonPoints.map(\.latitude).reduce(0, +) / Double(max(1, paddock.polygonPoints.count))
+        let centroidLon = paddock.polygonPoints.map(\.longitude).reduce(0, +) / Double(max(1, paddock.polygonPoints.count))
+        let mPerDegLon = 111_320.0 * cos(centroidLat * .pi / 180.0)
+        let rowAngleRad = paddock.rowDirection * .pi / 180.0
+
         let rowGroups = Dictionary(grouping: sites, by: \.rowNumber)
-        let sortedRowNumbers = rowGroups.keys.sorted()
+
+        let sortedRowNumbers = rowGroups.keys.sorted { a, b in
+            let rowA = paddock.rows.first { $0.number == a }
+            let rowB = paddock.rows.first { $0.number == b }
+            guard let rA = rowA, let rB = rowB else { return a < b }
+            let cAx = ((rA.startPoint.longitude + rA.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
+            let cAy = ((rA.startPoint.latitude + rA.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
+            let cBx = ((rB.startPoint.longitude + rB.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
+            let cBy = ((rB.startPoint.latitude + rB.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
+            let projA = cAx * cos(rowAngleRad) - cAy * sin(rowAngleRad)
+            let projB = cBx * cos(rowAngleRad) - cBy * sin(rowAngleRad)
+            return projA < projB
+        }
 
         var result: [SampleSite] = []
 
-        for rowNum in sortedRowNumbers {
+        for (idx, rowNum) in sortedRowNumbers.enumerated() {
             guard var rowSites = rowGroups[rowNum] else { continue }
 
-            let row = paddock.rows.first { $0.number == rowNum }
-            if let row {
-                let bearing = atan2(
-                    row.endPoint.longitude - row.startPoint.longitude,
-                    row.endPoint.latitude - row.startPoint.latitude
-                )
-                rowSites.sort { a, b in
-                    let projA = (a.latitude - row.startPoint.latitude) * cos(bearing) + (a.longitude - row.startPoint.longitude) * sin(bearing)
-                    let projB = (b.latitude - row.startPoint.latitude) * cos(bearing) + (b.longitude - row.startPoint.longitude) * sin(bearing)
-                    return projA < projB
-                }
+            rowSites.sort { a, b in
+                let ax = (a.longitude - centroidLon) * mPerDegLon
+                let ay = (a.latitude - centroidLat) * mPerDegLat
+                let bx = (b.longitude - centroidLon) * mPerDegLon
+                let by = (b.latitude - centroidLat) * mPerDegLat
+                let projA = ax * sin(rowAngleRad) + ay * cos(rowAngleRad)
+                let projB = bx * sin(rowAngleRad) + by * cos(rowAngleRad)
+                return projA < projB
+            }
+
+            if idx % 2 == 1 {
+                rowSites.reverse()
             }
 
             result.append(contentsOf: rowSites)
@@ -148,13 +167,16 @@ class YieldEstimationViewModel {
         let toRow = paddock.rows.first { $0.number == to.rowNumber }
         guard let fromRow, let toRow else { return [] }
 
-        let fromEnd = closerEnd(of: fromRow, to: CoordinatePoint(latitude: from.latitude, longitude: from.longitude))
-        let toStart = closerEnd(of: toRow, to: fromEnd)
+        let fromPoint = CoordinatePoint(latitude: from.latitude, longitude: from.longitude)
+        let fromExit = closerEnd(of: fromRow, to: fromPoint)
+
+        let toPoint = CoordinatePoint(latitude: to.latitude, longitude: to.longitude)
+        let toEntry = closerEnd(of: toRow, to: toPoint)
 
         var points: [CoordinatePoint] = []
-        points.append(fromEnd)
-        if distance(fromEnd, toStart) > 0.00001 {
-            points.append(toStart)
+        points.append(fromExit)
+        if distance(fromExit, toEntry) > 0.00001 {
+            points.append(toEntry)
         }
         return points
     }
@@ -295,7 +317,9 @@ class YieldEstimationViewModel {
 
         let mPerDegLat = 111_320.0
         let centroidLat = polygon.map(\.latitude).reduce(0, +) / Double(polygon.count)
+        let centroidLon = polygon.map(\.longitude).reduce(0, +) / Double(polygon.count)
         let mPerDegLon = 111_320.0 * cos(centroidLat * .pi / 180.0)
+        let rowAngleRad = paddock.rowDirection * .pi / 180.0
 
         struct ClippedSegment {
             let row: PaddockRow
@@ -306,7 +330,7 @@ class YieldEstimationViewModel {
             let length: Double
         }
 
-        var clippedSegments: [ClippedSegment] = []
+        var segmentsByRow: [Int: [ClippedSegment]] = [:]
 
         for row in rows {
             let segments = clipRowToPolygon(row: row, polygon: polygon)
@@ -315,7 +339,7 @@ class YieldEstimationViewModel {
                 let dLon = (seg.endLon - seg.startLon) * mPerDegLon
                 let length = sqrt(dLat * dLat + dLon * dLon)
                 guard length > 0.5 else { continue }
-                clippedSegments.append(ClippedSegment(
+                segmentsByRow[row.number, default: []].append(ClippedSegment(
                     row: row,
                     startLat: seg.startLat, startLon: seg.startLon,
                     endLat: seg.endLat, endLon: seg.endLon,
@@ -324,9 +348,60 @@ class YieldEstimationViewModel {
             }
         }
 
-        guard !clippedSegments.isEmpty else { return [] }
+        guard !segmentsByRow.isEmpty else { return [] }
 
-        let totalLength = clippedSegments.reduce(0.0) { $0 + $1.length }
+        let sortedRowNumbers = segmentsByRow.keys.sorted { a, b in
+            let rowA = rows.first { $0.number == a }
+            let rowB = rows.first { $0.number == b }
+            guard let rA = rowA, let rB = rowB else { return a < b }
+            let cAx = ((rA.startPoint.longitude + rA.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
+            let cAy = ((rA.startPoint.latitude + rA.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
+            let cBx = ((rB.startPoint.longitude + rB.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
+            let cBy = ((rB.startPoint.latitude + rB.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
+            let projA = cAx * cos(rowAngleRad) - cAy * sin(rowAngleRad)
+            let projB = cBx * cos(rowAngleRad) - cBy * sin(rowAngleRad)
+            return projA < projB
+        }
+
+        var orderedSegments: [ClippedSegment] = []
+
+        for (idx, rowNum) in sortedRowNumbers.enumerated() {
+            guard var segs = segmentsByRow[rowNum] else { continue }
+
+            segs.sort { a, b in
+                let ax = (a.startLon - centroidLon) * mPerDegLon
+                let ay = (a.startLat - centroidLat) * mPerDegLat
+                let bx = (b.startLon - centroidLon) * mPerDegLon
+                let by = (b.startLat - centroidLat) * mPerDegLat
+                let projA = ax * sin(rowAngleRad) + ay * cos(rowAngleRad)
+                let projB = bx * sin(rowAngleRad) + by * cos(rowAngleRad)
+                return projA < projB
+            }
+
+            segs = segs.map { seg in
+                let sx = (seg.startLon - centroidLon) * mPerDegLon
+                let sy = (seg.startLat - centroidLat) * mPerDegLat
+                let ex = (seg.endLon - centroidLon) * mPerDegLon
+                let ey = (seg.endLat - centroidLat) * mPerDegLat
+                let projS = sx * sin(rowAngleRad) + sy * cos(rowAngleRad)
+                let projE = ex * sin(rowAngleRad) + ey * cos(rowAngleRad)
+                if projS <= projE { return seg }
+                return ClippedSegment(row: seg.row, startLat: seg.endLat, startLon: seg.endLon, endLat: seg.startLat, endLon: seg.startLon, length: seg.length)
+            }
+
+            if idx % 2 == 1 {
+                segs.reverse()
+                segs = segs.map { seg in
+                    ClippedSegment(row: seg.row, startLat: seg.endLat, startLon: seg.endLon, endLat: seg.startLat, endLon: seg.startLon, length: seg.length)
+                }
+            }
+
+            orderedSegments.append(contentsOf: segs)
+        }
+
+        guard !orderedSegments.isEmpty else { return [] }
+
+        let totalLength = orderedSegments.reduce(0.0) { $0 + $1.length }
         guard totalLength > 0 else { return [] }
 
         let spacingMetres = totalLength / Double(totalSamples + 1)
@@ -336,7 +411,7 @@ class YieldEstimationViewModel {
         var nextSiteDistance = spacingMetres
         var siteIndex = startIndex
 
-        for seg in clippedSegments {
+        for seg in orderedSegments {
             let segStartDist = accumulatedDistance
             let segEndDist = accumulatedDistance + seg.length
 
@@ -365,9 +440,9 @@ class YieldEstimationViewModel {
 
         if sites.count < totalSamples {
             let remaining = totalSamples - sites.count
-            let segCount = clippedSegments.count
+            let segCount = orderedSegments.count
             for i in 0..<remaining {
-                let seg = clippedSegments[i % segCount]
+                let seg = orderedSegments[i % segCount]
                 let fraction = Double(i + 1) / Double(remaining + 1)
                 let lat = seg.startLat + fraction * (seg.endLat - seg.startLat)
                 let lon = seg.startLon + fraction * (seg.endLon - seg.startLon)
