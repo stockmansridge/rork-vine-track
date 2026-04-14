@@ -3,6 +3,7 @@ import SwiftUI
 struct DataPrivacySettingsView: View {
     @Environment(DataStore.self) private var store
     @Environment(CloudSyncService.self) private var cloudSync
+    @Environment(\.accessControl) private var accessControl
     @State private var showDeletePinsAlert: Bool = false
     @State private var showDeleteTripsAlert: Bool = false
     @State private var isSyncing: Bool = false
@@ -32,38 +33,40 @@ struct DataPrivacySettingsView: View {
                 Text("Current Data")
             }
 
-            Section {
-                Button(role: .destructive) {
-                    showDeletePinsAlert = true
-                } label: {
-                    Label("Delete All Pins", systemImage: "mappin.slash")
-                }
-                .alert("Delete All Pins?", isPresented: $showDeletePinsAlert) {
-                    Button("Cancel", role: .cancel) {}
-                    Button("Delete All", role: .destructive) {
-                        store.deleteAllPins()
+            if accessControl?.canDelete ?? true {
+                Section {
+                    Button(role: .destructive) {
+                        showDeletePinsAlert = true
+                    } label: {
+                        Label("Delete All Pins", systemImage: "mappin.slash")
                     }
-                } message: {
-                    Text("This will permanently delete all \(store.pins.count) pin\(store.pins.count == 1 ? "" : "s") in the current vineyard. This cannot be undone.")
-                }
+                    .alert("Delete All Pins?", isPresented: $showDeletePinsAlert) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Delete All", role: .destructive) {
+                            store.deleteAllPins()
+                        }
+                    } message: {
+                        Text("This will permanently delete all \(store.pins.count) pin\(store.pins.count == 1 ? "" : "s") in the current vineyard. This cannot be undone.")
+                    }
 
-                Button(role: .destructive) {
-                    showDeleteTripsAlert = true
-                } label: {
-                    Label("Delete All Trips", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
-                }
-                .alert("Delete All Trips?", isPresented: $showDeleteTripsAlert) {
-                    Button("Cancel", role: .cancel) {}
-                    Button("Delete All", role: .destructive) {
-                        store.deleteAllTrips()
+                    Button(role: .destructive) {
+                        showDeleteTripsAlert = true
+                    } label: {
+                        Label("Delete All Trips", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
                     }
-                } message: {
-                    Text("This will permanently delete all \(store.trips.count) trip\(store.trips.count == 1 ? "" : "s") in the current vineyard. This cannot be undone.")
+                    .alert("Delete All Trips?", isPresented: $showDeleteTripsAlert) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Delete All", role: .destructive) {
+                            store.deleteAllTrips()
+                        }
+                    } message: {
+                        Text("This will permanently delete all \(store.trips.count) trip\(store.trips.count == 1 ? "" : "s") in the current vineyard. This cannot be undone.")
+                    }
+                } header: {
+                    Text("Delete Data")
+                } footer: {
+                    Text("Permanently remove pins or trips from the current vineyard.")
                 }
-            } header: {
-                Text("Delete Data")
-            } footer: {
-                Text("Permanently remove pins or trips from the current vineyard.")
             }
         }
         .navigationTitle("Data Management")

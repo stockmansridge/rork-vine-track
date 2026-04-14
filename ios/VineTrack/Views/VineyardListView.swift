@@ -2,6 +2,7 @@ import SwiftUI
 
 struct VineyardListView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @State private var showAddVineyard: Bool = false
 
     var body: some View {
@@ -70,10 +71,12 @@ struct VineyardListView: View {
             ForEach(store.vineyards) { vineyard in
                 VineyardCardRow(vineyard: vineyard, isSelected: vineyard.id == store.selectedVineyardId)
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            store.deleteVineyard(vineyard)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        if accessControl?.canDelete ?? true {
+                            Button(role: .destructive) {
+                                store.deleteVineyard(vineyard)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
             }

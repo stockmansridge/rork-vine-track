@@ -4,6 +4,7 @@ struct ButtonTemplateListView: View {
     let mode: PinMode
     @Environment(DataStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessControl) private var accessControl
     @State private var editingTemplate: ButtonTemplate?
     @State private var showAddTemplate: Bool = false
 
@@ -28,10 +29,12 @@ struct ButtonTemplateListView: View {
                             templateRow(template)
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                store.deleteButtonTemplate(template)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                            if accessControl?.canDelete ?? true {
+                                Button(role: .destructive) {
+                                    store.deleteButtonTemplate(template)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
 
                             Button {

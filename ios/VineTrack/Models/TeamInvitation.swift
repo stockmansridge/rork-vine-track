@@ -16,7 +16,7 @@ nonisolated struct TeamInvitation: Codable, Identifiable, Sendable, Hashable {
         vineyard_id: String,
         vineyard_name: String? = nil,
         email: String,
-        role: String = "Member",
+        role: String = "Operator",
         invited_by: String? = nil,
         invited_by_name: String? = nil,
         status: String = "pending",

@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(AnalyticsService.self) private var analytics
     @Environment(AdminService.self) private var adminService
     @Environment(StoreViewModel.self) private var storeVM
+    @Environment(\.accessControl) private var accessControl
     @State private var selectedLogoItem: PhotosPickerItem?
     @State private var showAdminDashboard: Bool = false
     @State private var showVineyardList: Bool = false
@@ -204,7 +205,7 @@ struct SettingsView: View {
                 handleLogoSelection(newItem)
             }
 
-            if store.selectedVineyard?.logoData != nil {
+            if store.selectedVineyard?.logoData != nil && (accessControl?.canDelete ?? true) {
                 Button(role: .destructive) {
                     store.updateVineyardLogo(nil)
                 } label: {

@@ -4,6 +4,7 @@ import MapKit
 struct SprayRecordDetailView: View {
     let record: SprayRecord
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @State private var showEditSheet: Bool = false
     @State private var isGeneratingPDF: Bool = false
     @State private var isMapExpanded: Bool = true
@@ -61,10 +62,12 @@ struct SprayRecordDetailView: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    Button {
-                        sharePDF()
-                    } label: {
-                        Label("Share PDF", systemImage: "square.and.arrow.up")
+                    if accessControl?.canExport ?? true {
+                        Button {
+                            sharePDF()
+                        } label: {
+                            Label("Share PDF", systemImage: "square.and.arrow.up")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")

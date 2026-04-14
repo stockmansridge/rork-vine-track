@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GrowthStageReportView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @State private var selectedVintages: Set<Int> = []
     @State private var selectedPaddockId: UUID?
     @State private var showShareSheet: Bool = false
@@ -124,7 +125,7 @@ struct GrowthStageReportView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if !availableVintages.isEmpty {
+                if !availableVintages.isEmpty && (accessControl?.canExport ?? true) {
                     Button {
                         generatePDF()
                     } label: {

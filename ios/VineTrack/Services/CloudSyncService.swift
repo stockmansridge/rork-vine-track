@@ -246,7 +246,7 @@ class CloudSyncService {
                         VineyardUser(
                             id: UUID(uuidString: m.user_id) ?? UUID(),
                             name: m.name,
-                            role: VineyardRole(rawValue: m.role) ?? .member
+                            role: VineyardRole(rawValue: m.role) ?? .operator_
                         )
                     }
                     var logoData: Data?

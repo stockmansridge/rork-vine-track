@@ -3,6 +3,7 @@ import MapKit
 
 struct DamageRecordsListView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
 
     private var paddocks: [Paddock] {
         store.orderedPaddocks.filter { $0.polygonPoints.count >= 3 }
@@ -218,10 +219,12 @@ struct DamageRecordsListView: View {
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
         .contextMenu {
-            Button(role: .destructive) {
-                store.deleteDamageRecord(record)
-            } label: {
-                Label("Delete Record", systemImage: "trash")
+            if accessControl?.canDelete ?? true {
+                Button(role: .destructive) {
+                    store.deleteDamageRecord(record)
+                } label: {
+                    Label("Delete Record", systemImage: "trash")
+                }
             }
         }
     }

@@ -48,7 +48,7 @@ nonisolated struct VineyardUser: Codable, Identifiable, Sendable, Hashable {
     init(
         id: UUID = UUID(),
         name: String = "",
-        role: VineyardRole = .member,
+        role: VineyardRole = .operator_,
         operatorCategoryId: UUID? = nil
     ) {
         self.id = id
@@ -65,7 +65,7 @@ nonisolated struct VineyardUser: Codable, Identifiable, Sendable, Hashable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
-        role = try container.decodeIfPresent(VineyardRole.self, forKey: .role) ?? .member
+        role = try container.decodeIfPresent(VineyardRole.self, forKey: .role) ?? .operator_
         operatorCategoryId = try container.decodeIfPresent(UUID.self, forKey: .operatorCategoryId)
     }
 }
@@ -73,5 +73,26 @@ nonisolated struct VineyardUser: Codable, Identifiable, Sendable, Hashable {
 nonisolated enum VineyardRole: String, Codable, Sendable, Hashable, CaseIterable {
     case owner = "Owner"
     case manager = "Manager"
-    case member = "Member"
+    case operator_ = "Operator"
+
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        switch rawValue {
+        case "Owner": self = .owner
+        case "Manager": self = .manager
+        case "Operator", "Member": self = .operator_
+        default: self = .operator_
+        }
+    }
+
+    var displayName: String { rawValue }
+
+    var canDelete: Bool {
+        self == .owner || self == .manager
+    }
+
+    var canExport: Bool {
+        self == .owner || self == .manager
+    }
 }

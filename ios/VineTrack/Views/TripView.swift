@@ -17,6 +17,7 @@ nonisolated enum TripTypeFilter: String, CaseIterable, Sendable {
 struct TripView: View {
     @Environment(DataStore.self) private var store
     @Environment(LocationService.self) private var locationService
+    @Environment(\.accessControl) private var accessControl
     @State private var showTripTypeChoice: Bool = false
     @State private var showStartSheet: Bool = false
     @State private var showSprayCalculator: Bool = false
@@ -227,6 +228,7 @@ struct TripView: View {
                         .buttonStyle(.plain)
                     }
                     .onDelete { offsets in
+                        guard accessControl?.canDelete ?? true else { return }
                         let trips = filteredAndSortedTrips
                         tripToDelete = offsets.first.map { trips[$0] }
                         showDeleteConfirmation = true
@@ -1535,6 +1537,7 @@ struct ActiveTripView: View {
 struct TripDetailView: View {
     let trip: Trip
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @State private var position: MapCameraPosition = .automatic
     @State private var showSprayForm: Bool = false
     @State private var isGeneratingPDF: Bool = false
@@ -1633,16 +1636,18 @@ struct TripDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 12) {
-                    Button {
-                        generatePDF()
-                    } label: {
-                        if isGeneratingPDF {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "square.and.arrow.up")
+                    if accessControl?.canExport ?? true {
+                        Button {
+                            generatePDF()
+                        } label: {
+                            if isGeneratingPDF {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "square.and.arrow.up")
+                            }
                         }
+                        .disabled(isGeneratingPDF)
                     }
-                    .disabled(isGeneratingPDF)
 
                     if sprayRecord == nil {
                         Button {

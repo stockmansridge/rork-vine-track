@@ -5,7 +5,7 @@ struct InviteMemberSheet: View {
     @Environment(AuthService.self) private var authService
     @Environment(\.dismiss) private var dismiss
     @State private var email: String = ""
-    @State private var selectedRole: VineyardRole = .member
+    @State private var selectedRole: VineyardRole = .operator_
     @State private var isSending: Bool = false
     @State private var showSuccess: Bool = false
 
@@ -55,7 +55,7 @@ struct InviteMemberSheet: View {
                     }
                 }
             }
-            .navigationTitle("Invite Member")
+            .navigationTitle("Invite Operator")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

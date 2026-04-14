@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChemicalsManagementView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @State private var showAddSheet: Bool = false
     @State private var editingChemical: SavedChemical?
     @State private var searchText: String = ""
@@ -25,10 +26,12 @@ struct ChemicalsManagementView: View {
                     ChemicalDetailRow(chemical: chemical)
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        store.deleteSavedChemical(chemical)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    if accessControl?.canDelete ?? true {
+                        Button(role: .destructive) {
+                            store.deleteSavedChemical(chemical)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }

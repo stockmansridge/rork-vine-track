@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct DisclaimerReportView: View {
     @Environment(AdminService.self) private var adminService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessControl) private var accessControl
     @State private var searchText: String = ""
     @State private var isExporting: Bool = false
     @State private var csvFile: DisclaimerCSVFile?
@@ -77,12 +78,14 @@ struct DisclaimerReportView: View {
                     Button("Done") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        exportCSV()
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
+                    if accessControl?.canExport ?? true {
+                        Button {
+                            exportCSV()
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .disabled(adminService.disclaimerAcceptances.isEmpty)
                     }
-                    .disabled(adminService.disclaimerAcceptances.isEmpty)
                 }
             }
             .fileExporter(

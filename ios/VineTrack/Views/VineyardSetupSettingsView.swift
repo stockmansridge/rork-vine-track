@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct VineyardSetupSettingsView: View {
     @Environment(DataStore.self) private var store
     @Environment(LocationService.self) private var locationService
+    @Environment(\.accessControl) private var accessControl
     @State private var showAddPaddock: Bool = false
     @State private var editingPaddock: Paddock?
     @State private var showEditRepairButtons: Bool = false
@@ -171,10 +172,12 @@ struct VineyardSetupSettingsView: View {
                     }
                 }
                 .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        store.deletePaddock(paddock)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    if accessControl?.canDelete ?? true {
+                        Button(role: .destructive) {
+                            store.deletePaddock(paddock)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }
@@ -193,22 +196,24 @@ struct VineyardSetupSettingsView: View {
 
     private var blockExportImportSection: some View {
         Section {
-            Button {
-                exportBlocks()
-            } label: {
-                HStack {
-                    Label("Export Blocks", systemImage: "square.and.arrow.up")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text("\(store.paddocks.count) blocks")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+            if accessControl?.canExport ?? true {
+                Button {
+                    exportBlocks()
+                } label: {
+                    HStack {
+                        Label("Export Blocks", systemImage: "square.and.arrow.up")
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("\(store.paddocks.count) blocks")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
+                .disabled(store.paddocks.isEmpty)
             }
-            .disabled(store.paddocks.isEmpty)
 
             Button {
                 showImportPicker = true

@@ -5,6 +5,7 @@ struct VineyardDetailSheet: View {
     @Environment(DataStore.self) private var store
     @Environment(AuthService.self) private var authService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessControl) private var accessControl
     @State private var showAddUser: Bool = false
     @State private var showEditName: Bool = false
     @State private var showInviteMember: Bool = false
@@ -150,7 +151,7 @@ struct VineyardDetailSheet: View {
                     }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if user.role != .owner {
+                    if user.role != .owner && (accessControl?.canDelete ?? true) {
                         Button(role: .destructive) {
                             removeUser(user)
                         } label: {
@@ -210,16 +211,19 @@ struct VineyardDetailSheet: View {
         }
     }
 
+    @ViewBuilder
     private var dangerSection: some View {
-        Section {
-            Button(role: .destructive) {
-                store.deleteVineyard(vineyard)
-                dismiss()
-            } label: {
-                Label("Delete Vineyard", systemImage: "trash")
+        if accessControl?.canDelete ?? true {
+            Section {
+                Button(role: .destructive) {
+                    store.deleteVineyard(vineyard)
+                    dismiss()
+                } label: {
+                    Label("Delete Vineyard", systemImage: "trash")
+                }
+            } footer: {
+                Text("This will permanently delete the vineyard and all its data.")
             }
-        } footer: {
-            Text("This will permanently delete the vineyard and all its data.")
         }
     }
 
@@ -247,7 +251,7 @@ struct VineyardDetailSheet: View {
         switch role {
         case .owner: return .orange
         case .manager: return .blue
-        case .member: return .green
+        case .operator_: return .green
         }
     }
 }
@@ -257,7 +261,7 @@ struct AddUserSheet: View {
     @Environment(DataStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var userName: String = ""
-    @State private var selectedRole: VineyardRole = .member
+    @State private var selectedRole: VineyardRole = .operator_
 
     var body: some View {
         NavigationStack {

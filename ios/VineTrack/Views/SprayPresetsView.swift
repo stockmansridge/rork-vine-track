@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SprayPresetsView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @State private var showAddChemical: Bool = false
     @State private var showAddPreset: Bool = false
     @State private var editingChemical: SavedChemical?
@@ -57,10 +58,12 @@ struct SprayPresetsView: View {
                     }
                 }
                 .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        store.deleteSavedChemical(chemical)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    if accessControl?.canDelete ?? true {
+                        Button(role: .destructive) {
+                            store.deleteSavedChemical(chemical)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }
@@ -104,10 +107,12 @@ struct SprayPresetsView: View {
                     }
                 }
                 .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        store.deleteSavedSprayPreset(preset)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    if accessControl?.canDelete ?? true {
+                        Button(role: .destructive) {
+                            store.deleteSavedSprayPreset(preset)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }

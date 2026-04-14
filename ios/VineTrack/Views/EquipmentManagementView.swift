@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EquipmentManagementView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @State private var showAddSheet: Bool = false
     @State private var editingEquipment: SprayEquipmentItem?
     @State private var showAddTractorSheet: Bool = false
@@ -19,10 +20,12 @@ struct EquipmentManagementView: View {
                         EquipmentRow(equipment: item)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            store.deleteSprayEquipment(item)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        if accessControl?.canDelete ?? true {
+                            Button(role: .destructive) {
+                                store.deleteSprayEquipment(item)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
@@ -49,10 +52,12 @@ struct EquipmentManagementView: View {
                         TractorRow(tractor: tractor)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            store.deleteTractor(tractor)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        if accessControl?.canDelete ?? true {
+                            Button(role: .destructive) {
+                                store.deleteTractor(tractor)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
@@ -81,10 +86,12 @@ struct EquipmentManagementView: View {
                         FuelPurchaseRow(purchase: purchase)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            store.deleteFuelPurchase(purchase)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        if accessControl?.canDelete ?? true {
+                            Button(role: .destructive) {
+                                store.deleteFuelPurchase(purchase)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }

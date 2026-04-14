@@ -11,6 +11,7 @@ struct VineTrackApp: App {
     @State private var adminService = AdminService()
     @State private var tripTrackingService = TripTrackingService()
     @State private var storeViewModel = StoreViewModel()
+    @State private var accessControl: AccessControl?
 
     init() {
         #if DEBUG
@@ -32,7 +33,9 @@ struct VineTrackApp: App {
                 .environment(adminService)
                 .environment(tripTrackingService)
                 .environment(storeViewModel)
+                .environment(\.accessControl, accessControl)
                 .task {
+                    accessControl = AccessControl(store: store, authService: authService)
                     locationService.requestPermission()
                     store.cloudSync = cloudSync
                     store.analytics = analytics

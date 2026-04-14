@@ -4,6 +4,7 @@ import MapKit
 struct PinsView: View {
     @Environment(DataStore.self) private var store
     @Environment(LocationService.self) private var locationService
+    @Environment(\.accessControl) private var accessControl
     @State private var viewMode: PinsViewMode = .list
     @State private var filterModes: Set<PinMode> = []
     @State private var completionFilter: PinCompletionFilter = .notDone
@@ -74,23 +75,25 @@ struct PinsView: View {
             .navigationTitle("Pins")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showExportOptions = true
-                    } label: {
-                        if isExporting {
-                            ProgressView()
-                        } else {
-                            Label("Export", systemImage: "square.and.arrow.up")
+                    if accessControl?.canExport ?? true {
+                        Button {
+                            showExportOptions = true
+                        } label: {
+                            if isExporting {
+                                ProgressView()
+                            } else {
+                                Label("Export", systemImage: "square.and.arrow.up")
+                            }
                         }
-                    }
-                    .disabled(filteredPins.isEmpty || isExporting)
-                    .confirmationDialog("Export Pins", isPresented: $showExportOptions) {
-                        Button("Export as PDF") { exportPins(format: .pdf) }
-                        Button("Export as CSV (Excel)") { exportPins(format: .csv) }
-                        Button("Export Both (PDF + CSV)") { exportPins(format: .both) }
-                        Button("Cancel", role: .cancel) {}
-                    } message: {
-                        Text("Choose export format for \(filteredPins.count) pins")
+                        .disabled(filteredPins.isEmpty || isExporting)
+                        .confirmationDialog("Export Pins", isPresented: $showExportOptions) {
+                            Button("Export as PDF") { exportPins(format: .pdf) }
+                            Button("Export as CSV (Excel)") { exportPins(format: .csv) }
+                            Button("Export Both (PDF + CSV)") { exportPins(format: .both) }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("Choose export format for \(filteredPins.count) pins")
+                        }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -454,6 +457,7 @@ struct PinsListView: View {
     @Environment(DataStore.self) private var store
     @Environment(LocationService.self) private var locationService
     @Environment(AuthService.self) private var authService
+    @Environment(\.accessControl) private var accessControl
     @State private var selectedPinForMap: VinePin?
     @State private var selectedPinForDirections: VinePin?
     @State private var selectedPinForPhoto: VinePin?
@@ -512,9 +516,11 @@ struct PinsListView: View {
             .ignoresSafeArea()
         }
         .confirmationDialog("Delete Pin?", isPresented: $showDeleteConfirmation, presenting: pinToDelete) { pin in
-            Button("Delete", role: .destructive) {
-                store.deletePin(pin)
-                pinToDelete = nil
+            if accessControl?.canDelete ?? true {
+                Button("Delete", role: .destructive) {
+                    store.deletePin(pin)
+                    pinToDelete = nil
+                }
             }
         } message: { pin in
             Text("Delete \"\(pin.buttonName)\" pin? This cannot be undone.")
@@ -551,6 +557,7 @@ struct PinRowView: View {
     let onPhoto: () -> Void
     let onComplete: () -> Void
     let onDelete: () -> Void
+    @Environment(\.accessControl) private var accessControl
     @State private var showFullPhoto: Bool = false
 
     private var headingText: String {
@@ -668,8 +675,10 @@ struct PinRowView: View {
                     color: pin.isCompleted ? .orange : VineyardTheme.leafGreen,
                     action: onComplete
                 )
-                Spacer()
-                ActionButton(icon: "trash", label: "Delete", color: .red, action: onDelete)
+                if accessControl?.canDelete ?? true {
+                    Spacer()
+                    ActionButton(icon: "trash", label: "Delete", color: .red, action: onDelete)
+                }
             }
             .padding(.top, 2)
         }
@@ -892,6 +901,7 @@ struct PinDetailSheet: View {
     @Environment(DataStore.self) private var store
     @Environment(AuthService.self) private var authService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessControl) private var accessControl
 
     private var paddockName: String {
         guard let paddockId = pin.paddockId else { return "—" }
@@ -964,11 +974,13 @@ struct PinDetailSheet: View {
                         )
                     }
 
-                    Button(role: .destructive) {
-                        store.deletePin(pin)
-                        dismiss()
-                    } label: {
-                        Label("Delete Pin", systemImage: "trash")
+                    if accessControl?.canDelete ?? true {
+                        Button(role: .destructive) {
+                            store.deletePin(pin)
+                            dismiss()
+                        } label: {
+                            Label("Delete Pin", systemImage: "trash")
+                        }
                     }
                 }
             }

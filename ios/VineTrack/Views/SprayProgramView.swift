@@ -18,6 +18,7 @@ nonisolated enum SprayStatusFilter: String, CaseIterable, Sendable {
 
 struct SprayProgramView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @State private var selectedRecord: SprayRecord?
     @State private var searchText: String = ""
     @State private var sortOption: SprayProgramSortOption = .date
@@ -220,56 +221,58 @@ struct SprayProgramView: View {
             .searchable(text: $searchText, prompt: "Search spray records")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        if !statusFilteredRecords.isEmpty {
-                            ShareLink(
-                                item: SprayProgramExportService.generateProgramPDF(
-                                    records: statusFilteredRecords,
-                                    trips: store.trips,
-                                    paddocks: store.paddocks,
-                                    vineyardName: store.selectedVineyard?.name ?? "",
-                                    logoData: store.selectedVineyard?.logoData,
-                                    tractors: store.tractors,
-                                    seasonFuelCostPerLitre: store.seasonFuelCostPerLitre,
-                                    operatorCategories: store.operatorCategories,
-                                    vineyardUsers: store.selectedVineyard?.users ?? []
-                                ),
-                                preview: SharePreview("Spray Program PDF", image: Image(systemName: "doc.fill"))
-                            ) {
-                                Label("Export as PDF", systemImage: "doc.richtext")
+                    if accessControl?.canExport ?? true {
+                        Menu {
+                            if !statusFilteredRecords.isEmpty {
+                                ShareLink(
+                                    item: SprayProgramExportService.generateProgramPDF(
+                                        records: statusFilteredRecords,
+                                        trips: store.trips,
+                                        paddocks: store.paddocks,
+                                        vineyardName: store.selectedVineyard?.name ?? "",
+                                        logoData: store.selectedVineyard?.logoData,
+                                        tractors: store.tractors,
+                                        seasonFuelCostPerLitre: store.seasonFuelCostPerLitre,
+                                        operatorCategories: store.operatorCategories,
+                                        vineyardUsers: store.selectedVineyard?.users ?? []
+                                    ),
+                                    preview: SharePreview("Spray Program PDF", image: Image(systemName: "doc.fill"))
+                                ) {
+                                    Label("Export as PDF", systemImage: "doc.richtext")
+                                }
+
+                                ShareLink(
+                                    item: SprayProgramCSVService.exportRecords(
+                                        records: statusFilteredRecords,
+                                        trips: store.trips,
+                                        vineyardName: store.selectedVineyard?.name ?? "",
+                                        growthStageLookup: { record in
+                                            elStageForRecord(record)
+                                        }
+                                    ),
+                                    preview: SharePreview("Spray Program CSV", image: Image(systemName: "tablecells"))
+                                ) {
+                                    Label("Export as Excel (CSV)", systemImage: "tablecells")
+                                }
+
+                                Divider()
                             }
 
                             ShareLink(
-                                item: SprayProgramCSVService.exportRecords(
-                                    records: statusFilteredRecords,
-                                    trips: store.trips,
-                                    vineyardName: store.selectedVineyard?.name ?? "",
-                                    growthStageLookup: { record in
-                                        elStageForRecord(record)
-                                    }
-                                ),
-                                preview: SharePreview("Spray Program CSV", image: Image(systemName: "tablecells"))
+                                item: SprayProgramCSVService.generateTemplate(),
+                                preview: SharePreview("Spray Program Template", image: Image(systemName: "doc.badge.arrow.up"))
                             ) {
-                                Label("Export as Excel (CSV)", systemImage: "tablecells")
+                                Label("Download Template", systemImage: "doc.badge.arrow.up")
                             }
 
-                            Divider()
-                        }
-
-                        ShareLink(
-                            item: SprayProgramCSVService.generateTemplate(),
-                            preview: SharePreview("Spray Program Template", image: Image(systemName: "doc.badge.arrow.up"))
-                        ) {
-                            Label("Download Template", systemImage: "doc.badge.arrow.up")
-                        }
-
-                        Button {
-                            showImportPicker = true
+                            Button {
+                                showImportPicker = true
+                            } label: {
+                                Label("Import from CSV", systemImage: "square.and.arrow.down")
+                            }
                         } label: {
-                            Label("Import from CSV", systemImage: "square.and.arrow.down")
+                            Image(systemName: "square.and.arrow.up")
                         }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -465,10 +468,12 @@ struct SprayProgramView: View {
             .contentShape(Rectangle())
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                recordToDelete = record
-            } label: {
-                Label("Delete", systemImage: "trash")
+            if accessControl?.canDelete ?? true {
+                Button(role: .destructive) {
+                    recordToDelete = record
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
             }
         }
     }
@@ -506,6 +511,7 @@ struct SprayElapsedTimeLabel: View {
 struct SprayProgramDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     let record: SprayRecord
     @State private var isMapExpanded: Bool = true
     @State private var isRowsExpanded: Bool = false
@@ -533,7 +539,9 @@ struct SprayProgramDetailSheet: View {
                     if !record.notes.isEmpty {
                         notesSection
                     }
-                    exportSection
+                    if accessControl?.canExport ?? true {
+                        exportSection
+                    }
                     if let trip = trip, !trip.rowSequence.isEmpty {
                         rowsSprayedCard(trip)
                     }

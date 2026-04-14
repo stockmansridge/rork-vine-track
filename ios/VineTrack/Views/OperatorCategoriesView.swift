@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OperatorCategoriesView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @State private var showAddSheet: Bool = false
     @State private var editingCategory: OperatorCategory?
 
@@ -28,10 +29,12 @@ struct OperatorCategoriesView: View {
                         }
                     }
                     .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            store.deleteOperatorCategory(category)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        if accessControl?.canDelete ?? true {
+                            Button(role: .destructive) {
+                                store.deleteOperatorCategory(category)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
