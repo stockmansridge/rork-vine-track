@@ -5,6 +5,7 @@ nonisolated enum TrackingPattern: String, Codable, Sendable, CaseIterable, Ident
     case everySecondRow = "everySecondRow"
     case fiveThree = "fiveThree"
     case upAndBack = "upAndBack"
+    case twoRowUpBack = "twoRowUpBack"
     case custom = "custom"
 
     var id: String { rawValue }
@@ -15,6 +16,7 @@ nonisolated enum TrackingPattern: String, Codable, Sendable, CaseIterable, Ident
         case .everySecondRow: return "Every Second Row"
         case .fiveThree: return "3/5 Pattern"
         case .upAndBack: return "Up and Back"
+        case .twoRowUpBack: return "2 Row Up & Back"
         case .custom: return "Custom"
         }
     }
@@ -25,6 +27,7 @@ nonisolated enum TrackingPattern: String, Codable, Sendable, CaseIterable, Ident
         case .everySecondRow: return "0.5, 2.5, 4.5 ... then 3.5, 1.5"
         case .fiveThree: return "0.5, 3.5, 1.5, 5.5, 2.5 ... +5, -3"
         case .upAndBack: return "0.5, 0.5, 1.5, 1.5 ... each path twice"
+        case .twoRowUpBack: return "Spray 2, Skip 2 up then back"
         case .custom: return "Save & reuse your own sequences"
         }
     }
@@ -35,6 +38,7 @@ nonisolated enum TrackingPattern: String, Codable, Sendable, CaseIterable, Ident
         case .everySecondRow: return "arrow.right.arrow.left"
         case .fiveThree: return "arrow.triangle.swap"
         case .upAndBack: return "arrow.up.arrow.down"
+        case .twoRowUpBack: return "arrow.up.and.down.text.horizontal"
         case .custom: return "slider.horizontal.3"
         }
     }
@@ -82,6 +86,9 @@ nonisolated enum TrackingPattern: String, Codable, Sendable, CaseIterable, Ident
         case .fiveThree:
             result = Self.generateFiveThreeSequence(firstPath: firstPath, totalPaths: totalPaths)
 
+        case .twoRowUpBack:
+            result = Self.generateTwoRowUpBackSequence(firstPath: firstPath, totalPaths: totalPaths)
+
         case .custom:
             result = (0..<totalPaths).map { firstPath + Double($0) }
         }
@@ -89,6 +96,40 @@ nonisolated enum TrackingPattern: String, Codable, Sendable, CaseIterable, Ident
         if reversed {
             result.reverse()
         }
+        return result
+    }
+
+    private static func generateTwoRowUpBackSequence(firstPath: Double, totalPaths: Int) -> [Double] {
+        let lastPath = firstPath + Double(totalPaths - 1)
+
+        var upPaths: [Double] = []
+        var path = firstPath + 1.0
+        while path <= lastPath {
+            upPaths.append(path)
+            path += 4.0
+        }
+
+        var backPaths: [Double] = []
+        path = firstPath + 3.0
+        while path <= lastPath {
+            backPaths.append(path)
+            path += 4.0
+        }
+        backPaths.reverse()
+
+        var result = upPaths + backPaths
+
+        let visited = Set(result)
+        var remaining: [Double] = []
+        var r = firstPath
+        while r <= lastPath {
+            if !visited.contains(r) {
+                remaining.append(r)
+            }
+            r += 1.0
+        }
+        result.append(contentsOf: remaining)
+
         return result
     }
 

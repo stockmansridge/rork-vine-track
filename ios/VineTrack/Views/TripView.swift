@@ -2025,7 +2025,7 @@ struct StartTripSheet: View {
 
     private var patternSection: some View {
         Section {
-            ForEach([TrackingPattern.sequential, .everySecondRow, .fiveThree], id: \.id) { pattern in
+            ForEach([TrackingPattern.sequential, .everySecondRow, .fiveThree, .twoRowUpBack], id: \.id) { pattern in
                 PatternRowView(
                     pattern: pattern,
                     isSelected: selectedPattern == pattern,

@@ -1340,7 +1340,7 @@ struct CalcStartJobSheet: View {
                 .foregroundStyle(.primary)
 
             VStack(spacing: 0) {
-                ForEach([TrackingPattern.sequential, .everySecondRow, .fiveThree], id: \.id) { pattern in
+                ForEach([TrackingPattern.sequential, .everySecondRow, .fiveThree, .twoRowUpBack], id: \.id) { pattern in
                     let isSelected = selectedPattern == pattern
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -1373,7 +1373,7 @@ struct CalcStartJobSheet: View {
                         .padding(.vertical, 10)
                     }
 
-                    if pattern.id != TrackingPattern.fiveThree.id {
+                    if pattern.id != TrackingPattern.twoRowUpBack.id {
                         Divider().padding(.leading, 52)
                     }
                 }
