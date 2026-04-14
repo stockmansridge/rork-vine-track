@@ -1541,6 +1541,7 @@ struct TripDetailView: View {
     @State private var position: MapCameraPosition = .automatic
     @State private var showSprayForm: Bool = false
     @State private var isGeneratingPDF: Bool = false
+    @State private var includeCostingsInExport: Bool = true
 
     private var tripPins: [VinePin] {
         store.pins.filter { $0.tripId == trip.id }
@@ -1637,8 +1638,19 @@ struct TripDetailView: View {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 12) {
                     if accessControl?.canExport ?? true {
-                        Button {
-                            generatePDF()
+                        Menu {
+                            Button {
+                                generatePDF()
+                            } label: {
+                                Label("Export as PDF", systemImage: "doc.richtext")
+                            }
+                            .disabled(isGeneratingPDF)
+
+                            Divider()
+
+                            Toggle(isOn: $includeCostingsInExport) {
+                                Label("Include Costings", systemImage: "dollarsign.circle")
+                            }
                         } label: {
                             if isGeneratingPDF {
                                 ProgressView()
@@ -1865,7 +1877,8 @@ struct TripDetailView: View {
                 fuelCost: fuelCostValue,
                 chemicalCosts: pdfChemCosts,
                 operatorCost: operatorCostValue,
-                operatorCategoryName: operatorCatNameValue
+                operatorCategoryName: operatorCatNameValue,
+                includeCostings: includeCostingsInExport
             )
             let fileName = "TripReport_\(paddockName.isEmpty ? "Trip" : paddockName)_\(currentTrip.startTime.formatted(date: .numeric, time: .omitted))"
             let url = TripPDFService.savePDFToTemp(data: pdfData, fileName: fileName)

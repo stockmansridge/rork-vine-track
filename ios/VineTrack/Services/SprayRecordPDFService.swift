@@ -3,7 +3,7 @@ import PDFKit
 import MapKit
 
 struct SprayRecordPDFService {
-    static func generatePDF(record: SprayRecord, trip: Trip?, vineyardName: String, paddockName: String, personName: String, paddocks: [Paddock] = [], mapSnapshot: UIImage? = nil, logoData: Data? = nil, fuelCost: Double = 0, operatorCost: Double = 0, operatorCategoryName: String? = nil) -> Data {
+    static func generatePDF(record: SprayRecord, trip: Trip?, vineyardName: String, paddockName: String, personName: String, paddocks: [Paddock] = [], mapSnapshot: UIImage? = nil, logoData: Data? = nil, fuelCost: Double = 0, operatorCost: Double = 0, operatorCategoryName: String? = nil, includeCostings: Bool = true) -> Data {
         let pageWidth: CGFloat = 595.0
         let pageHeight: CGFloat = 842.0
         let margin: CGFloat = 40.0
@@ -297,7 +297,7 @@ struct SprayRecordPDFService {
             let totalSprayCost = chemCosts.reduce(0.0) { $0 + $1.1 }
 
             let hasCosts = !chemCosts.isEmpty || fuelCost > 0 || operatorCost > 0
-            if hasCosts {
+            if hasCosts && includeCostings {
                 drawSectionHeader("Costs")
                 for (name, cost) in chemCosts {
                     drawRow(label: name, value: String(format: "$%.2f", cost))

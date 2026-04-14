@@ -31,6 +31,7 @@ struct SprayProgramView: View {
     @State private var importWarnings: [SprayProgramCSVService.ImportWarning] = []
     @State private var importError: String?
     @State private var recordToDelete: SprayRecord?
+    @State private var includeCostings: Bool = true
 
     private func tripForRecord(_ record: SprayRecord) -> Trip? {
         store.trips.first(where: { $0.id == record.tripId })
@@ -234,7 +235,8 @@ struct SprayProgramView: View {
                                         tractors: store.tractors,
                                         seasonFuelCostPerLitre: store.seasonFuelCostPerLitre,
                                         operatorCategories: store.operatorCategories,
-                                        vineyardUsers: store.selectedVineyard?.users ?? []
+                                        vineyardUsers: store.selectedVineyard?.users ?? [],
+                                        includeCostings: includeCostings
                                     ),
                                     preview: SharePreview("Spray Program PDF", image: Image(systemName: "doc.fill"))
                                 ) {
@@ -253,6 +255,12 @@ struct SprayProgramView: View {
                                     preview: SharePreview("Spray Program CSV", image: Image(systemName: "tablecells"))
                                 ) {
                                     Label("Export as Excel (CSV)", systemImage: "tablecells")
+                                }
+
+                                Divider()
+
+                                Toggle(isOn: $includeCostings) {
+                                    Label("Include Costings", systemImage: "dollarsign.circle")
                                 }
 
                                 Divider()
@@ -518,6 +526,7 @@ struct SprayProgramDetailSheet: View {
     @State private var isRowsSectionExpanded: Bool = false
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var isGeneratingPDF: Bool = false
+    @State private var includeCostingsInExport: Bool = true
 
     private var trip: Trip? {
         store.trips.first(where: { $0.id == record.tripId })
@@ -1164,6 +1173,12 @@ struct SprayProgramDetailSheet: View {
                 Spacer()
             }
 
+            Toggle(isOn: $includeCostingsInExport) {
+                Label("Include Costings", systemImage: "dollarsign.circle")
+                    .font(.subheadline)
+            }
+            .tint(VineyardTheme.olive)
+
             Button {
                 sharePDF()
             } label: {
@@ -1219,7 +1234,8 @@ struct SprayProgramDetailSheet: View {
                 logoData: vineyard?.logoData,
                 fuelCost: fuelCostForTrip,
                 operatorCost: operatorCostForTrip,
-                operatorCategoryName: operatorCategoryName
+                operatorCategoryName: operatorCategoryName,
+                includeCostings: includeCostingsInExport
             )
             let dateStr = record.date.formatted(.dateTime.year().month().day())
             let fileName = "SprayRecord_\(dateStr)"

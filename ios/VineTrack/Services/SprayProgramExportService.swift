@@ -11,7 +11,8 @@ struct SprayProgramExportService {
         tractors: [Tractor] = [],
         seasonFuelCostPerLitre: Double = 0,
         operatorCategories: [OperatorCategory] = [],
-        vineyardUsers: [VineyardUser] = []
+        vineyardUsers: [VineyardUser] = [],
+        includeCostings: Bool = true
     ) -> URL {
         let pageWidth: CGFloat = 842.0
         let pageHeight: CGFloat = 595.0
@@ -209,7 +210,7 @@ struct SprayProgramExportService {
             }
 
             let hasCostData = !chemCosts.isEmpty || totalFuelCost > 0 || totalOperatorCost > 0
-            if hasCostData {
+            if hasCostData && includeCostings {
                 y += 8
                 checkPageBreak(needed: 40)
                 let costTitleAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 10, weight: .bold), .foregroundColor: accentColor]

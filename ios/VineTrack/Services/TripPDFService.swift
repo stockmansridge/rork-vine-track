@@ -4,7 +4,7 @@ import MapKit
 import CoreLocation
 
 struct TripPDFService {
-    static func generatePDF(trip: Trip, vineyardName: String, paddockName: String, pinCount: Int, mapSnapshot: UIImage?, logoData: Data? = nil, fuelCost: Double = 0, chemicalCosts: [(String, Double)] = [], operatorCost: Double = 0, operatorCategoryName: String? = nil) -> Data {
+    static func generatePDF(trip: Trip, vineyardName: String, paddockName: String, pinCount: Int, mapSnapshot: UIImage?, logoData: Data? = nil, fuelCost: Double = 0, chemicalCosts: [(String, Double)] = [], operatorCost: Double = 0, operatorCategoryName: String? = nil, includeCostings: Bool = true) -> Data {
         let pageWidth: CGFloat = 595.0
         let pageHeight: CGFloat = 842.0
         let margin: CGFloat = 40.0
@@ -140,7 +140,7 @@ struct TripPDFService {
 
             let hasChemCosts = !chemicalCosts.isEmpty
             let hasCosts = hasChemCosts || fuelCost > 0 || operatorCost > 0
-            if hasCosts {
+            if hasCosts && includeCostings {
                 drawSectionHeader("Costs")
                 let totalChemCost = chemicalCosts.reduce(0.0) { $0 + $1.1 }
                 for (name, cost) in chemicalCosts {
