@@ -22,8 +22,11 @@ struct VineyardSetupSettingsView: View {
     @State private var importData: BlockExportData?
     @State private var importError: String?
 
+    @State private var mapSelectedPaddock: Paddock?
+
     var body: some View {
         Form {
+            vineyardMapSection
             paddocksSection
             blockExportImportSection
             buttonsSection
@@ -49,6 +52,12 @@ struct VineyardSetupSettingsView: View {
         }
         .sheet(item: $editingPaddock) { paddock in
             EditPaddockSheet(paddock: paddock)
+        }
+        .onChange(of: mapSelectedPaddock) { _, newValue in
+            if let paddock = newValue {
+                mapSelectedPaddock = nil
+                editingPaddock = paddock
+            }
         }
         .sheet(isPresented: $showEditRepairButtons) {
             EditButtonsSheet(mode: .repairs)
@@ -95,6 +104,41 @@ struct VineyardSetupSettingsView: View {
             Button("OK") { importError = nil }
         } message: {
             Text(importError ?? "")
+        }
+    }
+
+    private var vineyardMapSection: some View {
+        Section {
+            if store.orderedPaddocks.contains(where: { $0.polygonPoints.count > 2 }) {
+                VineyardBlocksMapView(selectedPaddock: $mapSelectedPaddock)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "map")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                    Text("No block boundaries defined yet")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text("Add blocks with boundary points to see them on the map.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "map.fill")
+                    .foregroundStyle(.blue)
+                    .font(.caption)
+                Text("Vineyard Map")
+            }
+        } footer: {
+            if store.orderedPaddocks.contains(where: { $0.polygonPoints.count > 2 }) {
+                Text("Tap a block on the map to edit its settings.")
+            }
         }
     }
 
