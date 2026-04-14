@@ -9,6 +9,7 @@ struct PreferencesSettingsView: View {
             seasonSection
             trackingSection
             fillTimerSection
+            yieldEstimationSection
             photoSection
             timezoneSection
         }
@@ -92,6 +93,23 @@ struct PreferencesSettingsView: View {
             Text("Fill Timer")
         } footer: {
             Text("When enabled, a Start Fill button appears during spray trips to time how long each tank fill takes. Fill durations are recorded in the spray sheet and PDF export.")
+        }
+    }
+
+    private var yieldEstimationSection: some View {
+        Section {
+            Stepper("Samples per Ha: \(store.settings.samplesPerHectare)", value: Binding(
+                get: { store.settings.samplesPerHectare },
+                set: { newVal in
+                    var s = store.settings
+                    s.samplesPerHectare = newVal
+                    store.updateSettings(s)
+                }
+            ), in: 1...100)
+        } header: {
+            Text("Yield Estimation")
+        } footer: {
+            Text("Number of vine sample sites to generate per hectare when creating yield estimation sample points.")
         }
     }
 

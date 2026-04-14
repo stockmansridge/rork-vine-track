@@ -52,6 +52,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
     var seasonFuelCostPerLitre: Double
     var appearance: AppAppearance
     var fillTimerEnabled: Bool
+    var samplesPerHectare: Int
 
     init(
         id: UUID = UUID(),
@@ -72,7 +73,8 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         canopyWaterRates: CanopyWaterRateEntry = .defaults,
         seasonFuelCostPerLitre: Double = 0,
         appearance: AppAppearance = .system,
-        fillTimerEnabled: Bool = false
+        fillTimerEnabled: Bool = false,
+        samplesPerHectare: Int = 20
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -93,6 +95,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         self.seasonFuelCostPerLitre = seasonFuelCostPerLitre
         self.appearance = appearance
         self.fillTimerEnabled = fillTimerEnabled
+        self.samplesPerHectare = samplesPerHectare
     }
 
     init(from decoder: Decoder) throws {
@@ -116,6 +119,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         seasonFuelCostPerLitre = try container.decodeIfPresent(Double.self, forKey: .seasonFuelCostPerLitre) ?? 0
         appearance = try container.decodeIfPresent(AppAppearance.self, forKey: .appearance) ?? .system
         fillTimerEnabled = try container.decodeIfPresent(Bool.self, forKey: .fillTimerEnabled) ?? false
+        samplesPerHectare = try container.decodeIfPresent(Int.self, forKey: .samplesPerHectare) ?? 20
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
@@ -123,6 +127,6 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         case rowTrackingEnabled, rowTrackingInterval, defaultPaddockId
         case autoPhotoPrompt, enabledGrowthStageCodes, weatherStationId
         case defaultWaterVolume, defaultSprayRate, defaultConcentrationFactor
-        case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance, fillTimerEnabled
+        case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance, fillTimerEnabled, samplesPerHectare
     }
 }

@@ -26,6 +26,7 @@ struct SettingsView: View {
                 PendingInvitationsView()
                 vineyardSection
                 setupSection
+                yieldEstimationSection
                 reportsSection
                 accountNavSection
                 supportSection
@@ -324,6 +325,39 @@ struct SettingsView: View {
                     .foregroundStyle(VineyardTheme.olive)
                     .font(.caption)
                 Text("Manage")
+            }
+        }
+    }
+
+    private var yieldEstimationSection: some View {
+        Section {
+            NavigationLink {
+                YieldEstimationView()
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.purple.gradient)
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "chart.bar.doc.horizontal")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Yield Estimation")
+                            .font(.subheadline.weight(.medium))
+                        Text("Bunch count sample sites")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "chart.bar.doc.horizontal.fill")
+                    .foregroundStyle(.purple)
+                    .font(.caption)
+                Text("Yield Estimation")
             }
         }
     }
