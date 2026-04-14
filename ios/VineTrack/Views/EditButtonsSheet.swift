@@ -8,6 +8,11 @@ struct EditButtonsSheet: View {
     @State private var selectedTemplateId: UUID? = nil
     @State private var showTemplatePicker: Bool = false
 
+    private var hasDuplicateColors: Bool {
+        let colors = pairedRows.map { $0.left.color.lowercased() }
+        return Set(colors).count != colors.count
+    }
+
     private var pairedRows: [(left: ButtonConfig, right: ButtonConfig)] {
         let sorted = buttons.sorted { $0.index < $1.index }
         let leftButtons = sorted.filter { $0.index < 4 }
@@ -47,6 +52,7 @@ struct EditButtonsSheet: View {
                         saveButtons()
                         dismiss()
                     }
+                    .disabled(hasDuplicateColors)
                 }
             }
             .onAppear {
@@ -111,7 +117,13 @@ struct EditButtonsSheet: View {
         } header: {
             Text("Button Rows (Paired Left & Right)")
         } footer: {
-            Text("Each row is paired — the same name and colour applies to both the left and right button.")
+            if hasDuplicateColors {
+                Label("Each button must have a unique colour for filtering and identification.", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .font(.caption)
+            } else {
+                Text("Each row is paired — the same name and colour applies to both the left and right button.")
+            }
         }
     }
 
