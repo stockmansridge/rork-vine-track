@@ -51,7 +51,11 @@ struct EditButtonsSheet: View {
             }
             .onAppear {
                 buttons = store.buttonsForMode(mode)
-                store.ensureDefaultRepairTemplate()
+                if mode == .repairs {
+                    store.ensureDefaultRepairTemplate()
+                } else {
+                    store.ensureDefaultGrowthTemplate()
+                }
                 matchActiveTemplate()
             }
         }

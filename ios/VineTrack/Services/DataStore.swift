@@ -661,6 +661,18 @@ class DataStore {
         saveAllButtonTemplates()
     }
 
+    func ensureDefaultGrowthTemplate() {
+        guard let vid = selectedVineyardId else { return }
+        let growthTemplates = buttonTemplates.filter { $0.mode == .growth }
+        guard growthTemplates.isEmpty else { return }
+        let leftButtons = growthButtons.sorted { $0.index < $1.index }.filter { $0.index < 4 }
+        guard !leftButtons.isEmpty else { return }
+        let entries = leftButtons.map { ButtonTemplateEntry(name: $0.name, color: $0.color, isGrowthStageButton: $0.isGrowthStageButton) }
+        let template = ButtonTemplate(vineyardId: vid, name: "Growth 1", mode: .growth, entries: entries)
+        buttonTemplates.append(template)
+        saveAllButtonTemplates()
+    }
+
     // MARK: - Spray Application
 
     func addSprayApplication(_ application: SprayApplication, tripId: UUID? = nil, tractorName: String = "") {
