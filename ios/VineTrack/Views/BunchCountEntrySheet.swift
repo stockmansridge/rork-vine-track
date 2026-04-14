@@ -1,12 +1,16 @@
 import SwiftUI
+import CoreLocation
 
 struct BunchCountEntrySheet: View {
     let site: SampleSite
     let onSave: (Double, String) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthService.self) private var authService
+    @Environment(LocationService.self) private var locationService
     @State private var bunchCountText: String = ""
     @State private var userName: String = ""
+    @State private var liveDistance: Double?
+    @State private var distanceTimer: Timer?
     @FocusState private var isCountFocused: Bool
 
     var body: some View {
@@ -53,6 +57,39 @@ struct BunchCountEntrySheet: View {
                 }
 
                 Section {
+                    if let dist = liveDistance {
+                        HStack(spacing: 10) {
+                            Image(systemName: "location.fill")
+                                .foregroundStyle(.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Distance to Site")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(formatDistance(dist))
+                                    .font(.title3.weight(.bold).monospacedDigit())
+                                    .foregroundStyle(dist < 5 ? .green : dist < 20 ? .orange : .primary)
+                            }
+                            Spacer()
+                            if dist < 5 {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .font(.title3)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("Getting your location...")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Live Distance")
+                }
+
+                Section {
                     LabeledContent("Date", value: Date.now, format: .dateTime.day().month().year().hour().minute())
                     LabeledContent("Latitude", value: String(format: "%.6f", site.latitude))
                     LabeledContent("Longitude", value: String(format: "%.6f", site.longitude))
@@ -84,7 +121,37 @@ struct BunchCountEntrySheet: View {
                     userName = existing.recordedBy
                 }
                 isCountFocused = true
+                locationService.requestPermission()
+                locationService.startUpdating()
+                updateDistance()
+                distanceTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                    Task { @MainActor in
+                        updateDistance()
+                    }
+                }
             }
+            .onDisappear {
+                distanceTimer?.invalidate()
+                distanceTimer = nil
+                locationService.stopUpdating()
+            }
+        }
+    }
+
+    private func updateDistance() {
+        guard let userLoc = locationService.location else {
+            liveDistance = nil
+            return
+        }
+        let siteLoc = CLLocation(latitude: site.latitude, longitude: site.longitude)
+        liveDistance = userLoc.distance(from: siteLoc)
+    }
+
+    private func formatDistance(_ meters: Double) -> String {
+        if meters < 1000 {
+            return String(format: "%.0f m", meters)
+        } else {
+            return String(format: "%.2f km", meters / 1000)
         }
     }
 }

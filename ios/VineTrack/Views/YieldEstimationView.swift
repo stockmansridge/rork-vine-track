@@ -10,6 +10,8 @@ struct YieldEstimationView: View {
     @State private var showReport: Bool = false
     @State private var bunchWeightText: String = "150"
     @State private var editingBunchWeightPaddockId: UUID?
+    @State private var showFullScreenMap: Bool = false
+    @State private var fullScreenSelectedSite: SampleSite?
 
     private var paddocks: [Paddock] {
         store.orderedPaddocks.filter { $0.polygonPoints.count >= 3 }
@@ -60,6 +62,24 @@ struct YieldEstimationView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showBunchCountSheet) {
             if let site = viewModel.selectedSite {
+                BunchCountEntrySheet(site: site) { count, name in
+                    viewModel.recordBunchCount(siteId: site.id, bunchesPerVine: count, recordedBy: name)
+                    saveSession()
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $showFullScreenMap) {
+            FullScreenPathMapView(
+                paddocks: paddocks.filter { viewModel.selectedPaddockIds.contains($0.id) },
+                sampleSites: viewModel.sampleSites,
+                pathWaypoints: viewModel.pathWaypoints,
+                blockColors: blockColors,
+                colorForPaddock: { colorFor($0) },
+                onSiteSelected: { site in
+                    fullScreenSelectedSite = site
+                }
+            )
+            .sheet(item: $fullScreenSelectedSite) { site in
                 BunchCountEntrySheet(site: site) { count, name in
                     viewModel.recordBunchCount(siteId: site.id, bunchesPerVine: count, recordedBy: name)
                     saveSession()
@@ -179,6 +199,15 @@ struct YieldEstimationView: View {
                 Label("Sample Path", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
                     .font(.headline)
                 Spacer()
+                Button {
+                    showFullScreenMap = true
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(VineyardTheme.leafGreen, in: .rect(cornerRadius: 6))
+                }
                 HStack(spacing: 12) {
                     HStack(spacing: 4) {
                         Image(systemName: "flag.fill")
