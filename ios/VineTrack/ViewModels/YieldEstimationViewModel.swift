@@ -13,6 +13,8 @@ class YieldEstimationViewModel {
     var previousBunchWeights: [BunchWeightRecord] = []
     var selectedSite: SampleSite?
     var sessionId: UUID?
+    var isCompleted: Bool = false
+    var completedAt: Date?
 
     func togglePaddock(_ paddockId: UUID) {
         if selectedPaddockIds.contains(paddockId) {
@@ -348,6 +350,8 @@ class YieldEstimationViewModel {
         isPathGenerated = !session.pathWaypoints.isEmpty
         blockBunchWeightsKg = session.blockBunchWeightsKg
         previousBunchWeights = session.previousBunchWeights
+        isCompleted = session.isCompleted
+        completedAt = session.completedAt
     }
 
     func toSession(vineyardId: UUID, samplesPerHectare: Int) -> YieldEstimationSession {
@@ -359,8 +363,15 @@ class YieldEstimationViewModel {
             sampleSites: sampleSites,
             blockBunchWeightsKg: blockBunchWeightsKg,
             previousBunchWeights: previousBunchWeights,
-            pathWaypoints: pathWaypoints
+            pathWaypoints: pathWaypoints,
+            isCompleted: isCompleted,
+            completedAt: completedAt
         )
+    }
+
+    func markCompleted() {
+        isCompleted = true
+        completedAt = Date()
     }
 
     // MARK: - Sample Generation

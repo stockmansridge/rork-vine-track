@@ -12,6 +12,7 @@ struct YieldEstimationView: View {
     @State private var editingBunchWeightPaddockId: UUID?
     @State private var showFullScreenMap: Bool = false
     @State private var fullScreenSelectedSite: SampleSite?
+    @State private var showCompleteConfirmation: Bool = false
 
     private var paddocks: [Paddock] {
         store.orderedPaddocks.filter { $0.polygonPoints.count >= 3 }
@@ -39,11 +40,21 @@ struct YieldEstimationView: View {
                 generateButton
 
                 if viewModel.isGenerated {
-                    pathButton
+                    if viewModel.isCompleted {
+                        completedBanner
+                    }
+
+                    if !viewModel.isCompleted {
+                        pathButton
+                    }
                     bunchWeightButton
 
                     if viewModel.recordedSiteCount > 0 {
                         reportButton
+                    }
+
+                    if !viewModel.isCompleted && viewModel.recordedSiteCount > 0 {
+                        completeJobButton
                     }
 
                     progressSection
@@ -162,8 +173,10 @@ struct YieldEstimationView: View {
 
                 Annotation("", coordinate: site.coordinate) {
                     Button {
-                        viewModel.selectedSite = site
-                        showBunchCountSheet = true
+                        if !viewModel.isCompleted {
+                            viewModel.selectedSite = site
+                            showBunchCountSheet = true
+                        }
                     } label: {
                         ZStack {
                             Circle()
@@ -550,7 +563,7 @@ struct YieldEstimationView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(VineyardTheme.leafGreen)
-        .disabled(viewModel.selectedPaddockIds.isEmpty)
+        .disabled(viewModel.selectedPaddockIds.isEmpty || viewModel.isCompleted)
     }
 
     // MARK: - Path Button
@@ -589,9 +602,11 @@ struct YieldEstimationView: View {
                 let color = colorFor(paddock)
 
                 Button {
-                    editingBunchWeightPaddockId = paddock.id
-                    bunchWeightText = String(format: "%.0f", weight * 1000)
-                    showBunchWeightEditor = true
+                    if !viewModel.isCompleted {
+                        editingBunchWeightPaddockId = paddock.id
+                        bunchWeightText = String(format: "%.0f", weight * 1000)
+                        showBunchWeightEditor = true
+                    }
                 } label: {
                     HStack(spacing: 10) {
                         Circle()
@@ -629,6 +644,60 @@ struct YieldEstimationView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(.purple)
+    }
+
+    // MARK: - Completed Banner
+
+    private var completedBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "lock.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Job Completed")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                if let completedAt = viewModel.completedAt {
+                    Text(completedAt, format: .dateTime.day().month().year().hour().minute())
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            Spacer()
+            Image(systemName: "checkmark.seal.fill")
+                .font(.title3)
+                .foregroundStyle(.white.opacity(0.8))
+        }
+        .padding(14)
+        .background(VineyardTheme.leafGreen.gradient, in: .rect(cornerRadius: 12))
+    }
+
+    // MARK: - Complete Job Button
+
+    private var completeJobButton: some View {
+        Button {
+            showCompleteConfirmation = true
+        } label: {
+            Label("Complete Job", systemImage: "checkmark.seal.fill")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.green)
+        .confirmationDialog(
+            "Complete Yield Estimation?",
+            isPresented: $showCompleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Complete & Lock") {
+                viewModel.markCompleted()
+                saveSession()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will lock all values for this yield estimation job. Bunch counts and weights can no longer be edited.")
+        }
     }
 
     // MARK: - Progress
@@ -682,8 +751,10 @@ struct YieldEstimationView: View {
 
                     ForEach(sites) { site in
                         Button {
-                            viewModel.selectedSite = site
-                            showBunchCountSheet = true
+                            if !viewModel.isCompleted {
+                                viewModel.selectedSite = site
+                                showBunchCountSheet = true
+                            }
                         } label: {
                             HStack(spacing: 10) {
                                 Text("#\(site.siteIndex)")
@@ -803,6 +874,7 @@ struct YieldEstimationView: View {
                             viewModel.setBunchWeight(kg, for: pid)
                             let record = BunchWeightRecord(date: Date(), weightKg: kg)
                             viewModel.previousBunchWeights.append(record)
+                            syncBunchWeightToSettings(paddockId: pid, grams: grams)
                             saveSession()
                         }
                         showBunchWeightEditor = false
@@ -838,6 +910,12 @@ struct YieldEstimationView: View {
                 viewModel.setBunchWeight(grams / 1000.0, for: paddockId)
             }
         }
+    }
+
+    private func syncBunchWeightToSettings(paddockId: UUID, grams: Double) {
+        var s = store.settings
+        s.defaultBlockBunchWeightsGrams[paddockId] = grams
+        store.updateSettings(s)
     }
 
     // MARK: - Map Helpers

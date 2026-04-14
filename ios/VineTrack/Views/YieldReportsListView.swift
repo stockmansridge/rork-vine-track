@@ -315,9 +315,16 @@ struct YieldReportsListView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(sessionTitle(session))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
+                        HStack(spacing: 6) {
+                            Text(sessionTitle(session))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            if session.isCompleted {
+                                Image(systemName: "lock.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(VineyardTheme.leafGreen)
+                            }
+                        }
                         Text(session.createdAt, format: .dateTime.day().month().year().hour().minute())
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -355,7 +362,15 @@ struct YieldReportsListView: View {
                     Spacer()
 
                     let yieldT = sessionYield(session)
-                    if yieldT > 0 {
+                    if session.isCompleted {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.caption2)
+                            Text(String(format: "%.2f t", yieldT))
+                                .font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(VineyardTheme.leafGreen)
+                    } else if yieldT > 0 {
                         Text(String(format: "%.2f t", yieldT))
                             .font(.caption.weight(.bold))
                             .foregroundStyle(VineyardTheme.leafGreen)

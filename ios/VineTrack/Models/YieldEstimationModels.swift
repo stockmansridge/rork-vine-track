@@ -66,6 +66,8 @@ nonisolated struct YieldEstimationSession: Codable, Identifiable, Sendable {
     var blockBunchWeightsKg: [UUID: Double]
     var previousBunchWeights: [BunchWeightRecord]
     var pathWaypoints: [CoordinatePoint]
+    var isCompleted: Bool
+    var completedAt: Date?
 
     var averageBunchWeightKg: Double {
         guard !blockBunchWeightsKg.isEmpty else { return 0.15 }
@@ -85,7 +87,9 @@ nonisolated struct YieldEstimationSession: Codable, Identifiable, Sendable {
         sampleSites: [SampleSite] = [],
         blockBunchWeightsKg: [UUID: Double] = [:],
         previousBunchWeights: [BunchWeightRecord] = [],
-        pathWaypoints: [CoordinatePoint] = []
+        pathWaypoints: [CoordinatePoint] = [],
+        isCompleted: Bool = false,
+        completedAt: Date? = nil
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -96,12 +100,14 @@ nonisolated struct YieldEstimationSession: Codable, Identifiable, Sendable {
         self.blockBunchWeightsKg = blockBunchWeightsKg
         self.previousBunchWeights = previousBunchWeights
         self.pathWaypoints = pathWaypoints
+        self.isCompleted = isCompleted
+        self.completedAt = completedAt
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
         case id, vineyardId, createdAt, selectedPaddockIds, samplesPerHectare
         case sampleSites, blockBunchWeightsKg, averageBunchWeightKg
-        case previousBunchWeights, pathWaypoints
+        case previousBunchWeights, pathWaypoints, isCompleted, completedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -114,6 +120,8 @@ nonisolated struct YieldEstimationSession: Codable, Identifiable, Sendable {
         sampleSites = try container.decodeIfPresent([SampleSite].self, forKey: .sampleSites) ?? []
         previousBunchWeights = try container.decodeIfPresent([BunchWeightRecord].self, forKey: .previousBunchWeights) ?? []
         pathWaypoints = try container.decodeIfPresent([CoordinatePoint].self, forKey: .pathWaypoints) ?? []
+        isCompleted = try container.decodeIfPresent(Bool.self, forKey: .isCompleted) ?? false
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
 
         if let perBlock = try? container.decode([UUID: Double].self, forKey: .blockBunchWeightsKg) {
             blockBunchWeightsKg = perBlock
@@ -139,6 +147,8 @@ nonisolated struct YieldEstimationSession: Codable, Identifiable, Sendable {
         try container.encode(blockBunchWeightsKg, forKey: .blockBunchWeightsKg)
         try container.encode(previousBunchWeights, forKey: .previousBunchWeights)
         try container.encode(pathWaypoints, forKey: .pathWaypoints)
+        try container.encode(isCompleted, forKey: .isCompleted)
+        try container.encodeIfPresent(completedAt, forKey: .completedAt)
     }
 }
 
