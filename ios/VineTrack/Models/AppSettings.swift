@@ -53,6 +53,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
     var appearance: AppAppearance
     var fillTimerEnabled: Bool
     var samplesPerHectare: Int
+    var defaultBlockBunchWeightsGrams: [UUID: Double]
 
     init(
         id: UUID = UUID(),
@@ -74,7 +75,8 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         seasonFuelCostPerLitre: Double = 0,
         appearance: AppAppearance = .system,
         fillTimerEnabled: Bool = false,
-        samplesPerHectare: Int = 20
+        samplesPerHectare: Int = 20,
+        defaultBlockBunchWeightsGrams: [UUID: Double] = [:]
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -96,6 +98,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         self.appearance = appearance
         self.fillTimerEnabled = fillTimerEnabled
         self.samplesPerHectare = samplesPerHectare
+        self.defaultBlockBunchWeightsGrams = defaultBlockBunchWeightsGrams
     }
 
     init(from decoder: Decoder) throws {
@@ -120,6 +123,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         appearance = try container.decodeIfPresent(AppAppearance.self, forKey: .appearance) ?? .system
         fillTimerEnabled = try container.decodeIfPresent(Bool.self, forKey: .fillTimerEnabled) ?? false
         samplesPerHectare = try container.decodeIfPresent(Int.self, forKey: .samplesPerHectare) ?? 20
+        defaultBlockBunchWeightsGrams = try container.decodeIfPresent([UUID: Double].self, forKey: .defaultBlockBunchWeightsGrams) ?? [:]
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
@@ -127,6 +131,6 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         case rowTrackingEnabled, rowTrackingInterval, defaultPaddockId
         case autoPhotoPrompt, enabledGrowthStageCodes, weatherStationId
         case defaultWaterVolume, defaultSprayRate, defaultConcentrationFactor
-        case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance, fillTimerEnabled, samplesPerHectare
+        case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance, fillTimerEnabled, samplesPerHectare, defaultBlockBunchWeightsGrams
     }
 }

@@ -30,6 +30,7 @@ class DataStore {
     var buttonTemplates: [ButtonTemplate] = []
     var yieldSessions: [YieldEstimationSession] = []
     var damageRecords: [DamageRecord] = []
+    var historicalYieldRecords: [HistoricalYieldRecord] = []
 
     var selectedTab: Int = 0
     var cloudSync: CloudSyncService?
@@ -55,6 +56,7 @@ class DataStore {
     private let buttonTemplatesKey = "vinetrack_button_templates"
     private let yieldSessionsKey = "vinetrack_yield_sessions"
     private let damageRecordsKey = "vinetrack_damage_records"
+    private let historicalYieldRecordsKey = "vinetrack_historical_yield_records"
 
     private static let storageDirectory: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -157,6 +159,9 @@ class DataStore {
 
         let allDamageRecords: [DamageRecord] = loadData(key: damageRecordsKey) ?? []
         damageRecords = allDamageRecords.filter { $0.vineyardId == vid }
+
+        let allHistoricalYield: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
+        historicalYieldRecords = allHistoricalYield.filter { $0.vineyardId == vid }
 
         if operatorCategories.isEmpty {
             let defaultCategory = OperatorCategory(vineyardId: vid, name: "Tractor Operator", costPerHour: 40)
@@ -686,6 +691,27 @@ class DataStore {
         return factor
     }
 
+    // MARK: - Historical Yield Records
+
+    func addHistoricalYieldRecord(_ record: HistoricalYieldRecord) {
+        guard let vid = selectedVineyardId else { return }
+        var newRecord = record
+        newRecord.vineyardId = vid
+        historicalYieldRecords.append(newRecord)
+        saveAllHistoricalYieldRecords()
+    }
+
+    func updateHistoricalYieldRecord(_ record: HistoricalYieldRecord) {
+        guard let index = historicalYieldRecords.firstIndex(where: { $0.id == record.id }) else { return }
+        historicalYieldRecords[index] = record
+        saveAllHistoricalYieldRecords()
+    }
+
+    func deleteHistoricalYieldRecord(_ record: HistoricalYieldRecord) {
+        historicalYieldRecords.removeAll { $0.id == record.id }
+        saveAllHistoricalYieldRecords()
+    }
+
     // MARK: - Yield Sessions
 
     func saveYieldSession(_ session: YieldEstimationSession) {
@@ -909,6 +935,7 @@ class DataStore {
         buttonTemplates = []
         yieldSessions = []
         damageRecords = []
+        historicalYieldRecords = []
     }
 
     func clearInMemoryState() {
@@ -932,6 +959,7 @@ class DataStore {
         buttonTemplates = []
         yieldSessions = []
         damageRecords = []
+        historicalYieldRecords = []
     }
 
     // MARK: - Demo Data
@@ -2023,6 +2051,15 @@ class DataStore {
         }
         all.append(contentsOf: damageRecords)
         save(all, key: damageRecordsKey)
+    }
+
+    private func saveAllHistoricalYieldRecords() {
+        var all: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
+        if let vid = selectedVineyardId {
+            all.removeAll { $0.vineyardId == vid }
+        }
+        all.append(contentsOf: historicalYieldRecords)
+        save(all, key: historicalYieldRecordsKey)
     }
 
     private func saveAllYieldSessions() {

@@ -534,6 +534,7 @@ struct YieldEstimationView: View {
         Button {
             withAnimation(.smooth(duration: 0.3)) {
                 viewModel.generateSampleSites(paddocks: paddocks, samplesPerHectare: samplesPerHa)
+                applyDefaultBunchWeights()
                 viewModel.generatePath(paddocks: paddocks)
             }
             fitMapToSites()
@@ -825,6 +826,17 @@ struct YieldEstimationView: View {
         guard let vid = store.selectedVineyardId else { return }
         if let session = store.yieldSessions.first(where: { $0.vineyardId == vid }) {
             viewModel.loadSession(session)
+            applyDefaultBunchWeights()
+        }
+    }
+
+    private func applyDefaultBunchWeights() {
+        let defaults = store.settings.defaultBlockBunchWeightsGrams
+        for paddockId in viewModel.selectedPaddockIds {
+            if viewModel.blockBunchWeightsKg[paddockId] == nil,
+               let grams = defaults[paddockId], grams > 0 {
+                viewModel.setBunchWeight(grams / 1000.0, for: paddockId)
+            }
         }
     }
 
