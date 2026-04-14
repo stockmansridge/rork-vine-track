@@ -124,14 +124,17 @@ class AdminService {
             disclaimerAcceptances = result
         } catch {
             if !Task.isCancelled {
-                print("Failed to load disclaimer acceptances: \(error)")
+                print("[Disclaimer] Failed to load acceptances: \(error)")
             }
         }
         isLoadingDisclaimers = false
     }
 
     func checkDisclaimerAccepted(userId: String) async -> Bool {
-        guard isSupabaseConfigured else { return false }
+        guard isSupabaseConfigured else {
+            print("[Disclaimer] Supabase not configured, skipping check")
+            return false
+        }
         do {
             let result: [DisclaimerAcceptance] = try await supabase.from("disclaimer_acceptances")
                 .select()
@@ -139,8 +142,10 @@ class AdminService {
                 .limit(1)
                 .execute()
                 .value
+            print("[Disclaimer] Check for user \(userId): \(result.isEmpty ? "not accepted" : "accepted")")
             return !result.isEmpty
         } catch {
+            print("[Disclaimer] Check failed for user \(userId): \(error)")
             return false
         }
     }

@@ -82,15 +82,20 @@ struct DisclaimerView: View {
     }
 
     private func acceptDisclaimer() {
-        guard let userId = authService.userId else { return }
+        guard let userId = authService.userId else {
+            errorMessage = "No user session found. Please sign out and sign in again."
+            return
+        }
         isSubmitting = true
         errorMessage = nil
+
+        let displayName = authService.userName.isEmpty ? authService.userEmail : authService.userName
 
         Task {
             do {
                 let record = DisclaimerInsert(
                     user_id: userId,
-                    user_name: authService.userName,
+                    user_name: displayName,
                     user_email: authService.userEmail
                 )
                 try await supabase.from("disclaimer_acceptances")
@@ -100,7 +105,8 @@ struct DisclaimerView: View {
                 UserDefaults.standard.set(true, forKey: "vinetrack_disclaimer_accepted_\(userId)")
                 onAccepted()
             } catch {
-                errorMessage = "Failed to save acceptance. Please try again."
+                print("[Disclaimer] Insert failed for user \(userId): \(error)")
+                errorMessage = "Failed to save acceptance: \(error.localizedDescription)"
                 isSubmitting = false
             }
         }
