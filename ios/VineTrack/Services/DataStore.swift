@@ -359,11 +359,12 @@ class DataStore {
         let now = Date()
         trips[index].isActive = false
         trips[index].endTime = now
+        trips[index].isPaused = false
         saveAllTrips()
 
         if let recIndex = sprayRecords.firstIndex(where: { $0.tripId == trip.id }) {
             sprayRecords[recIndex].endTime = now
-            let durationSeconds = now.timeIntervalSince(trip.startTime)
+            let durationSeconds = trips[index].activeDuration
             if durationSeconds > 0 && trip.totalDistance > 0 {
                 let distanceKm = trip.totalDistance / 1000.0
                 let hours = durationSeconds / 3600.0

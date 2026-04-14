@@ -53,6 +53,25 @@ class TripTrackingService {
         }
     }
 
+    func pauseTracking() {
+        guard isTracking, let store, var trip = store.activeTrip, !trip.isPaused else { return }
+        trip.isPaused = true
+        trip.pauseTimestamps.append(Date())
+        store.updateTrip(trip)
+        trackingTask?.cancel()
+        trackingTask = nil
+        isTracking = false
+        locationService?.stopBackgroundUpdating()
+    }
+
+    func resumeTracking() {
+        guard let store, var trip = store.activeTrip, trip.isPaused else { return }
+        trip.isPaused = false
+        trip.resumeTimestamps.append(Date())
+        store.updateTrip(trip)
+        startTracking()
+    }
+
     func stopTracking() {
         trackingTask?.cancel()
         trackingTask = nil

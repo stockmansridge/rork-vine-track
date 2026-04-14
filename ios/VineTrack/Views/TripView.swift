@@ -317,8 +317,7 @@ struct TripHistoryRow: View {
     }
 
     private var duration: TimeInterval {
-        let end = trip.endTime ?? Date()
-        return end.timeIntervalSince(trip.startTime)
+        trip.activeDuration
     }
 
     var body: some View {
@@ -419,6 +418,8 @@ struct ActiveTripView: View {
     @State private var showSprayRecordForm: Bool = false
     @State private var showTankStartConfirmation: Bool = false
     @State private var showTankEndConfirmation: Bool = false
+    @State private var activeDurationTimer: TimeInterval = 0
+    @State private var durationTimer: Timer? = nil
 
     private var currentSpeedKmh: Double {
         guard let speed = locationService.location?.speed, speed > 0 else { return 0 }
@@ -455,7 +456,7 @@ struct ActiveTripView: View {
         let completed = trip.completedPaths.count + trip.skippedPaths.count
         let total = trip.rowSequence.count
         guard completed > 0, completed < total else { return nil }
-        let elapsed = Date().timeIntervalSince(trip.startTime)
+        let elapsed = trip.activeDuration
         let progressFraction = Double(completed) / Double(total)
         let estimatedTotal = elapsed / progressFraction
         let remainingSeconds = estimatedTotal - elapsed
@@ -574,11 +575,17 @@ struct ActiveTripView: View {
         }
         .onAppear {
             locationService.startUpdating()
-            if !trackingService.isTracking {
+            if !trackingService.isTracking && !trip.isPaused {
                 trackingService.startTracking()
             }
             confirmedPath = trip.currentRowNumber
             updateDetectedRow(from: locationService.location)
+            activeDurationTimer = trip.activeDuration
+            startDurationTimer()
+        }
+        .onDisappear {
+            durationTimer?.invalidate()
+            durationTimer = nil
         }
         .onChange(of: locationService.location) { _, newLocation in
             updateDetectedRow(from: newLocation)
@@ -744,11 +751,20 @@ struct ActiveTripView: View {
                     .frame(height: 40)
 
                 VStack(spacing: 4) {
-                    Text("DURATION")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.secondary)
-                    Text(trip.startTime, style: .timer)
+                    HStack(spacing: 3) {
+                        Text("DURATION")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.secondary)
+                        if trip.isPaused {
+                            Image(systemName: "pause.fill")
+                                .font(.system(size: 8))
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    Text(formatActiveDuration(activeDurationTimer))
                         .font(.system(.headline, design: .monospaced))
+                        .foregroundStyle(trip.isPaused ? .orange : .primary)
+                        .contentTransition(.numericText())
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -1182,8 +1198,8 @@ struct ActiveTripView: View {
     }
 
     private var tripControls: some View {
-        HStack(spacing: 16) {
-            if !isGPSActive {
+        HStack(spacing: 12) {
+            if !isGPSActive && !trip.isPaused {
                 Button {
                     advanceRow(by: -1)
                 } label: {
@@ -1204,6 +1220,16 @@ struct ActiveTripView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(!trip.rowSequence.isEmpty && trip.sequenceIndex >= trip.rowSequence.count - 1)
+            } else if trip.isPaused {
+                HStack(spacing: 8) {
+                    Image(systemName: "pause.fill")
+                        .foregroundStyle(.orange)
+                    Text("Trip Paused")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.orange)
+                }
+                .frame(maxWidth: .infinity)
             } else {
                 HStack(spacing: 8) {
                     Image(systemName: "location.fill")
@@ -1217,6 +1243,26 @@ struct ActiveTripView: View {
             }
 
             Button {
+                withAnimation(.snappy(duration: 0.3)) {
+                    if trip.isPaused {
+                        trackingService.resumeTracking()
+                        startDurationTimer()
+                    } else {
+                        trackingService.pauseTracking()
+                        durationTimer?.invalidate()
+                        durationTimer = nil
+                    }
+                }
+            } label: {
+                Image(systemName: trip.isPaused ? "play.fill" : "pause.fill")
+                    .font(.headline)
+                    .frame(width: 50, height: 50)
+            }
+            .buttonStyle(.bordered)
+            .tint(trip.isPaused ? .green : .orange)
+            .sensoryFeedback(.impact, trigger: trip.isPaused)
+
+            Button {
                 showEndConfirmation = true
             } label: {
                 Image(systemName: "stop.fill")
@@ -1227,6 +1273,11 @@ struct ActiveTripView: View {
             .tint(.red)
             .confirmationDialog("End Trip?", isPresented: $showEndConfirmation) {
                 Button("End Trip", role: .destructive) {
+                    durationTimer?.invalidate()
+                    durationTimer = nil
+                    if trip.isPaused {
+                        trackingService.resumeTracking()
+                    }
                     finalizeCurrentPath()
                     trackingService.stopTracking()
                     store.endTrip(trip)
@@ -1235,6 +1286,7 @@ struct ActiveTripView: View {
             }
         }
         .animation(.snappy(duration: 0.3), value: isGPSActive)
+        .animation(.snappy(duration: 0.3), value: trip.isPaused)
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
     }
@@ -1298,6 +1350,29 @@ struct ActiveTripView: View {
         }
         return String(format: "%.1fkm", meters / 1000)
     }
+
+    private func formatActiveDuration(_ seconds: TimeInterval) -> String {
+        let totalSeconds = Int(max(seconds, 0))
+        let hrs = totalSeconds / 3600
+        let mins = (totalSeconds % 3600) / 60
+        let secs = totalSeconds % 60
+        if hrs > 0 {
+            return String(format: "%d:%02d:%02d", hrs, mins, secs)
+        }
+        return String(format: "%d:%02d", mins, secs)
+    }
+
+    private func startDurationTimer() {
+        durationTimer?.invalidate()
+        guard !trip.isPaused else { return }
+        durationTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            Task { @MainActor in
+                if let activeTrip = store.activeTrip {
+                    activeDurationTimer = activeTrip.activeDuration
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Trip Detail View (Historical)
@@ -1318,8 +1393,7 @@ struct TripDetailView: View {
     }
 
     private var duration: TimeInterval {
-        let end = trip.endTime ?? Date()
-        return end.timeIntervalSince(trip.startTime)
+        trip.activeDuration
     }
 
     var body: some View {
@@ -1485,8 +1559,7 @@ struct TripDetailView: View {
     }
 
     private func formatAverageSpeed() -> String {
-        let end = trip.endTime ?? Date()
-        let durationSeconds = end.timeIntervalSince(trip.startTime)
+        let durationSeconds = trip.activeDuration
         guard durationSeconds > 0 && trip.totalDistance > 0 else { return "—" }
         let speedKmh = (trip.totalDistance / durationSeconds) * 3.6
         return String(format: "%.1f km/h", speedKmh)
@@ -1515,8 +1588,7 @@ struct TripDetailView: View {
         guard let tractor, tractor.fuelUsageLPerHour > 0 else { return 0 }
         let fuelPrice = store.seasonFuelCostPerLitre
         guard fuelPrice > 0 else { return 0 }
-        let end = trip.endTime ?? Date()
-        let durationHours = end.timeIntervalSince(trip.startTime) / 3600.0
+        let durationHours = trip.activeDuration / 3600.0
         return fuelPrice * tractor.fuelUsageLPerHour * durationHours
     }
 
@@ -1524,8 +1596,7 @@ struct TripDetailView: View {
         guard !trip.personName.isEmpty else { return 0 }
         guard let category = store.operatorCategoryForName(trip.personName) else { return 0 }
         guard category.costPerHour > 0 else { return 0 }
-        let end = trip.endTime ?? Date()
-        let durationHours = end.timeIntervalSince(trip.startTime) / 3600.0
+        let durationHours = trip.activeDuration / 3600.0
         return category.costPerHour * durationHours
     }
 

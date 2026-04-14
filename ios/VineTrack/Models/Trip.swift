@@ -66,6 +66,25 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
     var tankSessions: [TankSession]
     var activeTankNumber: Int?
     var totalTanks: Int
+    var pauseTimestamps: [Date]
+    var resumeTimestamps: [Date]
+    var isPaused: Bool
+
+    var activeDuration: TimeInterval {
+        let end = endTime ?? Date()
+        var total: TimeInterval = 0
+        var lastStart = startTime
+        for i in 0..<pauseTimestamps.count {
+            total += pauseTimestamps[i].timeIntervalSince(lastStart)
+            if i < resumeTimestamps.count {
+                lastStart = resumeTimestamps[i]
+            } else {
+                return total
+            }
+        }
+        total += end.timeIntervalSince(lastStart)
+        return total
+    }
 
     init(
         id: UUID = UUID(),
@@ -90,7 +109,10 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
         currentPathDistance: Double = 0,
         tankSessions: [TankSession] = [],
         activeTankNumber: Int? = nil,
-        totalTanks: Int = 0
+        totalTanks: Int = 0,
+        pauseTimestamps: [Date] = [],
+        resumeTimestamps: [Date] = [],
+        isPaused: Bool = false
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -115,6 +137,9 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
         self.tankSessions = tankSessions
         self.activeTankNumber = activeTankNumber
         self.totalTanks = totalTanks
+        self.pauseTimestamps = pauseTimestamps
+        self.resumeTimestamps = resumeTimestamps
+        self.isPaused = isPaused
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
@@ -124,6 +149,7 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
         case personName, totalDistance, pinIds
         case completedPaths, skippedPaths, currentPathDistance
         case tankSessions, activeTankNumber, totalTanks
+        case pauseTimestamps, resumeTimestamps, isPaused
     }
 
     init(from decoder: Decoder) throws {
@@ -148,6 +174,9 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
         tankSessions = try container.decodeIfPresent([TankSession].self, forKey: .tankSessions) ?? []
         activeTankNumber = try container.decodeIfPresent(Int.self, forKey: .activeTankNumber)
         totalTanks = try container.decodeIfPresent(Int.self, forKey: .totalTanks) ?? 0
+        pauseTimestamps = try container.decodeIfPresent([Date].self, forKey: .pauseTimestamps) ?? []
+        resumeTimestamps = try container.decodeIfPresent([Date].self, forKey: .resumeTimestamps) ?? []
+        isPaused = try container.decodeIfPresent(Bool.self, forKey: .isPaused) ?? false
 
         if let doubleRow = try? container.decode(Double.self, forKey: .currentRowNumber) {
             currentRowNumber = doubleRow

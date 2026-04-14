@@ -112,15 +112,17 @@ struct SprayRecordPDFService {
                 drawRow(label: "Start Time", value: "\(dateFormatter.string(from: trip.startTime)) \(timeFormatter.string(from: trip.startTime))")
                 if let endTime = trip.endTime {
                     drawRow(label: "End Time", value: "\(dateFormatter.string(from: endTime)) \(timeFormatter.string(from: endTime))")
-
-                    let duration = endTime.timeIntervalSince(trip.startTime)
-                    let hours = Int(duration) / 3600
-                    let minutes = (Int(duration) % 3600) / 60
-                    if hours > 0 {
-                        drawRow(label: "Duration", value: "\(hours)h \(minutes)m")
-                    } else {
-                        drawRow(label: "Duration", value: "\(minutes)m")
-                    }
+                }
+                let duration = trip.activeDuration
+                let hours = Int(duration) / 3600
+                let minutes = (Int(duration) % 3600) / 60
+                if hours > 0 {
+                    drawRow(label: "Duration", value: "\(hours)h \(minutes)m")
+                } else {
+                    drawRow(label: "Duration", value: "\(minutes)m")
+                }
+                if !trip.pauseTimestamps.isEmpty {
+                    drawRow(label: "Pauses", value: "\(trip.pauseTimestamps.count)")
                 }
                 if !trip.personName.isEmpty {
                     drawRow(label: "Operator", value: trip.personName)

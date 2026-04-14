@@ -108,8 +108,8 @@ struct SprayRecordFormView: View {
         guard averageSpeedText.isEmpty else { return }
         guard let trip = store.trips.first(where: { $0.id == tripId }),
               trip.totalDistance > 0,
-              let endTime = trip.endTime else { return }
-        let duration = endTime.timeIntervalSince(trip.startTime)
+              trip.endTime != nil else { return }
+        let duration = trip.activeDuration
         guard duration > 0 else { return }
         let distanceKm = trip.totalDistance / 1000.0
         let hours = duration / 3600.0

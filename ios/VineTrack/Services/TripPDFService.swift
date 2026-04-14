@@ -285,8 +285,7 @@ struct TripPDFService {
     }
 
     private static func formatDuration(_ trip: Trip) -> String {
-        let end = trip.endTime ?? Date()
-        let seconds = end.timeIntervalSince(trip.startTime)
+        let seconds = trip.activeDuration
         return formatDurationSeconds(seconds)
     }
 
@@ -307,8 +306,7 @@ struct TripPDFService {
     }
 
     private static func formatAverageSpeed(_ trip: Trip) -> String {
-        let end = trip.endTime ?? Date()
-        let durationSeconds = end.timeIntervalSince(trip.startTime)
+        let durationSeconds = trip.activeDuration
         guard durationSeconds > 0 && trip.totalDistance > 0 else { return "—" }
         let speedMps = trip.totalDistance / durationSeconds
         let speedKmh = speedMps * 3.6

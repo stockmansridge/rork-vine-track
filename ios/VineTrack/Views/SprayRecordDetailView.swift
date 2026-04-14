@@ -271,7 +271,12 @@ struct SprayRecordDetailView: View {
             } else if let trip = tripForRecord, let tripEnd = trip.endTime {
                 LabeledContent("Finished", value: tripEnd.formatted(date: .abbreviated, time: .shortened))
             }
-            if let endTime = effectiveEnd {
+            if let trip = tripForRecord {
+                let duration = trip.activeDuration
+                let hours = Int(duration) / 3600
+                let minutes = (Int(duration) % 3600) / 60
+                LabeledContent("Duration", value: hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m")
+            } else if let endTime = effectiveEnd {
                 let duration = endTime.timeIntervalSince(record.startTime)
                 let hours = Int(duration) / 3600
                 let minutes = (Int(duration) % 3600) / 60
@@ -337,8 +342,7 @@ struct SprayRecordDetailView: View {
         guard let tractor, tractor.fuelUsageLPerHour > 0 else { return 0 }
         let fuelPrice = store.seasonFuelCostPerLitre
         guard fuelPrice > 0 else { return 0 }
-        let end = trip.endTime ?? Date()
-        let durationHours = end.timeIntervalSince(trip.startTime) / 3600.0
+        let durationHours = trip.activeDuration / 3600.0
         return fuelPrice * tractor.fuelUsageLPerHour * durationHours
     }
 
@@ -346,8 +350,7 @@ struct SprayRecordDetailView: View {
         guard let trip = tripForRecord, !trip.personName.isEmpty else { return 0 }
         guard let category = store.operatorCategoryForName(trip.personName) else { return 0 }
         guard category.costPerHour > 0 else { return 0 }
-        let end = trip.endTime ?? Date()
-        let durationHours = end.timeIntervalSince(trip.startTime) / 3600.0
+        let durationHours = trip.activeDuration / 3600.0
         return category.costPerHour * durationHours
     }
 
