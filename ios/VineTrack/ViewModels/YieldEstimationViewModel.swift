@@ -118,7 +118,6 @@ class YieldEstimationViewModel {
         let sortedRowNumbers = rowGroups.keys.sorted()
 
         var result: [SampleSite] = []
-        var goingForward = true
 
         for rowNum in sortedRowNumbers {
             guard var rowSites = rowGroups[rowNum] else { continue }
@@ -132,12 +131,11 @@ class YieldEstimationViewModel {
                 rowSites.sort { a, b in
                     let projA = (a.latitude - row.startPoint.latitude) * cos(bearing) + (a.longitude - row.startPoint.longitude) * sin(bearing)
                     let projB = (b.latitude - row.startPoint.latitude) * cos(bearing) + (b.longitude - row.startPoint.longitude) * sin(bearing)
-                    return goingForward ? projA < projB : projA > projB
+                    return projA < projB
                 }
             }
 
             result.append(contentsOf: rowSites)
-            goingForward.toggle()
         }
 
         return result
