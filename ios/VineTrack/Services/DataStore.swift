@@ -649,6 +649,18 @@ class DataStore {
         buttonTemplates.filter { $0.mode == mode }
     }
 
+    func ensureDefaultRepairTemplate() {
+        guard let vid = selectedVineyardId else { return }
+        let repairTemplates = buttonTemplates.filter { $0.mode == .repairs }
+        guard repairTemplates.isEmpty else { return }
+        let leftButtons = repairButtons.sorted { $0.index < $1.index }.filter { $0.index < 4 }
+        guard !leftButtons.isEmpty else { return }
+        let entries = leftButtons.map { ButtonTemplateEntry(name: $0.name, color: $0.color, isGrowthStageButton: $0.isGrowthStageButton) }
+        let template = ButtonTemplate(vineyardId: vid, name: "Repairs 1", mode: .repairs, entries: entries)
+        buttonTemplates.append(template)
+        saveAllButtonTemplates()
+    }
+
     // MARK: - Spray Application
 
     func addSprayApplication(_ application: SprayApplication, tripId: UUID? = nil, tractorName: String = "") {
