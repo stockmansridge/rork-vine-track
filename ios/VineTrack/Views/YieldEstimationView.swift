@@ -44,6 +44,11 @@ struct YieldEstimationView: View {
                     }
 
                     progressSection
+
+                    if viewModel.isPathGenerated {
+                        pathMapSection
+                    }
+
                     sampleListSection
                 }
             }
@@ -104,6 +109,29 @@ struct YieldEstimationView: View {
             if viewModel.isPathGenerated {
                 MapPolyline(coordinates: viewModel.pathWaypoints.map(\.coordinate))
                     .stroke(.orange, lineWidth: 2.5)
+
+                if viewModel.pathWaypoints.count >= 2 {
+                    let startCoord = viewModel.pathWaypoints[0].coordinate
+                    let endCoord = viewModel.pathWaypoints[viewModel.pathWaypoints.count - 1].coordinate
+
+                    Annotation("Start", coordinate: startCoord) {
+                        Image(systemName: "flag.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.green)
+                            .padding(4)
+                            .background(.white, in: Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 2)
+                    }
+
+                    Annotation("End", coordinate: endCoord) {
+                        Image(systemName: "flag.checkered")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.red)
+                            .padding(4)
+                            .background(.white, in: Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 2)
+                    }
+                }
             }
 
             ForEach(viewModel.sampleSites) { site in
@@ -140,6 +168,204 @@ struct YieldEstimationView: View {
         .mapStyle(.hybrid)
         .frame(height: 320)
         .clipShape(.rect(cornerRadius: 14))
+    }
+
+    // MARK: - Path Map
+
+    private var pathMapSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Label("Sample Path", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    .font(.headline)
+                Spacer()
+                HStack(spacing: 12) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flag.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                        Text("Start")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "flag.checkered")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                        Text("End")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Map(initialPosition: pathMapPosition) {
+                ForEach(paddocks.filter { viewModel.selectedPaddockIds.contains($0.id) }) { paddock in
+                    let color = colorFor(paddock)
+
+                    MapPolygon(coordinates: paddock.polygonPoints.map(\.coordinate))
+                        .foregroundStyle(color.opacity(0.15))
+                        .stroke(color.opacity(0.5), lineWidth: 1.5)
+
+                    ForEach(paddock.rows) { row in
+                        MapPolyline(coordinates: [row.startPoint.coordinate, row.endPoint.coordinate])
+                            .stroke(color.opacity(0.15), lineWidth: 0.5)
+                    }
+                }
+
+                MapPolyline(coordinates: viewModel.pathWaypoints.map(\.coordinate))
+                    .stroke(
+                        .linearGradient(
+                            colors: [.orange, .red],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        lineWidth: 3
+                    )
+
+                ForEach(viewModel.sampleSites) { site in
+                    let paddock = paddocks.first { $0.id == site.paddockId }
+                    let color = paddock.map { colorFor($0) } ?? .red
+                    let isRecorded = site.isRecorded
+
+                    Annotation("", coordinate: site.coordinate) {
+                        ZStack {
+                            Circle()
+                                .fill(isRecorded ? .green : color)
+                                .frame(width: 20, height: 20)
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 13, height: 13)
+                            Text("\(site.siteIndex)")
+                                .font(.system(size: 6, weight: .heavy))
+                                .foregroundStyle(isRecorded ? .green : color)
+                        }
+                        .allowsHitTesting(false)
+                    }
+                }
+
+                if viewModel.pathWaypoints.count >= 2 {
+                    Annotation("Start", coordinate: viewModel.pathWaypoints[0].coordinate) {
+                        Image(systemName: "flag.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.green)
+                            .padding(3)
+                            .background(.white, in: Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 2)
+                    }
+                    Annotation("End", coordinate: viewModel.pathWaypoints[viewModel.pathWaypoints.count - 1].coordinate) {
+                        Image(systemName: "flag.checkered")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.red)
+                            .padding(3)
+                            .background(.white, in: Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 2)
+                    }
+                }
+
+                ForEach(pathArrowAnnotations, id: \.id) { arrow in
+                    Annotation("", coordinate: arrow.coordinate) {
+                        Image(systemName: "arrowtriangle.forward.fill")
+                            .font(.system(size: 8))
+                            .foregroundStyle(.orange)
+                            .rotationEffect(.degrees(arrow.bearing))
+                            .allowsHitTesting(false)
+                    }
+                }
+            }
+            .mapStyle(.hybrid)
+            .frame(height: 300)
+            .clipShape(.rect(cornerRadius: 14))
+
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(.orange)
+                        .frame(width: 8, height: 8)
+                    Text("\(viewModel.pathWaypoints.count) waypoints")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                    Text(String(format: "%.0f m total", pathTotalDistanceMetres))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var pathMapPosition: MapCameraPosition {
+        let selectedPaddockPoints = paddocks
+            .filter { viewModel.selectedPaddockIds.contains($0.id) }
+            .flatMap(\.polygonPoints)
+
+        let allLats = selectedPaddockPoints.map(\.latitude) + viewModel.sampleSites.map(\.latitude)
+        let allLons = selectedPaddockPoints.map(\.longitude) + viewModel.sampleSites.map(\.longitude)
+
+        guard let minLat = allLats.min(), let maxLat = allLats.max(),
+              let minLon = allLons.min(), let maxLon = allLons.max() else {
+            return .automatic
+        }
+
+        let center = CLLocationCoordinate2D(
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLon + maxLon) / 2
+        )
+        let span = MKCoordinateSpan(
+            latitudeDelta: (maxLat - minLat) * 1.4 + 0.001,
+            longitudeDelta: (maxLon - minLon) * 1.4 + 0.001
+        )
+        return .region(MKCoordinateRegion(center: center, span: span))
+    }
+
+    private struct ArrowAnnotation: Identifiable {
+        let id: Int
+        let coordinate: CLLocationCoordinate2D
+        let bearing: Double
+    }
+
+    private var pathArrowAnnotations: [ArrowAnnotation] {
+        let waypoints = viewModel.pathWaypoints
+        guard waypoints.count >= 2 else { return [] }
+
+        var arrows: [ArrowAnnotation] = []
+        let step = max(1, waypoints.count / 15)
+
+        for i in stride(from: step, to: waypoints.count, by: step) {
+            let prev = waypoints[i - 1]
+            let curr = waypoints[i]
+            let dLat = curr.latitude - prev.latitude
+            let dLon = curr.longitude - prev.longitude
+            guard abs(dLat) > 1e-10 || abs(dLon) > 1e-10 else { continue }
+
+            let bearing = atan2(dLon, dLat) * 180 / .pi
+            let midLat = (prev.latitude + curr.latitude) / 2
+            let midLon = (prev.longitude + curr.longitude) / 2
+
+            arrows.append(ArrowAnnotation(
+                id: i,
+                coordinate: CLLocationCoordinate2D(latitude: midLat, longitude: midLon),
+                bearing: bearing
+            ))
+        }
+
+        return arrows
+    }
+
+    private var pathTotalDistanceMetres: Double {
+        let waypoints = viewModel.pathWaypoints
+        guard waypoints.count >= 2 else { return 0 }
+
+        var total: Double = 0
+        for i in 1..<waypoints.count {
+            let loc1 = CLLocation(latitude: waypoints[i - 1].latitude, longitude: waypoints[i - 1].longitude)
+            let loc2 = CLLocation(latitude: waypoints[i].latitude, longitude: waypoints[i].longitude)
+            total += loc1.distance(from: loc2)
+        }
+        return total
     }
 
     // MARK: - Block Selection
