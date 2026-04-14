@@ -156,25 +156,88 @@ class YieldEstimationViewModel {
 
         var lanes: [MidlineLane] = []
         for pair in rowPairs {
+            let rawStart: CoordinatePoint
+            let rawEnd: CoordinatePoint
             if pair.count == 2 {
                 let (s1, e1) = orientRow(pair[0])
                 let (s2, e2) = orientRow(pair[1])
-                let midStart = CoordinatePoint(
+                rawStart = CoordinatePoint(
                     latitude: (s1.latitude + s2.latitude) / 2,
                     longitude: (s1.longitude + s2.longitude) / 2
                 )
-                let midEnd = CoordinatePoint(
+                rawEnd = CoordinatePoint(
                     latitude: (e1.latitude + e2.latitude) / 2,
                     longitude: (e1.longitude + e2.longitude) / 2
                 )
-                lanes.append(MidlineLane(start: midStart, end: midEnd))
             } else {
                 let (s, e) = orientRow(pair[0])
-                lanes.append(MidlineLane(start: s, end: e))
+                rawStart = s
+                rawEnd = e
+            }
+
+            let clipped = clipMidlineToPolygon(start: rawStart, end: rawEnd, polygon: polygon)
+            if let c = clipped {
+                lanes.append(MidlineLane(start: c.start, end: c.end))
+            } else {
+                lanes.append(MidlineLane(start: rawStart, end: rawEnd))
             }
         }
 
         return lanes
+    }
+
+    private func clipMidlineToPolygon(start: CoordinatePoint, end: CoordinatePoint, polygon: [CoordinatePoint]) -> (start: CoordinatePoint, end: CoordinatePoint)? {
+        let ax = start.longitude
+        let ay = start.latitude
+        let bx = end.longitude
+        let by = end.latitude
+        let dx = bx - ax
+        let dy = by - ay
+
+        var tValues: [Double] = []
+
+        let n = polygon.count
+        for i in 0..<n {
+            let j = (i + 1) % n
+            let cx = polygon[i].longitude
+            let cy = polygon[i].latitude
+            let ex = polygon[j].longitude - cx
+            let ey = polygon[j].latitude - cy
+
+            let denom = dx * ey - dy * ex
+            guard abs(denom) > 1e-15 else { continue }
+
+            let t = ((cx - ax) * ey - (cy - ay) * ex) / denom
+            let u = ((cx - ax) * dy - (cy - ay) * dx) / denom
+
+            if u >= 0 && u <= 1 && t > -0.001 && t < 1.001 {
+                tValues.append(min(max(t, 0), 1))
+            }
+        }
+
+        if pointInPolygon(lat: ay, lon: ax, polygon: polygon) {
+            tValues.append(0.0)
+        }
+        if pointInPolygon(lat: by, lon: bx, polygon: polygon) {
+            tValues.append(1.0)
+        }
+
+        guard tValues.count >= 2 else { return nil }
+        tValues.sort()
+
+        let t0 = tValues.first!
+        let t1 = tValues.last!
+        guard t1 - t0 > 1e-10 else { return nil }
+
+        let clippedStart = CoordinatePoint(
+            latitude: ay + t0 * dy,
+            longitude: ax + t0 * dx
+        )
+        let clippedEnd = CoordinatePoint(
+            latitude: ay + t1 * dy,
+            longitude: ax + t1 * dx
+        )
+        return (clippedStart, clippedEnd)
     }
 
     private func sortRowsPerpendicular(rows: [PaddockRow], paddock: Paddock) -> [PaddockRow] {
