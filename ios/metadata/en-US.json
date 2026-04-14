@@ -1,0 +1,48 @@
+{
+  "data": [
+    {
+      "type": "appStoreVersionLocalizations",
+      "id": "2c0cc18d-81c9-46f7-89e2-cf496823dffd",
+      "attributes": {
+        "locale": "en-US",
+        "description": "Managing a vineyard demands precision, accountability, and coordination across every row and paddock. VineTrack puts a professional-grade field management system in your pocket — built specifically for viticulturists who need reliable tools that work as hard as they do.\n\nGPS-Precise Vine Tracking\n\nDrop geo-located pins anywhere in the field to log vine repairs, growth stage observations, and issues — with left or right side identification for pinpoint accuracy. Attach photos on the spot, with an auto-prompt option so nothing gets missed. Every pin is timestamped, searchable, and visible to your entire team.\n\nGuided Row Navigation\n\nRun structured trips through your paddock rows with configurable tracking patterns — sequential, alternating, or fully custom. VineTrack guides you through each row with auto-completion, so you always know where you have been, what is left, and how far you have traveled.\n\nInteractive Map View\n\nSee your entire operation at a glance. Paddock boundaries, row overlays, and all your dropped pins appear on a live map you can filter by issue type, growth stage, or date. Whether you are planning from the office or checking progress from the shed, the picture is always clear.\n\nBuilt for Teams\n\nManage multiple vineyards with a full team roles system — owners, managers, and members, each with the right level of access. Invite your crew, assign paddocks, and keep everyone aligned with real-time cloud sync across all devices.\n\nPaddock Setup That Matches the Real World\n\nDraw paddock boundaries directly on the map, configure row direction, spacing, and numbering, and set up your tracking patterns once. VineTrack adapts to how your vineyard is actually laid out — not the other way around.\n\nTrip History and Reporting\n\nEvery trip is recorded with distance traveled, rows completed, and a full summary to review later. Track team activity, identify recurring problem areas, and build a reliable history of your vineyard's health over time.\n\nVineTrack syncs securely to the cloud and supports Apple Sign In for fast, frictionless onboarding. Your data is always backed up and accessible, whether you are mid-row or reviewing the week from the office.\n\nIf you are serious about vineyard management, VineTrack is the field tool your operation has been missing. Download VineTrack today and bring order, precision, and collaboration to every row you run.",
+        "keywords": "viticulture,gps,farm,winery,vine,paddock,crop,field,harvest,grape,agtech,row,mapping,orchard,pin,log",
+        "marketingUrl": "https://stockmansridge.com.au/pages/vineyard-tracker",
+        "promotionalText": "GPS-powered vineyard management built for the field. Drop pins, run guided row trips, and keep your whole team in sync — starting today.",
+        "supportUrl": "https://stockmansridge.com.au/pages/vineyard-tracker"
+      },
+      "relationships": {
+        "appScreenshotSets": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/2c0cc18d-81c9-46f7-89e2-cf496823dffd/relationships/appScreenshotSets",
+            "related": "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/2c0cc18d-81c9-46f7-89e2-cf496823dffd/appScreenshotSets"
+          }
+        },
+        "appPreviewSets": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/2c0cc18d-81c9-46f7-89e2-cf496823dffd/relationships/appPreviewSets",
+            "related": "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/2c0cc18d-81c9-46f7-89e2-cf496823dffd/appPreviewSets"
+          }
+        },
+        "searchKeywords": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/2c0cc18d-81c9-46f7-89e2-cf496823dffd/relationships/searchKeywords",
+            "related": "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/2c0cc18d-81c9-46f7-89e2-cf496823dffd/searchKeywords"
+          }
+        }
+      },
+      "links": {
+        "self": "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/2c0cc18d-81c9-46f7-89e2-cf496823dffd"
+      }
+    }
+  ],
+  "links": {
+    "self": "https://api.appstoreconnect.apple.com/v1/appStoreVersions/622b626f-a0b8-413a-b585-f43a5d6be5da/appStoreVersionLocalizations"
+  },
+  "meta": {
+    "paging": {
+      "total": 1,
+      "limit": 50
+    }
+  }
+}

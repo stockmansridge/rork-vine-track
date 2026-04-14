@@ -1,0 +1,61 @@
+import SwiftUI
+
+struct ContentView: View {
+    @Environment(DataStore.self) private var store
+    @Environment(AuthService.self) private var authService
+    @Environment(CloudSyncService.self) private var cloudSync
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+
+    var body: some View {
+        Group {
+            if authService.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGroupedBackground))
+            } else if !authService.isSignedIn {
+                LoginView()
+            } else if !hasCompletedOnboarding && !authService.isDemoMode {
+                OnboardingView {
+                    withAnimation(.smooth) {
+                        hasCompletedOnboarding = true
+                    }
+                }
+            } else if store.vineyards.isEmpty {
+                VineyardListView()
+            } else {
+                mainTabView
+            }
+        }
+        .onChange(of: authService.isLoading) { _, isLoading in
+            if !isLoading, authService.isSignedIn, let userId = authService.userId {
+                let name = authService.userName.isEmpty ? authService.userEmail : authService.userName
+                store.backfillVineyardOwner(userId: userId, userName: name)
+            }
+        }
+        .onChange(of: authService.isDemoMode) { _, isDemoMode in
+            if isDemoMode {
+                store.loadDemoData()
+            }
+        }
+    }
+
+    private var mainTabView: some View {
+        TabView(selection: Bindable(store).selectedTab) {
+            Tab("Home", systemImage: "house.fill", value: 0) {
+                HomeView()
+            }
+            Tab("Pins", systemImage: "mappin.and.ellipse", value: 1) {
+                PinsView()
+            }
+            Tab("Trip", systemImage: "steeringwheel", value: 2) {
+                TripView()
+            }
+            Tab("Program", systemImage: "sprinkler.and.droplets.fill", value: 3) {
+                SprayProgramView()
+            }
+            Tab("Settings", systemImage: "gearshape.fill", value: 4) {
+                SettingsView()
+            }
+        }
+    }
+}
