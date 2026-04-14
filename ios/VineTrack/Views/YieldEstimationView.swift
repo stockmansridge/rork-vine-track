@@ -5,6 +5,10 @@ struct YieldEstimationView: View {
     @Environment(DataStore.self) private var store
     @State private var viewModel = YieldEstimationViewModel()
     @State private var mapPosition: MapCameraPosition = .automatic
+    @State private var showBunchCountSheet: Bool = false
+    @State private var showBunchWeightEditor: Bool = false
+    @State private var showReport: Bool = false
+    @State private var bunchWeightText: String = "150"
 
     private var paddocks: [Paddock] {
         store.orderedPaddocks.filter { $0.polygonPoints.count >= 3 }
@@ -30,7 +34,16 @@ struct YieldEstimationView: View {
                 blockSelectionSection
                 summarySection
                 generateButton
+
                 if viewModel.isGenerated {
+                    pathButton
+                    bunchWeightButton
+
+                    if viewModel.recordedSiteCount > 0 {
+                        reportButton
+                    }
+
+                    progressSection
                     sampleListSection
                 }
             }
@@ -39,7 +52,22 @@ struct YieldEstimationView: View {
         }
         .navigationTitle("Yield Estimation")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showBunchCountSheet) {
+            if let site = viewModel.selectedSite {
+                BunchCountEntrySheet(site: site) { count, name in
+                    viewModel.recordBunchCount(siteId: site.id, bunchesPerVine: count, recordedBy: name)
+                    saveSession()
+                }
+            }
+        }
+        .sheet(isPresented: $showBunchWeightEditor) {
+            bunchWeightSheet
+        }
+        .navigationDestination(isPresented: $showReport) {
+            YieldReportView(viewModel: viewModel)
+        }
         .onAppear {
+            loadExistingSession()
             fitMap()
         }
     }
@@ -73,21 +101,38 @@ struct YieldEstimationView: View {
                 }
             }
 
+            if viewModel.isPathGenerated {
+                MapPolyline(coordinates: viewModel.pathWaypoints.map(\.coordinate))
+                    .stroke(.orange, lineWidth: 2.5)
+            }
+
             ForEach(viewModel.sampleSites) { site in
                 let paddock = paddocks.first { $0.id == site.paddockId }
                 let color = paddock.map { colorFor($0) } ?? .red
+                let isRecorded = site.isRecorded
 
                 Annotation("", coordinate: site.coordinate) {
-                    ZStack {
-                        Circle()
-                            .fill(color)
-                            .frame(width: 22, height: 22)
-                        Circle()
-                            .fill(.white)
-                            .frame(width: 16, height: 16)
-                        Text("\(site.siteIndex)")
-                            .font(.system(size: 7, weight: .heavy))
-                            .foregroundStyle(color)
+                    Button {
+                        viewModel.selectedSite = site
+                        showBunchCountSheet = true
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(isRecorded ? .green : color)
+                                .frame(width: 24, height: 24)
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 16, height: 16)
+                            if isRecorded {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 8, weight: .black))
+                                    .foregroundStyle(.green)
+                            } else {
+                                Text("\(site.siteIndex)")
+                                    .font(.system(size: 7, weight: .heavy))
+                                    .foregroundStyle(color)
+                            }
+                        }
                     }
                 }
             }
@@ -235,6 +280,7 @@ struct YieldEstimationView: View {
                 viewModel.generateSampleSites(paddocks: paddocks, samplesPerHectare: samplesPerHa)
             }
             fitMapToSites()
+            saveSession()
         } label: {
             Label(
                 viewModel.isGenerated ? "Regenerate Sample Sites" : "Generate Sample Sites",
@@ -247,6 +293,91 @@ struct YieldEstimationView: View {
         .buttonStyle(.borderedProminent)
         .tint(VineyardTheme.leafGreen)
         .disabled(viewModel.selectedPaddockIds.isEmpty)
+    }
+
+    // MARK: - Path Button
+
+    private var pathButton: some View {
+        Button {
+            withAnimation(.smooth(duration: 0.3)) {
+                viewModel.generatePath(paddocks: paddocks)
+            }
+            fitMapToSites()
+            saveSession()
+        } label: {
+            Label(
+                viewModel.isPathGenerated ? "Regenerate Path" : "Generate Path",
+                systemImage: viewModel.isPathGenerated ? "arrow.triangle.turn.up.right.circle" : "point.topleft.down.to.point.bottomright.curvepath"
+            )
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.orange)
+    }
+
+    // MARK: - Bunch Weight
+
+    private var bunchWeightButton: some View {
+        Button {
+            bunchWeightText = String(format: "%.0f", viewModel.averageBunchWeightKg * 1000)
+            showBunchWeightEditor = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "scalemass.fill")
+                    .font(.body)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Average Bunch Weight")
+                        .font(.subheadline.weight(.medium))
+                    Text(String(format: "%.0f g (%.3f kg)", viewModel.averageBunchWeightKg * 1000, viewModel.averageBunchWeightKg))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "pencil")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Report Button
+
+    private var reportButton: some View {
+        Button {
+            showReport = true
+        } label: {
+            Label("View Yield Report", systemImage: "chart.bar.doc.horizontal.fill")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.purple)
+    }
+
+    // MARK: - Progress
+
+    private var progressSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("Collection Progress", systemImage: "chart.line.uptrend.xyaxis")
+                    .font(.headline)
+                Spacer()
+                Text("\(viewModel.recordedSiteCount)/\(viewModel.totalSiteCount)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(viewModel.recordedSiteCount == viewModel.totalSiteCount ? .green : .orange)
+            }
+
+            if viewModel.totalSiteCount > 0 {
+                ProgressView(value: Double(viewModel.recordedSiteCount), total: Double(viewModel.totalSiteCount))
+                    .tint(viewModel.recordedSiteCount == viewModel.totalSiteCount ? .green : .orange)
+            }
+        }
     }
 
     // MARK: - Sample List
@@ -279,29 +410,135 @@ struct YieldEstimationView: View {
                     }
 
                     ForEach(sites) { site in
-                        HStack(spacing: 10) {
-                            Text("#\(site.siteIndex)")
-                                .font(.caption.weight(.bold).monospacedDigit())
-                                .foregroundStyle(color)
-                                .frame(width: 30, alignment: .trailing)
+                        Button {
+                            viewModel.selectedSite = site
+                            showBunchCountSheet = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Text("#\(site.siteIndex)")
+                                    .font(.caption.weight(.bold).monospacedDigit())
+                                    .foregroundStyle(color)
+                                    .frame(width: 30, alignment: .trailing)
 
-                            Text("Row \(site.rowNumber)")
-                                .font(.caption)
-                                .foregroundStyle(.primary)
+                                Text("Row \(site.rowNumber)")
+                                    .font(.caption)
+                                    .foregroundStyle(.primary)
 
-                            Spacer()
+                                if let entry = site.bunchCountEntry {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(.green)
+                                        Text(String(format: "%.1f bunches", entry.bunchesPerVine))
+                                            .font(.caption2.weight(.medium))
+                                            .foregroundStyle(.green)
+                                    }
+                                }
 
-                            Text(String(format: "%.5f, %.5f", site.latitude, site.longitude))
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                                Spacer()
+
+                                if site.isRecorded {
+                                    if let entry = site.bunchCountEntry {
+                                        Text(entry.recordedBy)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                } else {
+                                    Text("Tap to record")
+                                        .font(.caption2)
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
                         }
-                        .padding(.vertical, 3)
-                        .padding(.horizontal, 8)
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(10)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
             }
+        }
+    }
+
+    // MARK: - Bunch Weight Sheet
+
+    private var bunchWeightSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Weight in grams", text: $bunchWeightText)
+                        .keyboardType(.decimalPad)
+                } header: {
+                    Text("Average Bunch Weight (grams)")
+                } footer: {
+                    Text("Enter the average bunch weight in grams. This value is used in the yield calculation.")
+                }
+
+                if !viewModel.previousBunchWeights.isEmpty {
+                    Section {
+                        ForEach(viewModel.previousBunchWeights.sorted(by: { $0.date > $1.date }).prefix(5)) { record in
+                            Button {
+                                bunchWeightText = String(format: "%.0f", record.weightKg * 1000)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(record.date, format: .dateTime.day().month().year())
+                                            .font(.subheadline)
+                                            .foregroundStyle(.primary)
+                                        Text(String(format: "%.0f g", record.weightKg * 1000))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "arrow.uturn.left")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Previous Records")
+                    }
+                }
+            }
+            .navigationTitle("Bunch Weight")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showBunchWeightEditor = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        if let grams = Double(bunchWeightText), grams > 0 {
+                            let kg = grams / 1000.0
+                            viewModel.averageBunchWeightKg = kg
+                            let record = BunchWeightRecord(date: Date(), weightKg: kg)
+                            viewModel.previousBunchWeights.append(record)
+                            saveSession()
+                        }
+                        showBunchWeightEditor = false
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(Double(bunchWeightText) == nil || (Double(bunchWeightText) ?? 0) <= 0)
+                }
+            }
+        }
+    }
+
+    // MARK: - Persistence
+
+    private func saveSession() {
+        guard let vid = store.selectedVineyardId else { return }
+        let session = viewModel.toSession(vineyardId: vid, samplesPerHectare: samplesPerHa)
+        store.saveYieldSession(session)
+    }
+
+    private func loadExistingSession() {
+        guard let vid = store.selectedVineyardId else { return }
+        if let session = store.yieldSessions.first(where: { $0.vineyardId == vid }) {
+            viewModel.loadSession(session)
         }
     }
 

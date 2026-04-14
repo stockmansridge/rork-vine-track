@@ -28,6 +28,7 @@ class DataStore {
     var fuelPurchases: [FuelPurchase] = []
     var operatorCategories: [OperatorCategory] = []
     var buttonTemplates: [ButtonTemplate] = []
+    var yieldSessions: [YieldEstimationSession] = []
 
     var selectedTab: Int = 0
     var cloudSync: CloudSyncService?
@@ -51,6 +52,7 @@ class DataStore {
     private let fuelPurchasesKey = "vinetrack_fuel_purchases"
     private let operatorCategoriesKey = "vinetrack_operator_categories"
     private let buttonTemplatesKey = "vinetrack_button_templates"
+    private let yieldSessionsKey = "vinetrack_yield_sessions"
 
     private static let storageDirectory: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -147,6 +149,9 @@ class DataStore {
 
         let allButtonTemplates: [ButtonTemplate] = loadData(key: buttonTemplatesKey) ?? []
         buttonTemplates = allButtonTemplates.filter { $0.vineyardId == vid }
+
+        let allYieldSessions: [YieldEstimationSession] = loadData(key: yieldSessionsKey) ?? []
+        yieldSessions = allYieldSessions.filter { $0.vineyardId == vid }
 
         if operatorCategories.isEmpty {
             let defaultCategory = OperatorCategory(vineyardId: vid, name: "Tractor Operator", costPerHour: 40)
@@ -635,6 +640,23 @@ class DataStore {
         saveAllButtonTemplates()
     }
 
+    // MARK: - Yield Sessions
+
+    func saveYieldSession(_ session: YieldEstimationSession) {
+        if let index = yieldSessions.firstIndex(where: { $0.id == session.id }) {
+            yieldSessions[index] = session
+        } else {
+            yieldSessions.removeAll { $0.vineyardId == session.vineyardId }
+            yieldSessions.append(session)
+        }
+        saveAllYieldSessions()
+    }
+
+    func deleteYieldSession(_ session: YieldEstimationSession) {
+        yieldSessions.removeAll { $0.id == session.id }
+        saveAllYieldSessions()
+    }
+
     func applyButtonTemplate(_ template: ButtonTemplate) {
         guard let vid = selectedVineyardId else { return }
         let configs = template.toButtonConfigs(for: vid)
@@ -813,7 +835,7 @@ class DataStore {
     }
 
     func deleteAllData() {
-        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey]
+        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey, yieldSessionsKey]
         for key in keys {
             let fileURL = Self.storageDirectory.appendingPathComponent("\(key).json")
             try? FileManager.default.removeItem(at: fileURL)
@@ -839,6 +861,7 @@ class DataStore {
         fuelPurchases = []
         operatorCategories = []
         buttonTemplates = []
+        yieldSessions = []
     }
 
     func clearInMemoryState() {
@@ -860,6 +883,7 @@ class DataStore {
         fuelPurchases = []
         operatorCategories = []
         buttonTemplates = []
+        yieldSessions = []
     }
 
     // MARK: - Demo Data
@@ -1942,6 +1966,15 @@ class DataStore {
         all.append(contentsOf: buttonTemplates)
         save(all, key: buttonTemplatesKey)
         syncDataToCloud(dataType: "button_templates")
+    }
+
+    private func saveAllYieldSessions() {
+        var all: [YieldEstimationSession] = loadData(key: yieldSessionsKey) ?? []
+        if let vid = selectedVineyardId {
+            all.removeAll { $0.vineyardId == vid }
+        }
+        all.append(contentsOf: yieldSessions)
+        save(all, key: yieldSessionsKey)
     }
 
     private func saveAllCustomPatterns() {
