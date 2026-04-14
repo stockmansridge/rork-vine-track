@@ -276,6 +276,23 @@ struct SprayRecordDetailView: View {
                 let hours = Int(duration) / 3600
                 let minutes = (Int(duration) % 3600) / 60
                 LabeledContent("Duration", value: hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m")
+
+                let fillSessions = trip.tankSessions.filter { $0.fillDuration != nil }
+                if !fillSessions.isEmpty {
+                    ForEach(fillSessions) { session in
+                        if let fillDur = session.fillDuration {
+                            HStack {
+                                Label("Tank \(session.tankNumber) Fill", systemImage: "drop.fill")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.cyan)
+                                Spacer()
+                                Text(formatFillDurationDetail(fillDur))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
             } else if let endTime = effectiveEnd {
                 let duration = endTime.timeIntervalSince(record.startTime)
                 let hours = Int(duration) / 3600
@@ -283,6 +300,16 @@ struct SprayRecordDetailView: View {
                 LabeledContent("Duration", value: hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m")
             }
         }
+    }
+
+    private func formatFillDurationDetail(_ seconds: TimeInterval) -> String {
+        let totalSeconds = Int(max(seconds, 0))
+        let mins = totalSeconds / 60
+        let secs = totalSeconds % 60
+        if mins > 0 {
+            return "\(mins)m \(secs)s"
+        }
+        return "\(secs)s"
     }
 
     private var weatherSection: some View {

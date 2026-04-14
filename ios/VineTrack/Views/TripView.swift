@@ -420,6 +420,9 @@ struct ActiveTripView: View {
     @State private var showTankEndConfirmation: Bool = false
     @State private var activeDurationTimer: TimeInterval = 0
     @State private var durationTimer: Timer? = nil
+    @State private var showFillStopConfirmation: Bool = false
+    @State private var fillElapsed: TimeInterval = 0
+    @State private var fillTimer: Timer? = nil
 
     private var currentSpeedKmh: Double {
         guard let speed = locationService.location?.speed, speed > 0 else { return 0 }
@@ -558,6 +561,7 @@ struct ActiveTripView: View {
             }
 
             currentRowBanner
+            fillControlBar
             tankControlBar
             tripControls
         }
@@ -582,10 +586,13 @@ struct ActiveTripView: View {
             updateDetectedRow(from: locationService.location)
             activeDurationTimer = trip.activeDuration
             startDurationTimer()
+            startFillTimerIfNeeded()
         }
         .onDisappear {
             durationTimer?.invalidate()
             durationTimer = nil
+            fillTimer?.invalidate()
+            fillTimer = nil
         }
         .onChange(of: locationService.location) { _, newLocation in
             updateDetectedRow(from: newLocation)
@@ -1062,6 +1069,85 @@ struct ActiveTripView: View {
         return completedTanks.count >= trip.totalTanks
     }
 
+    private var fillTimerEnabled: Bool {
+        store.settings.fillTimerEnabled
+    }
+
+    private var fillControlBar: some View {
+        Group {
+            if fillTimerEnabled && hasSprayProgram {
+                VStack(spacing: 0) {
+                    Divider()
+                    if trip.isFillingTank, let tankNum = trip.fillingTankNumber {
+                        HStack(spacing: 12) {
+                            Button {
+                                showFillStopConfirmation = true
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "stop.circle.fill")
+                                        .font(.title3)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Stop Fill")
+                                            .font(.headline)
+                                        Text("Tank \(tankNum) • \(formatFillDuration(fillElapsed))")
+                                            .font(.caption)
+                                    }
+                                }
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(.orange.gradient, in: .rect(cornerRadius: 12))
+                            }
+                            .sensoryFeedback(.warning, trigger: showFillStopConfirmation)
+                            .confirmationDialog(
+                                "Stop filling Tank \(tankNum)?",
+                                isPresented: $showFillStopConfirmation
+                            ) {
+                                Button("Stop Fill") {
+                                    stopFill()
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("This will record the fill duration for Tank \(tankNum).")
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    } else if let nextTank = nextTankToFill {
+                        Button {
+                            startFill(tankNumber: nextTank)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "drop.circle.fill")
+                                    .font(.title3)
+                                Text("Start Fill – Tank \(nextTank)")
+                                    .font(.headline)
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.cyan.gradient, in: .rect(cornerRadius: 12))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .sensoryFeedback(.success, trigger: trip.isFillingTank)
+                    }
+                }
+                .background(Color(.secondarySystemGroupedBackground))
+            }
+        }
+    }
+
+    private var nextTankToFill: Int? {
+        guard hasSprayProgram else { return nil }
+        if trip.isFillingTank { return nil }
+        let filledTanks = Set(trip.tankSessions.compactMap { $0.fillEndTime != nil ? $0.tankNumber : nil })
+        for i in 1...trip.totalTanks {
+            if !filledTanks.contains(i) { return i }
+        }
+        return nil
+    }
+
     private var tankControlBar: some View {
         Group {
             if hasSprayProgram && !allTanksCompleted {
@@ -1149,14 +1235,78 @@ struct ActiveTripView: View {
 
     private func startTank() {
         guard let tankNum = nextTankToStart else { return }
-        var updated = trip
+        if trip.isFillingTank {
+            stopFill()
+        }
+        var updated = store.activeTrip ?? trip
         updated.activeTankNumber = tankNum
-        let session = TankSession(
-            tankNumber: tankNum,
-            startTime: Date()
-        )
-        updated.tankSessions.append(session)
+        if let idx = updated.tankSessions.lastIndex(where: { $0.tankNumber == tankNum && $0.endTime == nil }) {
+            updated.tankSessions[idx].startTime = Date()
+        } else {
+            let session = TankSession(
+                tankNumber: tankNum,
+                startTime: Date()
+            )
+            updated.tankSessions.append(session)
+        }
         store.updateTrip(updated)
+    }
+
+    private func startFill(tankNumber: Int) {
+        var updated = trip
+        if let idx = updated.tankSessions.lastIndex(where: { $0.tankNumber == tankNumber && $0.endTime == nil }) {
+            updated.tankSessions[idx].fillStartTime = Date()
+        } else {
+            let session = TankSession(
+                tankNumber: tankNumber,
+                startTime: Date(),
+                fillStartTime: Date()
+            )
+            updated.tankSessions.append(session)
+        }
+        updated.isFillingTank = true
+        updated.fillingTankNumber = tankNumber
+        store.updateTrip(updated)
+        startFillTimerIfNeeded()
+    }
+
+    private func stopFill() {
+        var updated = store.activeTrip ?? trip
+        guard let tankNum = updated.fillingTankNumber else { return }
+        if let idx = updated.tankSessions.lastIndex(where: { $0.tankNumber == tankNum && $0.fillStartTime != nil && $0.fillEndTime == nil }) {
+            updated.tankSessions[idx].fillEndTime = Date()
+        }
+        updated.isFillingTank = false
+        updated.fillingTankNumber = nil
+        store.updateTrip(updated)
+        fillTimer?.invalidate()
+        fillTimer = nil
+        fillElapsed = 0
+    }
+
+    private func startFillTimerIfNeeded() {
+        fillTimer?.invalidate()
+        fillTimer = nil
+        guard trip.isFillingTank, let tankNum = trip.fillingTankNumber else {
+            fillElapsed = 0
+            return
+        }
+        if let session = trip.tankSessions.last(where: { $0.tankNumber == tankNum && $0.fillStartTime != nil && $0.fillEndTime == nil }),
+           let start = session.fillStartTime {
+            fillElapsed = Date().timeIntervalSince(start)
+            fillTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                Task { @MainActor in
+                    fillElapsed = Date().timeIntervalSince(start)
+                }
+            }
+        }
+    }
+
+    private func formatFillDuration(_ seconds: TimeInterval) -> String {
+        let totalSeconds = Int(max(seconds, 0))
+        let mins = totalSeconds / 60
+        let secs = totalSeconds % 60
+        return String(format: "%d:%02d", mins, secs)
     }
 
     private func endTank() {
@@ -1275,6 +1425,11 @@ struct ActiveTripView: View {
                 Button("End Trip", role: .destructive) {
                     durationTimer?.invalidate()
                     durationTimer = nil
+                    fillTimer?.invalidate()
+                    fillTimer = nil
+                    if trip.isFillingTank {
+                        stopFill()
+                    }
                     if trip.isPaused {
                         trackingService.resumeTracking()
                     }

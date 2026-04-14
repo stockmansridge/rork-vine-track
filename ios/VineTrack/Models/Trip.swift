@@ -9,6 +9,13 @@ nonisolated struct TankSession: Codable, Identifiable, Sendable, Hashable {
     var pathsCovered: [Double]
     var startRow: Double?
     var endRow: Double?
+    var fillStartTime: Date?
+    var fillEndTime: Date?
+
+    var fillDuration: TimeInterval? {
+        guard let start = fillStartTime, let end = fillEndTime else { return nil }
+        return end.timeIntervalSince(start)
+    }
 
     init(
         id: UUID = UUID(),
@@ -17,7 +24,9 @@ nonisolated struct TankSession: Codable, Identifiable, Sendable, Hashable {
         endTime: Date? = nil,
         pathsCovered: [Double] = [],
         startRow: Double? = nil,
-        endRow: Double? = nil
+        endRow: Double? = nil,
+        fillStartTime: Date? = nil,
+        fillEndTime: Date? = nil
     ) {
         self.id = id
         self.tankNumber = tankNumber
@@ -26,6 +35,8 @@ nonisolated struct TankSession: Codable, Identifiable, Sendable, Hashable {
         self.pathsCovered = pathsCovered
         self.startRow = startRow
         self.endRow = endRow
+        self.fillStartTime = fillStartTime
+        self.fillEndTime = fillEndTime
     }
 
     var rowRange: String {
@@ -69,6 +80,8 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
     var pauseTimestamps: [Date]
     var resumeTimestamps: [Date]
     var isPaused: Bool
+    var isFillingTank: Bool
+    var fillingTankNumber: Int?
 
     var activeDuration: TimeInterval {
         let end = endTime ?? Date()
@@ -112,7 +125,9 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
         totalTanks: Int = 0,
         pauseTimestamps: [Date] = [],
         resumeTimestamps: [Date] = [],
-        isPaused: Bool = false
+        isPaused: Bool = false,
+        isFillingTank: Bool = false,
+        fillingTankNumber: Int? = nil
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -140,6 +155,8 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
         self.pauseTimestamps = pauseTimestamps
         self.resumeTimestamps = resumeTimestamps
         self.isPaused = isPaused
+        self.isFillingTank = isFillingTank
+        self.fillingTankNumber = fillingTankNumber
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
@@ -150,6 +167,7 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
         case completedPaths, skippedPaths, currentPathDistance
         case tankSessions, activeTankNumber, totalTanks
         case pauseTimestamps, resumeTimestamps, isPaused
+        case isFillingTank, fillingTankNumber
     }
 
     init(from decoder: Decoder) throws {
@@ -177,6 +195,8 @@ nonisolated struct Trip: Codable, Identifiable, Sendable, Hashable {
         pauseTimestamps = try container.decodeIfPresent([Date].self, forKey: .pauseTimestamps) ?? []
         resumeTimestamps = try container.decodeIfPresent([Date].self, forKey: .resumeTimestamps) ?? []
         isPaused = try container.decodeIfPresent(Bool.self, forKey: .isPaused) ?? false
+        isFillingTank = try container.decodeIfPresent(Bool.self, forKey: .isFillingTank) ?? false
+        fillingTankNumber = try container.decodeIfPresent(Int.self, forKey: .fillingTankNumber)
 
         if let doubleRow = try? container.decode(Double.self, forKey: .currentRowNumber) {
             currentRowNumber = doubleRow

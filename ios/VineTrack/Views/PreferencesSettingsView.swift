@@ -8,6 +8,7 @@ struct PreferencesSettingsView: View {
             appearanceSection
             seasonSection
             trackingSection
+            fillTimerSection
             photoSection
             timezoneSection
         }
@@ -74,6 +75,23 @@ struct PreferencesSettingsView: View {
             Text("Row Tracking")
         } footer: {
             Text("Controls how frequently location points are recorded during a trip.")
+        }
+    }
+
+    private var fillTimerSection: some View {
+        Section {
+            Toggle("Tank Fill Timer", isOn: Binding(
+                get: { store.settings.fillTimerEnabled },
+                set: { newVal in
+                    var s = store.settings
+                    s.fillTimerEnabled = newVal
+                    store.updateSettings(s)
+                }
+            ))
+        } header: {
+            Text("Fill Timer")
+        } footer: {
+            Text("When enabled, a Start Fill button appears during spray trips to time how long each tank fill takes. Fill durations are recorded in the spray sheet and PDF export.")
         }
     }
 

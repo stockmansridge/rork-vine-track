@@ -155,6 +155,12 @@ struct SprayRecordPDFService {
                             sessionDesc += " (\(session.rowRange))"
                         }
                         drawRow(label: sessionDesc, value: "", indent: 12)
+                        if let fillDur = session.fillDuration {
+                            let fillMins = Int(fillDur) / 60
+                            let fillSecs = Int(fillDur) % 60
+                            let fillStr = fillMins > 0 ? "\(fillMins)m \(fillSecs)s" : "\(fillSecs)s"
+                            drawRow(label: "  Fill Duration: \(fillStr)", value: "", indent: 24)
+                        }
                     }
                 }
             }

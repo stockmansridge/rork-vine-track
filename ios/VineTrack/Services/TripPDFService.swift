@@ -131,6 +131,9 @@ struct TripPDFService {
                         let dur = end.timeIntervalSince(start)
                         drawRow(label: "  Duration", value: formatDurationSeconds(dur), indent: 12)
                     }
+                    if let fillDur = session.fillDuration {
+                        drawRow(label: "  Fill Duration", value: formatDurationSeconds(fillDur), indent: 12)
+                    }
                     y += 4
                 }
             }

@@ -168,6 +168,11 @@ struct TripSummarySheet: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        if let fillDur = session.fillDuration {
+                            Label("Fill: \(formatFillDuration(fillDur))", systemImage: "drop.fill")
+                                .font(.caption)
+                                .foregroundStyle(.cyan)
+                        }
                     }
 
                     Spacer()
@@ -204,6 +209,16 @@ struct TripSummarySheet: View {
             return String(format: "%.0f", value)
         }
         return String(format: "%.1f", value)
+    }
+
+    private func formatFillDuration(_ seconds: TimeInterval) -> String {
+        let totalSeconds = Int(max(seconds, 0))
+        let mins = totalSeconds / 60
+        let secs = totalSeconds % 60
+        if mins > 0 {
+            return "\(mins)m \(secs)s"
+        }
+        return "\(secs)s"
     }
 }
 

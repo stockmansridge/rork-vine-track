@@ -51,6 +51,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
     var canopyWaterRates: CanopyWaterRateEntry
     var seasonFuelCostPerLitre: Double
     var appearance: AppAppearance
+    var fillTimerEnabled: Bool
 
     init(
         id: UUID = UUID(),
@@ -70,7 +71,8 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         paddockOrder: [UUID] = [],
         canopyWaterRates: CanopyWaterRateEntry = .defaults,
         seasonFuelCostPerLitre: Double = 0,
-        appearance: AppAppearance = .system
+        appearance: AppAppearance = .system,
+        fillTimerEnabled: Bool = false
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -90,6 +92,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         self.canopyWaterRates = canopyWaterRates
         self.seasonFuelCostPerLitre = seasonFuelCostPerLitre
         self.appearance = appearance
+        self.fillTimerEnabled = fillTimerEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -112,6 +115,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         canopyWaterRates = try container.decodeIfPresent(CanopyWaterRateEntry.self, forKey: .canopyWaterRates) ?? .defaults
         seasonFuelCostPerLitre = try container.decodeIfPresent(Double.self, forKey: .seasonFuelCostPerLitre) ?? 0
         appearance = try container.decodeIfPresent(AppAppearance.self, forKey: .appearance) ?? .system
+        fillTimerEnabled = try container.decodeIfPresent(Bool.self, forKey: .fillTimerEnabled) ?? false
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
@@ -119,6 +123,6 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         case rowTrackingEnabled, rowTrackingInterval, defaultPaddockId
         case autoPhotoPrompt, enabledGrowthStageCodes, weatherStationId
         case defaultWaterVolume, defaultSprayRate, defaultConcentrationFactor
-        case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance
+        case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance, fillTimerEnabled
     }
 }
