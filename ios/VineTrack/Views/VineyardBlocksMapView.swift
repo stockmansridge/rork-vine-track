@@ -5,6 +5,7 @@ struct VineyardBlocksMapView: View {
     @Environment(DataStore.self) private var store
     @Environment(LocationService.self) private var locationService
     @Binding var selectedPaddock: Paddock?
+    var onAddBlock: (() -> Void)? = nil
     @State private var position: MapCameraPosition = .automatic
     @State private var hasSetInitialPosition: Bool = false
 
@@ -57,20 +58,35 @@ struct VineyardBlocksMapView: View {
             .mapStyle(.hybrid)
             .clipShape(.rect(cornerRadius: 12))
 
-            if paddocks.contains(where: { $0.polygonPoints.count > 2 }) {
-                Button {
-                    withAnimation(.smooth(duration: 0.4)) {
-                        fitAllBlocks()
+            VStack(spacing: 8) {
+                if let onAddBlock {
+                    Button {
+                        onAddBlock()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(8)
+                            .background(.blue, in: .circle)
+                            .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
                     }
-                } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(.ultraThinMaterial, in: .circle)
                 }
-                .padding(8)
+
+                if paddocks.contains(where: { $0.polygonPoints.count > 2 }) {
+                    Button {
+                        withAnimation(.smooth(duration: 0.4)) {
+                            fitAllBlocks()
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(8)
+                            .background(.ultraThinMaterial, in: .circle)
+                    }
+                }
             }
+            .padding(8)
         }
         .frame(height: 280)
         .onAppear {

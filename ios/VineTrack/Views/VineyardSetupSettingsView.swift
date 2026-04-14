@@ -110,7 +110,7 @@ struct VineyardSetupSettingsView: View {
     private var vineyardMapSection: some View {
         Section {
             if store.orderedPaddocks.contains(where: { $0.polygonPoints.count > 2 }) {
-                VineyardBlocksMapView(selectedPaddock: $mapSelectedPaddock)
+                VineyardBlocksMapView(selectedPaddock: $mapSelectedPaddock, onAddBlock: { showAddPaddock = true })
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
             } else {
                 VStack(spacing: 8) {
@@ -184,11 +184,6 @@ struct VineyardSetupSettingsView: View {
                 store.updatePaddockOrder(ordered.map { $0.id })
             }
 
-            Button {
-                showAddPaddock = true
-            } label: {
-                Label("Add Block", systemImage: "plus.circle")
-            }
         } header: {
             Text("Blocks")
         } footer: {
