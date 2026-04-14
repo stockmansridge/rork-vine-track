@@ -5,6 +5,7 @@ struct EditButtonsSheet: View {
     @Environment(DataStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var buttons: [ButtonConfig] = []
+    @State private var showTemplatePicker: Bool = false
 
     private func buttonBinding(_ id: UUID) -> Binding<ButtonConfig> {
         Binding(
@@ -56,6 +57,22 @@ struct EditButtonsSheet: View {
             .navigationTitle("\(mode.rawValue) Buttons")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .bottomBar) {
+                    if !store.buttonTemplates(for: mode).isEmpty {
+                        Menu {
+                            ForEach(store.buttonTemplates(for: mode)) { template in
+                                Button {
+                                    applyTemplate(template)
+                                } label: {
+                                    Label(template.name, systemImage: "square.on.square")
+                                }
+                            }
+                        } label: {
+                            Label("Apply Template", systemImage: "square.on.square")
+                                .font(.subheadline)
+                        }
+                    }
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
@@ -70,6 +87,11 @@ struct EditButtonsSheet: View {
                 buttons = store.buttonsForMode(mode)
             }
         }
+    }
+
+    private func applyTemplate(_ template: ButtonTemplate) {
+        guard let vid = store.selectedVineyardId else { return }
+        buttons = template.toButtonConfigs(for: vid)
     }
 
     private func saveButtons() {

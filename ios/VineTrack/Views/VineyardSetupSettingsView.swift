@@ -9,6 +9,8 @@ struct VineyardSetupSettingsView: View {
     @State private var editingPaddock: Paddock?
     @State private var showEditRepairButtons: Bool = false
     @State private var showEditGrowthButtons: Bool = false
+    @State private var showRepairTemplates: Bool = false
+    @State private var showGrowthTemplates: Bool = false
     @State private var showGrowthStageConfig: Bool = false
     @State private var weatherStationService = WeatherStationService()
     @State private var manualStationId: String = ""
@@ -53,6 +55,12 @@ struct VineyardSetupSettingsView: View {
         }
         .sheet(isPresented: $showEditGrowthButtons) {
             EditButtonsSheet(mode: .growth)
+        }
+        .sheet(isPresented: $showRepairTemplates) {
+            ButtonTemplateListView(mode: .repairs)
+        }
+        .sheet(isPresented: $showGrowthTemplates) {
+            ButtonTemplateListView(mode: .growth)
         }
         .sheet(isPresented: $showGrowthStageConfig) {
             GrowthStageConfigSheet()
@@ -222,6 +230,25 @@ struct VineyardSetupSettingsView: View {
             }
 
             Button {
+                showRepairTemplates = true
+            } label: {
+                HStack {
+                    Label("Repair Templates", systemImage: "square.on.square")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    let count = store.buttonTemplates(for: .repairs).count
+                    if count > 0 {
+                        Text("\(count)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Button {
                 showEditGrowthButtons = true
             } label: {
                 HStack {
@@ -240,10 +267,29 @@ struct VineyardSetupSettingsView: View {
                         .foregroundStyle(.tertiary)
                 }
             }
+
+            Button {
+                showGrowthTemplates = true
+            } label: {
+                HStack {
+                    Label("Growth Templates", systemImage: "square.on.square")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    let count = store.buttonTemplates(for: .growth).count
+                    if count > 0 {
+                        Text("\(count)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
         } header: {
             Text("Button Customization")
         } footer: {
-            Text("Customize the 8 buttons for each mode (Repairs & Growth).")
+            Text("Customize buttons directly or create templates to quickly switch between different button sets. Templates pair rows left and right.")
         }
     }
 

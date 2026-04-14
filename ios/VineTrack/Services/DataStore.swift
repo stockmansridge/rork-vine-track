@@ -27,6 +27,7 @@ class DataStore {
     var tractors: [Tractor] = []
     var fuelPurchases: [FuelPurchase] = []
     var operatorCategories: [OperatorCategory] = []
+    var buttonTemplates: [ButtonTemplate] = []
 
     var selectedTab: Int = 0
     var cloudSync: CloudSyncService?
@@ -49,6 +50,7 @@ class DataStore {
     private let tractorsKey = "vinetrack_tractors"
     private let fuelPurchasesKey = "vinetrack_fuel_purchases"
     private let operatorCategoriesKey = "vinetrack_operator_categories"
+    private let buttonTemplatesKey = "vinetrack_button_templates"
 
     private static let storageDirectory: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -143,6 +145,9 @@ class DataStore {
         let allOperatorCategories: [OperatorCategory] = loadData(key: operatorCategoriesKey) ?? []
         operatorCategories = allOperatorCategories.filter { $0.vineyardId == vid }
 
+        let allButtonTemplates: [ButtonTemplate] = loadData(key: buttonTemplatesKey) ?? []
+        buttonTemplates = allButtonTemplates.filter { $0.vineyardId == vid }
+
         if operatorCategories.isEmpty {
             let defaultCategory = OperatorCategory(vineyardId: vid, name: "Tractor Operator", costPerHour: 40)
             operatorCategories = [defaultCategory]
@@ -170,6 +175,7 @@ class DataStore {
     var allTractors: [Tractor] { loadData(key: tractorsKey) ?? [] }
     var allFuelPurchases: [FuelPurchase] { loadData(key: fuelPurchasesKey) ?? [] }
     var allOperatorCategories: [OperatorCategory] { loadData(key: operatorCategoriesKey) ?? [] }
+    var allButtonTemplates: [ButtonTemplate] { loadData(key: buttonTemplatesKey) ?? [] }
 
     var chemicals: [SavedChemical] { savedChemicals }
     var equipment: [SprayEquipmentItem] { sprayEquipment }
@@ -607,6 +613,42 @@ class DataStore {
         save(vineyards, key: vineyardsKey)
     }
 
+    // MARK: - Button Templates
+
+    func addButtonTemplate(_ template: ButtonTemplate) {
+        guard let vid = selectedVineyardId else { return }
+        var newTemplate = template
+        newTemplate.vineyardId = vid
+        buttonTemplates.append(newTemplate)
+        saveAllButtonTemplates()
+    }
+
+    func updateButtonTemplate(_ template: ButtonTemplate) {
+        guard let index = buttonTemplates.firstIndex(where: { $0.id == template.id }) else { return }
+        buttonTemplates[index] = template
+        saveAllButtonTemplates()
+    }
+
+    func deleteButtonTemplate(_ template: ButtonTemplate) {
+        buttonTemplates.removeAll { $0.id == template.id }
+        saveAllButtonTemplates()
+    }
+
+    func applyButtonTemplate(_ template: ButtonTemplate) {
+        guard let vid = selectedVineyardId else { return }
+        let configs = template.toButtonConfigs(for: vid)
+        switch template.mode {
+        case .repairs:
+            updateRepairButtons(configs)
+        case .growth:
+            updateGrowthButtons(configs)
+        }
+    }
+
+    func buttonTemplates(for mode: PinMode) -> [ButtonTemplate] {
+        buttonTemplates.filter { $0.mode == mode }
+    }
+
     // MARK: - Spray Application
 
     func addSprayApplication(_ application: SprayApplication, tripId: UUID? = nil, tractorName: String = "") {
@@ -746,7 +788,7 @@ class DataStore {
     }
 
     func deleteAllData() {
-        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey]
+        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey]
         for key in keys {
             let fileURL = Self.storageDirectory.appendingPathComponent("\(key).json")
             try? FileManager.default.removeItem(at: fileURL)
@@ -771,6 +813,7 @@ class DataStore {
         tractors = []
         fuelPurchases = []
         operatorCategories = []
+        buttonTemplates = []
     }
 
     func clearInMemoryState() {
@@ -791,6 +834,7 @@ class DataStore {
         tractors = []
         fuelPurchases = []
         operatorCategories = []
+        buttonTemplates = []
     }
 
     // MARK: - Demo Data
@@ -1863,6 +1907,16 @@ class DataStore {
         all.append(contentsOf: operatorCategories)
         save(all, key: operatorCategoriesKey)
         syncDataToCloud(dataType: "operator_categories")
+    }
+
+    private func saveAllButtonTemplates() {
+        var all: [ButtonTemplate] = loadData(key: buttonTemplatesKey) ?? []
+        if let vid = selectedVineyardId {
+            all.removeAll { $0.vineyardId == vid }
+        }
+        all.append(contentsOf: buttonTemplates)
+        save(all, key: buttonTemplatesKey)
+        syncDataToCloud(dataType: "button_templates")
     }
 
     private func saveAllCustomPatterns() {
