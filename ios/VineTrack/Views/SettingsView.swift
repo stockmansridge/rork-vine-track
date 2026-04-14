@@ -374,6 +374,29 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            NavigationLink {
+                DamageRecordsListView()
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.red.gradient)
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Record Damage")
+                            .font(.subheadline.weight(.medium))
+                        let count = store.damageRecords.count
+                        Text(count > 0 ? "\(count) damage record\(count == 1 ? "" : "s")" : "Frost, hail, wind & more")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         } header: {
             HStack(spacing: 6) {
                 Image(systemName: "chart.bar.doc.horizontal.fill")

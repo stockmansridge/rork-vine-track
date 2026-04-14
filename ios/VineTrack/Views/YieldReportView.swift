@@ -9,7 +9,7 @@ struct YieldReportView: View {
     }
 
     private var estimates: [BlockYieldEstimate] {
-        viewModel.calculateYieldEstimates(paddocks: paddocks)
+        viewModel.calculateYieldEstimates(paddocks: paddocks, damageFactorProvider: { store.damageFactor(for: $0) })
     }
 
     private var totalYieldTonnes: Double {
@@ -169,7 +169,7 @@ struct YieldReportView: View {
                 estimateRow("Avg Bunches/Vine", value: String(format: "%.2f", est.averageBunchesPerVine))
                 estimateRow("Total Bunches", value: String(format: "%.0f", est.totalBunches))
                 estimateRow("Avg Bunch Weight", value: String(format: "%.0f g", est.averageBunchWeightKg * 1000))
-                estimateRow("Damage Factor", value: String(format: "%.2f", est.damageFactor))
+                estimateRow("Damage Factor", value: String(format: "%.2f (%.0f%% viable)", est.damageFactor, est.damageFactor * 100))
                 estimateRow("Samples", value: "\(est.samplesRecorded)/\(est.samplesTotal)")
             }
 
@@ -220,7 +220,7 @@ struct YieldReportView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     formulaNote("Bunches per vine is averaged from all recorded samples (to 2 decimal places)")
                     formulaNote("Bunch weight can be manually entered or loaded from previous season records")
-                    formulaNote("Damage factor is 1.0 (no damage) — damage calculation coming soon")
+                    formulaNote("Damage factor reflects cumulative damage recorded for each block (1.0 = no damage)")
                 }
             }
             .padding(12)

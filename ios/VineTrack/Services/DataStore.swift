@@ -29,6 +29,7 @@ class DataStore {
     var operatorCategories: [OperatorCategory] = []
     var buttonTemplates: [ButtonTemplate] = []
     var yieldSessions: [YieldEstimationSession] = []
+    var damageRecords: [DamageRecord] = []
 
     var selectedTab: Int = 0
     var cloudSync: CloudSyncService?
@@ -53,6 +54,7 @@ class DataStore {
     private let operatorCategoriesKey = "vinetrack_operator_categories"
     private let buttonTemplatesKey = "vinetrack_button_templates"
     private let yieldSessionsKey = "vinetrack_yield_sessions"
+    private let damageRecordsKey = "vinetrack_damage_records"
 
     private static let storageDirectory: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -152,6 +154,9 @@ class DataStore {
 
         let allYieldSessions: [YieldEstimationSession] = loadData(key: yieldSessionsKey) ?? []
         yieldSessions = allYieldSessions.filter { $0.vineyardId == vid }
+
+        let allDamageRecords: [DamageRecord] = loadData(key: damageRecordsKey) ?? []
+        damageRecords = allDamageRecords.filter { $0.vineyardId == vid }
 
         if operatorCategories.isEmpty {
             let defaultCategory = OperatorCategory(vineyardId: vid, name: "Tractor Operator", costPerHour: 40)
@@ -640,6 +645,47 @@ class DataStore {
         saveAllButtonTemplates()
     }
 
+    // MARK: - Damage Records
+
+    func addDamageRecord(_ record: DamageRecord) {
+        guard let vid = selectedVineyardId else { return }
+        var newRecord = record
+        newRecord.vineyardId = vid
+        damageRecords.append(newRecord)
+        saveAllDamageRecords()
+    }
+
+    func updateDamageRecord(_ record: DamageRecord) {
+        guard let index = damageRecords.firstIndex(where: { $0.id == record.id }) else { return }
+        damageRecords[index] = record
+        saveAllDamageRecords()
+    }
+
+    func deleteDamageRecord(_ record: DamageRecord) {
+        damageRecords.removeAll { $0.id == record.id }
+        saveAllDamageRecords()
+    }
+
+    func damageRecords(for paddockId: UUID) -> [DamageRecord] {
+        damageRecords.filter { $0.paddockId == paddockId }
+    }
+
+    func damageFactor(for paddockId: UUID) -> Double {
+        let records = damageRecords.filter { $0.paddockId == paddockId }
+        guard !records.isEmpty else { return 1.0 }
+        guard let paddock = paddocks.first(where: { $0.id == paddockId }) else { return 1.0 }
+        let blockArea = paddock.areaHectares
+        guard blockArea > 0 else { return 1.0 }
+        var totalLostHa: Double = 0
+        for record in records {
+            let damageArea = min(record.areaHectares, blockArea)
+            let lostHa = damageArea * (record.damagePercent / 100.0)
+            totalLostHa += lostHa
+        }
+        let factor = max(0, 1.0 - (totalLostHa / blockArea))
+        return factor
+    }
+
     // MARK: - Yield Sessions
 
     func saveYieldSession(_ session: YieldEstimationSession) {
@@ -835,7 +881,7 @@ class DataStore {
     }
 
     func deleteAllData() {
-        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey, yieldSessionsKey]
+        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey, yieldSessionsKey, damageRecordsKey]
         for key in keys {
             let fileURL = Self.storageDirectory.appendingPathComponent("\(key).json")
             try? FileManager.default.removeItem(at: fileURL)
@@ -862,6 +908,7 @@ class DataStore {
         operatorCategories = []
         buttonTemplates = []
         yieldSessions = []
+        damageRecords = []
     }
 
     func clearInMemoryState() {
@@ -884,6 +931,7 @@ class DataStore {
         operatorCategories = []
         buttonTemplates = []
         yieldSessions = []
+        damageRecords = []
     }
 
     // MARK: - Demo Data
@@ -1966,6 +2014,15 @@ class DataStore {
         all.append(contentsOf: buttonTemplates)
         save(all, key: buttonTemplatesKey)
         syncDataToCloud(dataType: "button_templates")
+    }
+
+    private func saveAllDamageRecords() {
+        var all: [DamageRecord] = loadData(key: damageRecordsKey) ?? []
+        if let vid = selectedVineyardId {
+            all.removeAll { $0.vineyardId == vid }
+        }
+        all.append(contentsOf: damageRecords)
+        save(all, key: damageRecordsKey)
     }
 
     private func saveAllYieldSessions() {

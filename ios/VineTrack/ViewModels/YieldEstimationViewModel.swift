@@ -173,13 +173,14 @@ class YieldEstimationViewModel {
 
     // MARK: - Yield Calculation
 
-    func calculateYieldEstimates(paddocks: [Paddock]) -> [BlockYieldEstimate] {
+    func calculateYieldEstimates(paddocks: [Paddock], damageFactorProvider: ((UUID) -> Double)? = nil) -> [BlockYieldEstimate] {
         let selected = paddocks.filter { selectedPaddockIds.contains($0.id) }
         var estimates: [BlockYieldEstimate] = []
 
         for paddock in selected {
             let sitesInPaddock = sampleSites.filter { $0.paddockId == paddock.id }
             let recordedSites = sitesInPaddock.filter { $0.isRecorded }
+            let damageFactor = damageFactorProvider?(paddock.id) ?? 1.0
 
             guard !recordedSites.isEmpty else {
                 estimates.append(BlockYieldEstimate(
@@ -190,11 +191,12 @@ class YieldEstimationViewModel {
                     averageBunchesPerVine: 0,
                     totalBunches: 0,
                     averageBunchWeightKg: averageBunchWeightKg,
-                    damageFactor: 1.0,
+                    damageFactor: damageFactor,
                     estimatedYieldKg: 0,
                     estimatedYieldTonnes: 0,
                     samplesRecorded: 0,
-                    samplesTotal: sitesInPaddock.count
+                    samplesTotal: sitesInPaddock.count,
+                    damageRecords: []
                 ))
                 continue
             }
@@ -204,7 +206,6 @@ class YieldEstimationViewModel {
 
             let totalVines = paddock.effectiveVineCount
             let totalBunches = Double(totalVines) * avgBunchesRounded
-            let damageFactor = 1.0
             let yieldKg = totalBunches * averageBunchWeightKg * damageFactor
             let yieldTonnes = yieldKg / 1000.0
 
@@ -220,7 +221,8 @@ class YieldEstimationViewModel {
                 estimatedYieldKg: yieldKg,
                 estimatedYieldTonnes: yieldTonnes,
                 samplesRecorded: recordedSites.count,
-                samplesTotal: sitesInPaddock.count
+                samplesTotal: sitesInPaddock.count,
+                damageRecords: []
             ))
         }
 

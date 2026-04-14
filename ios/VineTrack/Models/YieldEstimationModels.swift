@@ -115,4 +115,78 @@ nonisolated struct BlockYieldEstimate: Sendable {
     let estimatedYieldTonnes: Double
     let samplesRecorded: Int
     let samplesTotal: Int
+    let damageRecords: [DamageRecord]
+}
+
+nonisolated enum DamageType: String, Codable, Sendable, CaseIterable, Hashable {
+    case frost = "Frost"
+    case hail = "Hail"
+    case wind = "Wind"
+    case heat = "Heat"
+    case disease = "Disease"
+    case pest = "Pest"
+    case other = "Other"
+
+    var icon: String {
+        switch self {
+        case .frost: "snowflake"
+        case .hail: "cloud.hail.fill"
+        case .wind: "wind"
+        case .heat: "sun.max.fill"
+        case .disease: "allergens"
+        case .pest: "ladybug.fill"
+        case .other: "exclamationmark.triangle.fill"
+        }
+    }
+}
+
+nonisolated struct DamageRecord: Codable, Identifiable, Sendable, Hashable {
+    let id: UUID
+    var vineyardId: UUID
+    var paddockId: UUID
+    var polygonPoints: [CoordinatePoint]
+    var date: Date
+    var damageType: DamageType
+    var damagePercent: Double
+    var notes: String
+
+    init(
+        id: UUID = UUID(),
+        vineyardId: UUID = UUID(),
+        paddockId: UUID,
+        polygonPoints: [CoordinatePoint] = [],
+        date: Date = Date(),
+        damageType: DamageType = .frost,
+        damagePercent: Double = 20,
+        notes: String = ""
+    ) {
+        self.id = id
+        self.vineyardId = vineyardId
+        self.paddockId = paddockId
+        self.polygonPoints = polygonPoints
+        self.date = date
+        self.damageType = damageType
+        self.damagePercent = damagePercent
+        self.notes = notes
+    }
+
+    var areaHectares: Double {
+        let points = polygonPoints
+        guard points.count >= 3 else { return 0 }
+        let centroidLat = points.map(\.latitude).reduce(0, +) / Double(points.count)
+        let mPerDegLat = 111_320.0
+        let mPerDegLon = 111_320.0 * cos(centroidLat * .pi / 180.0)
+        var area = 0.0
+        let n = points.count
+        for i in 0..<n {
+            let j = (i + 1) % n
+            let xi = points[i].longitude * mPerDegLon
+            let yi = points[i].latitude * mPerDegLat
+            let xj = points[j].longitude * mPerDegLon
+            let yj = points[j].latitude * mPerDegLat
+            area += xi * yj - xj * yi
+        }
+        area = abs(area) / 2.0
+        return area / 10_000.0
+    }
 }
