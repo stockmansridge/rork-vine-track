@@ -39,6 +39,7 @@ struct AdminDashboardView: View {
     @State private var selectedUser: AdminUser?
     @State private var selectedStat: StatFilter?
     @State private var sortOrder: SortOrder = .newest
+    @State private var showDisclaimerReport: Bool = false
 
     enum SortOrder: String, CaseIterable {
         case newest = "Newest"
@@ -80,6 +81,7 @@ struct AdminDashboardView: View {
                         errorCard(error)
                     } else {
                         statsGrid
+                        disclaimerReportButton
                         signupMethodCard
                         sortPicker
                         usersList
@@ -100,6 +102,9 @@ struct AdminDashboardView: View {
             }
             .sheet(item: $selectedStat) { stat in
                 StatDetailSheet(filter: stat, users: adminService.users)
+            }
+            .sheet(isPresented: $showDisclaimerReport) {
+                DisclaimerReportView()
             }
             .task {
                 if adminService.users.isEmpty {
@@ -176,6 +181,38 @@ struct AdminDashboardView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    private var disclaimerReportButton: some View {
+        Button {
+            showDisclaimerReport = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.title3)
+                    .foregroundStyle(VineyardTheme.leafGreen)
+                    .frame(width: 40, height: 40)
+                    .background(VineyardTheme.leafGreen.opacity(0.12), in: .rect(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Disclaimer Acceptances")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text("View and export acceptance records")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding()
+            .background(.background, in: .rect(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
     }
 
     private var signupMethodCard: some View {

@@ -12,6 +12,8 @@ class AdminService {
     var users: [AdminUser] = []
     var isLoading: Bool = false
     var errorMessage: String?
+    var disclaimerAcceptances: [DisclaimerAcceptance] = []
+    var isLoadingDisclaimers: Bool = false
 
 
 
@@ -108,5 +110,38 @@ class AdminService {
 
     var emailUsers: Int {
         users.filter { $0.provider.lowercased() == "email" }.count
+    }
+
+    func fetchDisclaimerAcceptances() async {
+        guard isSupabaseConfigured else { return }
+        isLoadingDisclaimers = true
+        do {
+            let result: [DisclaimerAcceptance] = try await supabase.from("disclaimer_acceptances")
+                .select()
+                .order("accepted_at", ascending: false)
+                .execute()
+                .value
+            disclaimerAcceptances = result
+        } catch {
+            if !Task.isCancelled {
+                print("Failed to load disclaimer acceptances: \(error)")
+            }
+        }
+        isLoadingDisclaimers = false
+    }
+
+    func checkDisclaimerAccepted(userId: String) async -> Bool {
+        guard isSupabaseConfigured else { return false }
+        do {
+            let result: [DisclaimerAcceptance] = try await supabase.from("disclaimer_acceptances")
+                .select()
+                .eq("user_id", value: userId)
+                .limit(1)
+                .execute()
+                .value
+            return !result.isEmpty
+        } catch {
+            return false
+        }
     }
 }

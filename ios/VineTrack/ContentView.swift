@@ -5,6 +5,8 @@ struct ContentView: View {
     @Environment(AuthService.self) private var authService
     @Environment(CloudSyncService.self) private var cloudSync
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+    @State private var hasAcceptedDisclaimer: Bool = false
+    @State private var isCheckingDisclaimer: Bool = false
 
     var body: some View {
         Group {
@@ -18,6 +20,18 @@ struct ContentView: View {
                 OnboardingView {
                     withAnimation(.smooth) {
                         hasCompletedOnboarding = true
+                    }
+                }
+            } else if !hasAcceptedDisclaimer && !authService.isDemoMode {
+                if isCheckingDisclaimer {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(.systemGroupedBackground))
+                } else {
+                    DisclaimerView {
+                        withAnimation(.smooth) {
+                            hasAcceptedDisclaimer = true
+                        }
                     }
                 }
             } else if store.vineyards.isEmpty {
@@ -34,7 +48,28 @@ struct ContentView: View {
         }
         .onChange(of: authService.isDemoMode) { _, isDemoMode in
             if isDemoMode {
+                hasAcceptedDisclaimer = true
                 store.loadDemoData()
+            }
+        }
+        .onChange(of: authService.isSignedIn) { _, isSignedIn in
+            if isSignedIn, !authService.isDemoMode, let userId = authService.userId {
+                let localKey = "vinetrack_disclaimer_accepted_\(userId)"
+                if UserDefaults.standard.bool(forKey: localKey) {
+                    hasAcceptedDisclaimer = true
+                } else {
+                    isCheckingDisclaimer = true
+                    Task {
+                        let accepted = await AdminService().checkDisclaimerAccepted(userId: userId)
+                        if accepted {
+                            UserDefaults.standard.set(true, forKey: localKey)
+                        }
+                        hasAcceptedDisclaimer = accepted
+                        isCheckingDisclaimer = false
+                    }
+                }
+            } else if !isSignedIn {
+                hasAcceptedDisclaimer = false
             }
         }
     }
