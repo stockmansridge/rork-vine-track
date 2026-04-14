@@ -4,7 +4,7 @@ struct YieldSettingsView: View {
     @Environment(DataStore.self) private var store
 
     private var paddocks: [Paddock] {
-        store.orderedPaddocks.filter { $0.polygonPoints.count >= 3 }
+        store.orderedPaddocks
     }
 
     var body: some View {
@@ -14,7 +14,7 @@ struct YieldSettingsView: View {
                     ContentUnavailableView {
                         Label("No Blocks", systemImage: "map")
                     } description: {
-                        Text("Add blocks with boundaries to set default bunch weights.")
+                        Text("Add blocks in Vineyard Setup to set bunch weights.")
                     }
                 } else {
                     ForEach(paddocks) { paddock in
@@ -22,9 +22,9 @@ struct YieldSettingsView: View {
                     }
                 }
             } header: {
-                Text("Default Bunch Weight per Block")
+                Text("Bunch Weight per Block")
             } footer: {
-                Text("Set a default bunch weight (in grams) for each block. This value is automatically used when creating new yield estimations.")
+                Text("Set the average bunch weight (in grams) for each block. These values are used in yield estimation calculations.")
             }
         }
         .navigationTitle("Yield Settings")
@@ -52,9 +52,20 @@ private struct BunchWeightRow: View {
                     Text(paddock.name)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
-                    Text(String(format: "%.2f Ha • %d vines", paddock.areaHectares, paddock.effectiveVineCount))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        if paddock.areaHectares > 0 {
+                            Text(String(format: "%.2f Ha", paddock.areaHectares))
+                        }
+                        if paddock.effectiveVineCount > 0 {
+                            if paddock.areaHectares > 0 {
+                                Text("•")
+                            }
+                            Text("\(paddock.effectiveVineCount) vines")
+                        }
+
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
