@@ -352,6 +352,28 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            NavigationLink {
+                YieldReportsListView()
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.indigo.gradient)
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "list.clipboard.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Yield Reports")
+                            .font(.subheadline.weight(.medium))
+                        Text("Block summaries & estimation jobs")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         } header: {
             HStack(spacing: 6) {
                 Image(systemName: "chart.bar.doc.horizontal.fill")
