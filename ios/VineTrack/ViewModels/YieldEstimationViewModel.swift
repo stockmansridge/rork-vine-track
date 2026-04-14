@@ -175,7 +175,19 @@ class YieldEstimationViewModel {
                 rawEnd = e
             }
 
-            let clipped = clipMidlineToPolygon(start: rawStart, end: rawEnd, polygon: polygon)
+            let extDirLat = rawEnd.latitude - rawStart.latitude
+            let extDirLon = rawEnd.longitude - rawStart.longitude
+            let extLen = sqrt(extDirLat * extDirLat * mPerDegLat * mPerDegLat + extDirLon * extDirLon * mPerDegLon * mPerDegLon)
+            let extFactor: Double = extLen > 0 ? 500.0 / extLen : 0
+            let extStart = CoordinatePoint(
+                latitude: rawStart.latitude - extDirLat * extFactor,
+                longitude: rawStart.longitude - extDirLon * extFactor
+            )
+            let extEnd = CoordinatePoint(
+                latitude: rawEnd.latitude + extDirLat * extFactor,
+                longitude: rawEnd.longitude + extDirLon * extFactor
+            )
+            let clipped = clipMidlineToPolygon(start: extStart, end: extEnd, polygon: polygon)
             if let c = clipped {
                 lanes.append(MidlineLane(start: c.start, end: c.end))
             } else {
