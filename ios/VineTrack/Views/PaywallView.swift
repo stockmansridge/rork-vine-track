@@ -58,8 +58,7 @@ struct PaywallView: View {
 
     private var headerSection: some View {
         VStack(spacing: 12) {
-            Image(systemName: "leaf.circle.fill")
-                .font(.system(size: 64))
+            GrapeLeafIcon(size: 64)
                 .foregroundStyle(VineyardTheme.leafGreen.gradient)
                 .padding(.top, 24)
 

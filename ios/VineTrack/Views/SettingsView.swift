@@ -180,7 +180,7 @@ struct SettingsView: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Color.green.gradient)
                                 .frame(width: 40, height: 40)
-                            Image(systemName: "leaf.fill")
+                            GrapeLeafIcon(size: 18)
                                 .foregroundStyle(.white)
                         }
                     }

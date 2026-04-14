@@ -34,10 +34,8 @@ struct VineyardListView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: "leaf.circle")
-                .font(.system(size: 64))
+            GrapeLeafIcon(size: 64)
                 .foregroundStyle(VineyardTheme.leafGreen.opacity(0.6))
-                .symbolEffect(.pulse)
 
             VStack(spacing: 8) {
                 Text("Welcome to VineTrack")
@@ -102,8 +100,7 @@ struct VineyardCardRow: View {
                         .fill(isSelected ? VineyardTheme.leafGreen.gradient : Color(.tertiarySystemFill).gradient)
                         .frame(width: 44, height: 44)
 
-                    Image(systemName: "leaf.fill")
-                        .font(.title3)
+                    GrapeLeafIcon(size: 22)
                         .foregroundStyle(isSelected ? .white : VineyardTheme.leafGreen)
                 }
 

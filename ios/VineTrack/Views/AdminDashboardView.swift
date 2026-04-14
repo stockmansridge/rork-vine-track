@@ -322,9 +322,15 @@ struct StatCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: icon)
-                    .font(.subheadline)
-                    .foregroundStyle(color)
+                Group {
+                    if icon == "leaf.fill" {
+                        GrapeLeafIcon(size: 16)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.subheadline)
+                    }
+                }
+                .foregroundStyle(color)
                 Spacer()
             }
             Text(value)
@@ -378,8 +384,7 @@ struct AdminUserRow: View {
             VStack(alignment: .trailing, spacing: 3) {
                 if user.vineyard_count > 0 {
                     HStack(spacing: 3) {
-                        Image(systemName: "leaf.fill")
-                            .font(.system(size: 10))
+                        GrapeLeafIcon(size: 10)
                             .foregroundStyle(VineyardTheme.leafGreen)
                         Text("\(user.vineyard_count)")
                             .font(.caption.weight(.medium))

@@ -121,9 +121,15 @@ struct OnboardingView: View {
                     Circle()
                         .fill(page.iconColor.opacity(0.15))
                         .frame(width: 100, height: 100)
-                    Image(systemName: page.icon)
-                        .font(.system(size: 42))
-                        .foregroundStyle(page.iconColor)
+                    Group {
+                        if page.icon == "leaf.fill" {
+                            GrapeLeafIcon(size: 42)
+                        } else {
+                            Image(systemName: page.icon)
+                                .font(.system(size: 42))
+                        }
+                    }
+                    .foregroundStyle(page.iconColor)
                 }
 
                 VStack(spacing: 8) {

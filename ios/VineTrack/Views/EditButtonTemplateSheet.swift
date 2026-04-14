@@ -118,8 +118,7 @@ struct EditButtonTemplateSheet: View {
                     Button {
                         entryIsGrowthStage[index].toggle()
                     } label: {
-                        Image(systemName: entryIsGrowthStage[index] ? "leaf.fill" : "leaf")
-                            .font(.caption)
+                        GrapeLeafIcon(size: 14)
                             .foregroundStyle(entryIsGrowthStage[index] ? .green : .secondary)
                     }
                 }

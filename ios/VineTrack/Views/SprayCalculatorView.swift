@@ -599,8 +599,7 @@ struct SprayCalculatorView: View {
                                                 .resizable()
                                                 .aspectRatio(contentMode: .fit)
                                         } else if phase.error != nil {
-                                            Image(systemName: "leaf.fill")
-                                                .font(.title)
+                                            GrapeLeafIcon(size: 28)
                                                 .foregroundStyle(.tertiary)
                                         } else {
                                             ProgressView()

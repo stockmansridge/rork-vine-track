@@ -100,8 +100,14 @@ struct HomeView: View {
                     }
                 } label: {
                     HStack(spacing: 5) {
-                        Image(systemName: mode == .repairs ? "wrench.fill" : "leaf.fill")
-                            .font(.caption)
+                        Group {
+                            if mode == .repairs {
+                                Image(systemName: "wrench.fill")
+                            } else {
+                                GrapeLeafIcon(size: 14)
+                            }
+                        }
+                        .font(.caption)
                         Text(mode.rawValue)
                             .font(.subheadline.weight(.semibold))
                     }
@@ -314,8 +320,14 @@ struct PinButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                Image(systemName: config.isGrowthStageButton ? "leaf.fill" : "mappin.and.ellipse")
-                    .font(.body)
+                Group {
+                    if config.isGrowthStageButton {
+                        GrapeLeafIcon(size: 20)
+                    } else {
+                        Image(systemName: "mappin.and.ellipse")
+                    }
+                }
+                .font(.body)
 
                 Text(config.name)
                     .font(.subheadline.weight(.semibold))
