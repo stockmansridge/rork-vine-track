@@ -90,22 +90,15 @@ class YieldEstimationViewModel {
             let sitesInPaddock = sampleSites.filter { $0.paddockId == paddock.id }
             guard !sitesInPaddock.isEmpty else { continue }
 
-            let sorted = sortSitesForPath(sites: sitesInPaddock, paddock: paddock)
+            let lanes = computeMidlineLanes(paddock: paddock)
+            guard !lanes.isEmpty else { continue }
 
-            for i in 0..<sorted.count {
-                let site = sorted[i]
-
-                if i > 0 {
-                    let prev = sorted[i - 1]
-                    let connectorPoints = generateRowConnector(
-                        from: prev,
-                        to: site,
-                        paddock: paddock
-                    )
-                    waypoints.append(contentsOf: connectorPoints)
-                }
-
-                waypoints.append(CoordinatePoint(latitude: site.latitude, longitude: site.longitude))
+            for (laneIdx, lane) in lanes.enumerated() {
+                let isReversed = laneIdx % 2 == 1
+                let entry = isReversed ? lane.end : lane.start
+                let exit = isReversed ? lane.start : lane.end
+                waypoints.append(entry)
+                waypoints.append(exit)
             }
         }
 
@@ -113,84 +106,95 @@ class YieldEstimationViewModel {
         isPathGenerated = true
     }
 
-    private func sortSitesForPath(sites: [SampleSite], paddock: Paddock) -> [SampleSite] {
+    private struct MidlineLane {
+        let start: CoordinatePoint
+        let end: CoordinatePoint
+    }
+
+    private func computeMidlineLanes(paddock: Paddock) -> [MidlineLane] {
+        let polygon = paddock.polygonPoints
+        guard !paddock.rows.isEmpty, polygon.count >= 3 else { return [] }
+
         let mPerDegLat = 111_320.0
-        let centroidLat = paddock.polygonPoints.map(\.latitude).reduce(0, +) / Double(max(1, paddock.polygonPoints.count))
-        let centroidLon = paddock.polygonPoints.map(\.longitude).reduce(0, +) / Double(max(1, paddock.polygonPoints.count))
+        let centroidLat = polygon.map(\.latitude).reduce(0, +) / Double(polygon.count)
+        let centroidLon = polygon.map(\.longitude).reduce(0, +) / Double(polygon.count)
         let mPerDegLon = 111_320.0 * cos(centroidLat * .pi / 180.0)
         let rowAngleRad = paddock.rowDirection * .pi / 180.0
 
-        let rowGroups = Dictionary(grouping: sites, by: \.rowNumber)
-
-        let sortedRowNumbers = rowGroups.keys.sorted { a, b in
-            let rowA = paddock.rows.first { $0.number == a }
-            let rowB = paddock.rows.first { $0.number == b }
-            guard let rA = rowA, let rB = rowB else { return a < b }
-            let cAx = ((rA.startPoint.longitude + rA.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
-            let cAy = ((rA.startPoint.latitude + rA.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
-            let cBx = ((rB.startPoint.longitude + rB.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
-            let cBy = ((rB.startPoint.latitude + rB.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
+        let sortedRows = paddock.rows.sorted { a, b in
+            let cAx = ((a.startPoint.longitude + a.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
+            let cAy = ((a.startPoint.latitude + a.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
+            let cBx = ((b.startPoint.longitude + b.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
+            let cBy = ((b.startPoint.latitude + b.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
             let projA = cAx * cos(rowAngleRad) - cAy * sin(rowAngleRad)
             let projB = cBx * cos(rowAngleRad) - cBy * sin(rowAngleRad)
             return projA < projB
         }
 
-        var result: [SampleSite] = []
-
-        for (idx, rowNum) in sortedRowNumbers.enumerated() {
-            guard var rowSites = rowGroups[rowNum] else { continue }
-
-            rowSites.sort { a, b in
-                let ax = (a.longitude - centroidLon) * mPerDegLon
-                let ay = (a.latitude - centroidLat) * mPerDegLat
-                let bx = (b.longitude - centroidLon) * mPerDegLon
-                let by = (b.latitude - centroidLat) * mPerDegLat
-                let projA = ax * sin(rowAngleRad) + ay * cos(rowAngleRad)
-                let projB = bx * sin(rowAngleRad) + by * cos(rowAngleRad)
-                return projA < projB
-            }
-
-            if idx % 2 == 1 {
-                rowSites.reverse()
-            }
-
-            result.append(contentsOf: rowSites)
+        func orientRow(_ row: PaddockRow) -> (start: CoordinatePoint, end: CoordinatePoint) {
+            let sx = (row.startPoint.longitude - centroidLon) * mPerDegLon
+            let sy = (row.startPoint.latitude - centroidLat) * mPerDegLat
+            let ex = (row.endPoint.longitude - centroidLon) * mPerDegLon
+            let ey = (row.endPoint.latitude - centroidLat) * mPerDegLat
+            let projS = sx * sin(rowAngleRad) + sy * cos(rowAngleRad)
+            let projE = ex * sin(rowAngleRad) + ey * cos(rowAngleRad)
+            if projS <= projE { return (row.startPoint, row.endPoint) }
+            return (row.endPoint, row.startPoint)
         }
 
-        return result
-    }
-
-    private func generateRowConnector(from: SampleSite, to: SampleSite, paddock: Paddock) -> [CoordinatePoint] {
-        guard from.rowNumber != to.rowNumber else { return [] }
-
-        let fromRow = paddock.rows.first { $0.number == from.rowNumber }
-        let toRow = paddock.rows.first { $0.number == to.rowNumber }
-        guard let fromRow, let toRow else { return [] }
-
-        let fromPoint = CoordinatePoint(latitude: from.latitude, longitude: from.longitude)
-        let fromExit = closerEnd(of: fromRow, to: fromPoint)
-
-        let toPoint = CoordinatePoint(latitude: to.latitude, longitude: to.longitude)
-        let toEntry = closerEnd(of: toRow, to: toPoint)
-
-        var points: [CoordinatePoint] = []
-        points.append(fromExit)
-        if distance(fromExit, toEntry) > 0.00001 {
-            points.append(toEntry)
+        var rowPairs: [[PaddockRow]] = []
+        var i = 0
+        while i < sortedRows.count {
+            if i + 1 < sortedRows.count {
+                rowPairs.append([sortedRows[i], sortedRows[i + 1]])
+                i += 2
+            } else {
+                rowPairs.append([sortedRows[i]])
+                i += 1
+            }
         }
-        return points
+
+        var lanes: [MidlineLane] = []
+        for pair in rowPairs {
+            if pair.count == 2 {
+                let (s1, e1) = orientRow(pair[0])
+                let (s2, e2) = orientRow(pair[1])
+                let midStart = CoordinatePoint(
+                    latitude: (s1.latitude + s2.latitude) / 2,
+                    longitude: (s1.longitude + s2.longitude) / 2
+                )
+                let midEnd = CoordinatePoint(
+                    latitude: (e1.latitude + e2.latitude) / 2,
+                    longitude: (e1.longitude + e2.longitude) / 2
+                )
+                lanes.append(MidlineLane(start: midStart, end: midEnd))
+            } else {
+                let (s, e) = orientRow(pair[0])
+                lanes.append(MidlineLane(start: s, end: e))
+            }
+        }
+
+        return lanes
     }
 
-    private func closerEnd(of row: PaddockRow, to point: CoordinatePoint) -> CoordinatePoint {
-        let dStart = distance(point, row.startPoint)
-        let dEnd = distance(point, row.endPoint)
-        return dStart <= dEnd ? row.startPoint : row.endPoint
-    }
+    private func sortRowsPerpendicular(rows: [PaddockRow], paddock: Paddock) -> [PaddockRow] {
+        let polygon = paddock.polygonPoints
+        guard !polygon.isEmpty else { return rows }
+        let mPerDegLat = 111_320.0
+        let centroidLat = polygon.map(\.latitude).reduce(0, +) / Double(polygon.count)
+        let centroidLon = polygon.map(\.longitude).reduce(0, +) / Double(polygon.count)
+        let mPerDegLon = 111_320.0 * cos(centroidLat * .pi / 180.0)
+        let rowAngleRad = paddock.rowDirection * .pi / 180.0
 
-    private func distance(_ a: CoordinatePoint, _ b: CoordinatePoint) -> Double {
-        let dLat = a.latitude - b.latitude
-        let dLon = a.longitude - b.longitude
-        return sqrt(dLat * dLat + dLon * dLon)
+        return rows.sorted { a, b in
+            let cAx = ((a.startPoint.longitude + a.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
+            let cAy = ((a.startPoint.latitude + a.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
+            let cBx = ((b.startPoint.longitude + b.endPoint.longitude) / 2 - centroidLon) * mPerDegLon
+            let cBy = ((b.startPoint.latitude + b.endPoint.latitude) / 2 - centroidLat) * mPerDegLat
+            let projA = cAx * cos(rowAngleRad) - cAy * sin(rowAngleRad)
+            let projB = cBx * cos(rowAngleRad) - cBy * sin(rowAngleRad)
+            return projA < projB
+        }
     }
 
     // MARK: - Yield Calculation
@@ -363,40 +367,59 @@ class YieldEstimationViewModel {
             return projA < projB
         }
 
+        var rowPairs: [[Int]] = []
+        var ri = 0
+        while ri < sortedRowNumbers.count {
+            if ri + 1 < sortedRowNumbers.count {
+                rowPairs.append([sortedRowNumbers[ri], sortedRowNumbers[ri + 1]])
+                ri += 2
+            } else {
+                rowPairs.append([sortedRowNumbers[ri]])
+                ri += 1
+            }
+        }
+
+        func orientSegment(_ seg: ClippedSegment) -> ClippedSegment {
+            let sx = (seg.startLon - centroidLon) * mPerDegLon
+            let sy = (seg.startLat - centroidLat) * mPerDegLat
+            let ex = (seg.endLon - centroidLon) * mPerDegLon
+            let ey = (seg.endLat - centroidLat) * mPerDegLat
+            let projS = sx * sin(rowAngleRad) + sy * cos(rowAngleRad)
+            let projE = ex * sin(rowAngleRad) + ey * cos(rowAngleRad)
+            if projS <= projE { return seg }
+            return ClippedSegment(row: seg.row, startLat: seg.endLat, startLon: seg.endLon,
+                                 endLat: seg.startLat, endLon: seg.startLon, length: seg.length)
+        }
+
+        func flipSegment(_ seg: ClippedSegment) -> ClippedSegment {
+            ClippedSegment(row: seg.row, startLat: seg.endLat, startLon: seg.endLon,
+                          endLat: seg.startLat, endLon: seg.startLon, length: seg.length)
+        }
+
         var orderedSegments: [ClippedSegment] = []
 
-        for (idx, rowNum) in sortedRowNumbers.enumerated() {
-            guard var segs = segmentsByRow[rowNum] else { continue }
-
-            segs.sort { a, b in
-                let ax = (a.startLon - centroidLon) * mPerDegLon
-                let ay = (a.startLat - centroidLat) * mPerDegLat
-                let bx = (b.startLon - centroidLon) * mPerDegLon
-                let by = (b.startLat - centroidLat) * mPerDegLat
-                let projA = ax * sin(rowAngleRad) + ay * cos(rowAngleRad)
-                let projB = bx * sin(rowAngleRad) + by * cos(rowAngleRad)
-                return projA < projB
-            }
-
-            segs = segs.map { seg in
-                let sx = (seg.startLon - centroidLon) * mPerDegLon
-                let sy = (seg.startLat - centroidLat) * mPerDegLat
-                let ex = (seg.endLon - centroidLon) * mPerDegLon
-                let ey = (seg.endLat - centroidLat) * mPerDegLat
-                let projS = sx * sin(rowAngleRad) + sy * cos(rowAngleRad)
-                let projE = ex * sin(rowAngleRad) + ey * cos(rowAngleRad)
-                if projS <= projE { return seg }
-                return ClippedSegment(row: seg.row, startLat: seg.endLat, startLon: seg.endLon, endLat: seg.startLat, endLon: seg.startLon, length: seg.length)
-            }
-
-            if idx % 2 == 1 {
-                segs.reverse()
-                segs = segs.map { seg in
-                    ClippedSegment(row: seg.row, startLat: seg.endLat, startLon: seg.endLon, endLat: seg.startLat, endLon: seg.startLon, length: seg.length)
+        for (pairIdx, pair) in rowPairs.enumerated() {
+            var pairSegs: [ClippedSegment] = []
+            for rowNum in pair {
+                if let segs = segmentsByRow[rowNum] {
+                    pairSegs.append(contentsOf: segs.map(orientSegment))
                 }
             }
 
-            orderedSegments.append(contentsOf: segs)
+            pairSegs.sort { a, b in
+                let aProj = ((a.startLon + a.endLon) / 2 - centroidLon) * mPerDegLon * sin(rowAngleRad)
+                    + ((a.startLat + a.endLat) / 2 - centroidLat) * mPerDegLat * cos(rowAngleRad)
+                let bProj = ((b.startLon + b.endLon) / 2 - centroidLon) * mPerDegLon * sin(rowAngleRad)
+                    + ((b.startLat + b.endLat) / 2 - centroidLat) * mPerDegLat * cos(rowAngleRad)
+                return aProj < bProj
+            }
+
+            if pairIdx % 2 == 1 {
+                pairSegs.reverse()
+                pairSegs = pairSegs.map(flipSegment)
+            }
+
+            orderedSegments.append(contentsOf: pairSegs)
         }
 
         guard !orderedSegments.isEmpty else { return [] }
@@ -422,15 +445,14 @@ class YieldEstimationViewModel {
                 let lat = seg.startLat + fraction * (seg.endLat - seg.startLat)
                 let lon = seg.startLon + fraction * (seg.endLon - seg.startLon)
 
-                let site = SampleSite(
+                sites.append(SampleSite(
                     paddockId: paddock.id,
                     paddockName: paddock.name,
                     rowNumber: seg.row.number,
                     latitude: lat,
                     longitude: lon,
                     siteIndex: siteIndex
-                )
-                sites.append(site)
+                ))
                 siteIndex += 1
                 nextSiteDistance += spacingMetres
             }
@@ -447,15 +469,14 @@ class YieldEstimationViewModel {
                 let lat = seg.startLat + fraction * (seg.endLat - seg.startLat)
                 let lon = seg.startLon + fraction * (seg.endLon - seg.startLon)
 
-                let site = SampleSite(
+                sites.append(SampleSite(
                     paddockId: paddock.id,
                     paddockName: paddock.name,
                     rowNumber: seg.row.number,
                     latitude: lat,
                     longitude: lon,
                     siteIndex: siteIndex
-                )
-                sites.append(site)
+                ))
                 siteIndex += 1
             }
         }
