@@ -9,7 +9,7 @@ class YieldEstimationViewModel {
     var isGenerated: Bool = false
     var pathWaypoints: [CoordinatePoint] = []
     var isPathGenerated: Bool = false
-    var averageBunchWeightKg: Double = 0.15
+    var blockBunchWeightsKg: [UUID: Double] = [:]
     var previousBunchWeights: [BunchWeightRecord] = []
     var selectedSite: SampleSite?
     var sessionId: UUID?
@@ -190,7 +190,7 @@ class YieldEstimationViewModel {
                     totalVines: paddock.effectiveVineCount,
                     averageBunchesPerVine: 0,
                     totalBunches: 0,
-                    averageBunchWeightKg: averageBunchWeightKg,
+                    averageBunchWeightKg: bunchWeightKg(for: paddock.id),
                     damageFactor: damageFactor,
                     estimatedYieldKg: 0,
                     estimatedYieldTonnes: 0,
@@ -206,7 +206,8 @@ class YieldEstimationViewModel {
 
             let totalVines = paddock.effectiveVineCount
             let totalBunches = Double(totalVines) * avgBunchesRounded
-            let yieldKg = totalBunches * averageBunchWeightKg * damageFactor
+            let blockWeight = bunchWeightKg(for: paddock.id)
+            let yieldKg = totalBunches * blockWeight * damageFactor
             let yieldTonnes = yieldKg / 1000.0
 
             estimates.append(BlockYieldEstimate(
@@ -216,7 +217,7 @@ class YieldEstimationViewModel {
                 totalVines: totalVines,
                 averageBunchesPerVine: avgBunchesRounded,
                 totalBunches: totalBunches,
-                averageBunchWeightKg: averageBunchWeightKg,
+                averageBunchWeightKg: blockWeight,
                 damageFactor: damageFactor,
                 estimatedYieldKg: yieldKg,
                 estimatedYieldTonnes: yieldTonnes,
@@ -244,7 +245,7 @@ class YieldEstimationViewModel {
         isGenerated = !session.sampleSites.isEmpty
         pathWaypoints = session.pathWaypoints
         isPathGenerated = !session.pathWaypoints.isEmpty
-        averageBunchWeightKg = session.averageBunchWeightKg
+        blockBunchWeightsKg = session.blockBunchWeightsKg
         previousBunchWeights = session.previousBunchWeights
     }
 
@@ -255,13 +256,21 @@ class YieldEstimationViewModel {
             selectedPaddockIds: Array(selectedPaddockIds),
             samplesPerHectare: samplesPerHectare,
             sampleSites: sampleSites,
-            averageBunchWeightKg: averageBunchWeightKg,
+            blockBunchWeightsKg: blockBunchWeightsKg,
             previousBunchWeights: previousBunchWeights,
             pathWaypoints: pathWaypoints
         )
     }
 
     // MARK: - Sample Generation
+
+    func bunchWeightKg(for paddockId: UUID) -> Double {
+        blockBunchWeightsKg[paddockId] ?? 0.15
+    }
+
+    func setBunchWeight(_ weightKg: Double, for paddockId: UUID) {
+        blockBunchWeightsKg[paddockId] = weightKg
+    }
 
     var totalSelectedArea: Double { 0 }
 

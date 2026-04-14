@@ -9,6 +9,7 @@ struct YieldEstimationView: View {
     @State private var showBunchWeightEditor: Bool = false
     @State private var showReport: Bool = false
     @State private var bunchWeightText: String = "150"
+    @State private var editingBunchWeightPaddockId: UUID?
 
     private var paddocks: [Paddock] {
         store.orderedPaddocks.filter { $0.polygonPoints.count >= 3 }
@@ -504,6 +505,7 @@ struct YieldEstimationView: View {
         Button {
             withAnimation(.smooth(duration: 0.3)) {
                 viewModel.generateSampleSites(paddocks: paddocks, samplesPerHectare: samplesPerHa)
+                viewModel.generatePath(paddocks: paddocks)
             }
             fitMapToSites()
             saveSession()
@@ -546,29 +548,42 @@ struct YieldEstimationView: View {
     // MARK: - Bunch Weight
 
     private var bunchWeightButton: some View {
-        Button {
-            bunchWeightText = String(format: "%.0f", viewModel.averageBunchWeightKg * 1000)
-            showBunchWeightEditor = true
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "scalemass.fill")
-                    .font(.body)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Average Bunch Weight")
-                        .font(.subheadline.weight(.medium))
-                    Text(String(format: "%.0f g (%.3f kg)", viewModel.averageBunchWeightKg * 1000, viewModel.averageBunchWeightKg))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Bunch Weight per Block", systemImage: "scalemass.fill")
+                .font(.headline)
+
+            let selectedPaddocksList = paddocks.filter { viewModel.selectedPaddockIds.contains($0.id) }
+
+            ForEach(selectedPaddocksList) { paddock in
+                let weight = viewModel.bunchWeightKg(for: paddock.id)
+                let color = colorFor(paddock)
+
+                Button {
+                    editingBunchWeightPaddockId = paddock.id
+                    bunchWeightText = String(format: "%.0f", weight * 1000)
+                    showBunchWeightEditor = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Circle()
+                            .fill(color)
+                            .frame(width: 10, height: 10)
+                        Text(paddock.name)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text(String(format: "%.0f g", weight * 1000))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(color)
+                        Image(systemName: "pencil")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(10)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
                 }
-                Spacer()
-                Image(systemName: "pencil")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .buttonStyle(.plain)
             }
-            .padding(12)
-            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Report Button
@@ -693,13 +708,28 @@ struct YieldEstimationView: View {
     private var bunchWeightSheet: some View {
         NavigationStack {
             Form {
+                if let pid = editingBunchWeightPaddockId,
+                   let paddock = paddocks.first(where: { $0.id == pid }) {
+                    Section {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(colorFor(paddock))
+                                .frame(width: 10, height: 10)
+                            Text(paddock.name)
+                                .font(.subheadline.weight(.semibold))
+                        }
+                    } header: {
+                        Text("Block")
+                    }
+                }
+
                 Section {
                     TextField("Weight in grams", text: $bunchWeightText)
                         .keyboardType(.decimalPad)
                 } header: {
-                    Text("Average Bunch Weight (grams)")
+                    Text("Bunch Weight (grams)")
                 } footer: {
-                    Text("Enter the average bunch weight in grams. This value is used in the yield calculation.")
+                    Text("Enter the average bunch weight in grams for this block.")
                 }
 
                 if !viewModel.previousBunchWeights.isEmpty {
@@ -737,9 +767,10 @@ struct YieldEstimationView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if let grams = Double(bunchWeightText), grams > 0 {
+                        if let grams = Double(bunchWeightText), grams > 0,
+                           let pid = editingBunchWeightPaddockId {
                             let kg = grams / 1000.0
-                            viewModel.averageBunchWeightKg = kg
+                            viewModel.setBunchWeight(kg, for: pid)
                             let record = BunchWeightRecord(date: Date(), weightKg: kg)
                             viewModel.previousBunchWeights.append(record)
                             saveSession()

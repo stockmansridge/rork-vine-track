@@ -66,9 +66,9 @@ struct YieldReportView: View {
                     color: .purple
                 )
                 reportCard(
-                    title: "Bunch Wt",
-                    value: String(format: "%.0f g", viewModel.averageBunchWeightKg * 1000),
-                    icon: "leaf.fill",
+                    title: "Blocks",
+                    value: "\(estimates.count)",
+                    icon: "map.fill",
                     color: .teal
                 )
             }
@@ -98,40 +98,19 @@ struct YieldReportView: View {
 
     private var bunchWeightSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Average Bunch Weight", systemImage: "scalemass")
+            Label("Bunch Weight per Block", systemImage: "scalemass")
                 .font(.headline)
 
-            HStack {
-                Text("Current Value")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(String(format: "%.0f g (%.3f kg)", viewModel.averageBunchWeightKg * 1000, viewModel.averageBunchWeightKg))
-                    .font(.subheadline.weight(.medium))
-            }
-            .padding(12)
-            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
-
-            if !viewModel.previousBunchWeights.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Previous Records")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-
-                    ForEach(viewModel.previousBunchWeights.sorted(by: { $0.date > $1.date }).prefix(5)) { record in
-                        HStack {
-                            Text(record.date, format: .dateTime.day().month().year())
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(String(format: "%.0f g", record.weightKg * 1000))
-                                .font(.caption.weight(.medium))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                    }
+            ForEach(estimates, id: \.paddockId) { est in
+                HStack {
+                    Text(est.paddockName)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text(String(format: "%.0f g", est.averageBunchWeightKg * 1000))
+                        .font(.subheadline.weight(.semibold))
                 }
-                .padding(.vertical, 6)
+                .padding(12)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
             }
         }

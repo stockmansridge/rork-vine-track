@@ -41,7 +41,7 @@ struct YieldReportsListView: View {
             let totalVines = paddock.effectiveVineCount
             let totalBunches = Double(totalVines) * avgBunchesRounded
             let damageFactor = store.damageFactor(for: paddock.id)
-            let yieldKg = totalBunches * session.averageBunchWeightKg * damageFactor
+            let yieldKg = totalBunches * session.bunchWeightKg(for: paddock.id) * damageFactor
             let yieldTonnes = yieldKg / 1000.0
 
             let latestDate = recorded
@@ -346,7 +346,7 @@ struct YieldReportsListView: View {
             let totalVines = paddock.effectiveVineCount
             let totalBunches = Double(totalVines) * avgBunchesRounded
             let dmgFactor = store.damageFactor(for: paddockId)
-            totalYieldKg += totalBunches * session.averageBunchWeightKg * dmgFactor
+            totalYieldKg += totalBunches * session.bunchWeightKg(for: paddockId) * dmgFactor
         }
 
         return totalYieldKg / 1000.0

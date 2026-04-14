@@ -63,9 +63,18 @@ nonisolated struct YieldEstimationSession: Codable, Identifiable, Sendable {
     var selectedPaddockIds: [UUID]
     var samplesPerHectare: Int
     var sampleSites: [SampleSite]
-    var averageBunchWeightKg: Double
+    var blockBunchWeightsKg: [UUID: Double]
     var previousBunchWeights: [BunchWeightRecord]
     var pathWaypoints: [CoordinatePoint]
+
+    var averageBunchWeightKg: Double {
+        guard !blockBunchWeightsKg.isEmpty else { return 0.15 }
+        return blockBunchWeightsKg.values.reduce(0, +) / Double(blockBunchWeightsKg.count)
+    }
+
+    func bunchWeightKg(for paddockId: UUID) -> Double {
+        blockBunchWeightsKg[paddockId] ?? 0.15
+    }
 
     init(
         id: UUID = UUID(),
@@ -74,7 +83,7 @@ nonisolated struct YieldEstimationSession: Codable, Identifiable, Sendable {
         selectedPaddockIds: [UUID] = [],
         samplesPerHectare: Int = 20,
         sampleSites: [SampleSite] = [],
-        averageBunchWeightKg: Double = 0.15,
+        blockBunchWeightsKg: [UUID: Double] = [:],
         previousBunchWeights: [BunchWeightRecord] = [],
         pathWaypoints: [CoordinatePoint] = []
     ) {
@@ -84,9 +93,52 @@ nonisolated struct YieldEstimationSession: Codable, Identifiable, Sendable {
         self.selectedPaddockIds = selectedPaddockIds
         self.samplesPerHectare = samplesPerHectare
         self.sampleSites = sampleSites
-        self.averageBunchWeightKg = averageBunchWeightKg
+        self.blockBunchWeightsKg = blockBunchWeightsKg
         self.previousBunchWeights = previousBunchWeights
         self.pathWaypoints = pathWaypoints
+    }
+
+    nonisolated enum CodingKeys: String, CodingKey {
+        case id, vineyardId, createdAt, selectedPaddockIds, samplesPerHectare
+        case sampleSites, blockBunchWeightsKg, averageBunchWeightKg
+        case previousBunchWeights, pathWaypoints
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        vineyardId = try container.decode(UUID.self, forKey: .vineyardId)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        selectedPaddockIds = try container.decodeIfPresent([UUID].self, forKey: .selectedPaddockIds) ?? []
+        samplesPerHectare = try container.decodeIfPresent(Int.self, forKey: .samplesPerHectare) ?? 20
+        sampleSites = try container.decodeIfPresent([SampleSite].self, forKey: .sampleSites) ?? []
+        previousBunchWeights = try container.decodeIfPresent([BunchWeightRecord].self, forKey: .previousBunchWeights) ?? []
+        pathWaypoints = try container.decodeIfPresent([CoordinatePoint].self, forKey: .pathWaypoints) ?? []
+
+        if let perBlock = try? container.decode([UUID: Double].self, forKey: .blockBunchWeightsKg) {
+            blockBunchWeightsKg = perBlock
+        } else if let legacy = try? container.decode(Double.self, forKey: .averageBunchWeightKg) {
+            var weights: [UUID: Double] = [:]
+            for pid in selectedPaddockIds {
+                weights[pid] = legacy
+            }
+            blockBunchWeightsKg = weights
+        } else {
+            blockBunchWeightsKg = [:]
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(vineyardId, forKey: .vineyardId)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(selectedPaddockIds, forKey: .selectedPaddockIds)
+        try container.encode(samplesPerHectare, forKey: .samplesPerHectare)
+        try container.encode(sampleSites, forKey: .sampleSites)
+        try container.encode(blockBunchWeightsKg, forKey: .blockBunchWeightsKg)
+        try container.encode(previousBunchWeights, forKey: .previousBunchWeights)
+        try container.encode(pathWaypoints, forKey: .pathWaypoints)
     }
 }
 
