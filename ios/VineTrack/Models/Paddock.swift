@@ -148,6 +148,13 @@ extension Paddock {
         guard let ml = mlPerHaPerHour else { return nil }
         return ml * 100.0
     }
+
+    var litresPerHour: Double? {
+        guard let emitterSpacing, emitterSpacing > 0,
+              let flowPerEmitter, flowPerEmitter > 0,
+              !rows.isEmpty else { return nil }
+        return (totalRowLengthMetres / emitterSpacing) * flowPerEmitter
+    }
 }
 
 nonisolated struct PaddockRow: Codable, Identifiable, Sendable, Hashable {
