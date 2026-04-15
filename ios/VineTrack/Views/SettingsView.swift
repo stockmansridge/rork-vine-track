@@ -509,6 +509,28 @@ struct SettingsView: View {
         Section {
             LabeledContent("Version", value: appVersion)
             LabeledContent("Build", value: appBuild)
+
+            Link(destination: AppLinks.termsOfUse) {
+                HStack {
+                    Text("Terms of Use (EULA)")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Link(destination: AppLinks.privacyPolicy) {
+                HStack {
+                    Text("Privacy Policy")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
         } header: {
             Text("About")
         }

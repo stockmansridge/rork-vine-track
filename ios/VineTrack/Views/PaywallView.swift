@@ -167,9 +167,19 @@ struct PaywallView: View {
     }
 
     private var legalText: some View {
-        Text("Payment will be charged to your Apple ID account. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period.")
+        VStack(spacing: 8) {
+            Text("Payment will be charged to your Apple ID account. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 4) {
+                Link("Terms of Use (EULA)", destination: AppLinks.termsOfUse)
+                Text("and")
+                    .foregroundStyle(.tertiary)
+                Link("Privacy Policy", destination: AppLinks.privacyPolicy)
+            }
             .font(.caption2)
-            .foregroundStyle(.tertiary)
-            .multilineTextAlignment(.center)
+        }
     }
 }
