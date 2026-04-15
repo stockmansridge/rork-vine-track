@@ -12,6 +12,8 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
     var rowOffset: Double
     var vineSpacing: Double
     var vineCountOverride: Int?
+    var flowPerEmitter: Double?
+    var emitterSpacing: Double?
 
     init(
         id: UUID = UUID(),
@@ -23,7 +25,9 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         rowWidth: Double = 2.5,
         rowOffset: Double = 0,
         vineSpacing: Double = 1.0,
-        vineCountOverride: Int? = nil
+        vineCountOverride: Int? = nil,
+        flowPerEmitter: Double? = nil,
+        emitterSpacing: Double? = nil
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -35,10 +39,12 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         self.rowOffset = rowOffset
         self.vineSpacing = vineSpacing
         self.vineCountOverride = vineCountOverride
+        self.flowPerEmitter = flowPerEmitter
+        self.emitterSpacing = emitterSpacing
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
-        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride
+        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride, flowPerEmitter, emitterSpacing
     }
 
     init(from decoder: Decoder) throws {
@@ -53,6 +59,8 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         rowOffset = try container.decodeIfPresent(Double.self, forKey: .rowOffset) ?? 0
         vineSpacing = try container.decodeIfPresent(Double.self, forKey: .vineSpacing) ?? 1.0
         vineCountOverride = try container.decodeIfPresent(Int.self, forKey: .vineCountOverride)
+        flowPerEmitter = try container.decodeIfPresent(Double.self, forKey: .flowPerEmitter)
+        emitterSpacing = try container.decodeIfPresent(Double.self, forKey: .emitterSpacing)
     }
 }
 
@@ -119,6 +127,26 @@ extension Paddock {
 
     var effectiveVineCount: Int {
         vineCountOverride ?? estimatedVineCount
+    }
+
+    var emittersPerHectare: Double? {
+        guard let emitterSpacing, emitterSpacing > 0, rowWidth > 0 else { return nil }
+        return 10_000.0 / (rowWidth * emitterSpacing)
+    }
+
+    var litresPerHaPerHour: Double? {
+        guard let flowPerEmitter, let emittersPerHa = emittersPerHectare else { return nil }
+        return emittersPerHa * flowPerEmitter
+    }
+
+    var mlPerHaPerHour: Double? {
+        guard let litres = litresPerHaPerHour else { return nil }
+        return litres / 1_000_000.0
+    }
+
+    var mmPerHour: Double? {
+        guard let ml = mlPerHaPerHour else { return nil }
+        return ml * 100.0
     }
 }
 

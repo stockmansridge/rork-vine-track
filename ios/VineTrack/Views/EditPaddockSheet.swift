@@ -16,6 +16,8 @@ struct EditPaddockSheet: View {
     @State private var rowNumberAscending: Bool = true
     @State private var vineSpacing: Double = 1.0
     @State private var vineCountOverride: String = ""
+    @State private var flowPerEmitterText: String = ""
+    @State private var emitterSpacingText: String = ""
     @State private var showBoundaryEditor: Bool = false
     @State private var showFullscreenRowConfig: Bool = false
 
@@ -31,6 +33,7 @@ struct EditPaddockSheet: View {
                     rowNumberingSection
                 }
                 vineSpacingSection
+                irrigationSection
                 if polygonPoints.count > 2 && rowCount > 0 {
                     blockSummarySection
                 }
@@ -77,6 +80,12 @@ struct EditPaddockSheet: View {
                     vineSpacing = paddock.vineSpacing
                     if let override = paddock.vineCountOverride {
                         vineCountOverride = "\(override)"
+                    }
+                    if let flow = paddock.flowPerEmitter {
+                        flowPerEmitterText = String(format: "%.1f", flow)
+                    }
+                    if let spacing = paddock.emitterSpacing {
+                        emitterSpacingText = String(format: "%.2f", spacing)
                     }
                     if let firstRow = paddock.rows.first, let lastRow = paddock.rows.last {
                         rowNumberAscending = lastRow.number >= firstRow.number
@@ -272,6 +281,86 @@ struct EditPaddockSheet: View {
         }
     }
 
+    private var irrigationFlowPerEmitter: Double? {
+        guard let val = Double(flowPerEmitterText), val > 0 else { return nil }
+        return val
+    }
+
+    private var irrigationEmitterSpacing: Double? {
+        guard let val = Double(emitterSpacingText), val > 0 else { return nil }
+        return val
+    }
+
+    private var irrigationSection: some View {
+        Section {
+            HStack {
+                Text("Flow per Emitter")
+                    .font(.subheadline)
+                Spacer()
+                TextField("0.0", text: $flowPerEmitterText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 80)
+                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                Text("L/hr")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Text("Emitter Spacing")
+                    .font(.subheadline)
+                Spacer()
+                TextField("0.00", text: $emitterSpacingText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 80)
+                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                Text("m")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let flow = irrigationFlowPerEmitter, let spacing = irrigationEmitterSpacing, rowWidth > 0 {
+                let emittersPerHa = 10_000.0 / (rowWidth * spacing)
+                let litresPerHaHr = emittersPerHa * flow
+                let mlPerHaHr = litresPerHaHr / 1_000_000.0
+                let mmHr = mlPerHaHr * 100.0
+
+                Divider()
+
+                HStack {
+                    Label("ML/ha/hr", systemImage: "drop.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.blue)
+                    Spacer()
+                    Text(String(format: "%.4f", mlPerHaHr))
+                        .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                        .foregroundStyle(.blue)
+                }
+
+                HStack {
+                    Label("mm/hr", systemImage: "ruler")
+                        .font(.subheadline)
+                        .foregroundStyle(.teal)
+                    Spacer()
+                    Text(String(format: "%.2f", mmHr))
+                        .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                        .foregroundStyle(.teal)
+                }
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "drop.circle.fill")
+                    .foregroundStyle(.blue)
+                    .font(.caption)
+                Text("Irrigation")
+            }
+        } footer: {
+            Text("ML/ha/hr = (emitters per ha × flow) ÷ 1,000,000. mm/hr = ML/ha/hr × 100. Row spacing (\(String(format: "%.1f", rowWidth)) m) is used for the calculation.")
+        }
+    }
+
     private var vineSpacingSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 4) {
@@ -401,6 +490,8 @@ struct EditPaddockSheet: View {
             existing.rowOffset = rowOffset
             existing.vineSpacing = vineSpacing
             existing.vineCountOverride = Int(vineCountOverride)
+            existing.flowPerEmitter = irrigationFlowPerEmitter
+            existing.emitterSpacing = irrigationEmitterSpacing
             store.updatePaddock(existing)
         } else {
             let newPaddock = Paddock(
@@ -411,7 +502,9 @@ struct EditPaddockSheet: View {
                 rowWidth: rowWidth,
                 rowOffset: rowOffset,
                 vineSpacing: vineSpacing,
-                vineCountOverride: Int(vineCountOverride)
+                vineCountOverride: Int(vineCountOverride),
+                flowPerEmitter: irrigationFlowPerEmitter,
+                emitterSpacing: irrigationEmitterSpacing
             )
             store.addPaddock(newPaddock)
         }
