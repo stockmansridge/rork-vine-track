@@ -15,6 +15,11 @@ nonisolated struct GrowthStage: Codable, Identifiable, Sendable, Hashable {
         code
     }
 
+    var imageName: String? {
+        let hasImage: Set<String> = ["EL1","EL2","EL3","EL4","EL7","EL9","EL11","EL12","EL17","EL19","EL21","EL23","EL25","EL27","EL29","EL31","EL33","EL35","EL38","EL41","EL47"]
+        return hasImage.contains(code) ? code : nil
+    }
+
     static let allStages: [GrowthStage] = [
         GrowthStage(code: "EL1", description: "Winter bud", isEnabled: true),
         GrowthStage(code: "EL2", description: "Bud scales opening", isEnabled: true),

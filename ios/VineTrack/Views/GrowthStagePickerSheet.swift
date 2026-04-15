@@ -4,6 +4,7 @@ struct GrowthStagePickerSheet: View {
     @Environment(DataStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var searchText: String = ""
+    @State private var pendingStage: GrowthStage?
     let onSelect: (GrowthStage) -> Void
 
     private var enabledStages: [GrowthStage] {
@@ -19,39 +20,80 @@ struct GrowthStagePickerSheet: View {
         }
     }
 
+    private var showConfirmation: Bool {
+        store.settings.elConfirmationEnabled
+    }
+
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(filteredStages) { stage in
-                    Button {
-                        onSelect(stage)
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Text(stage.code)
-                                .font(.subheadline.weight(.bold).monospacedDigit())
-                                .foregroundStyle(.white)
-                                .frame(width: 48, height: 32)
-                                .background(Color.green.gradient, in: .rect(cornerRadius: 6))
-
-                            Text(stage.description)
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-                                .lineLimit(2)
+            Group {
+                if let stage = pendingStage {
+                    ELStageConfirmationView(
+                        stage: stage,
+                        onConfirm: {
+                            onSelect(stage)
+                            dismiss()
+                        },
+                        onBack: {
+                            withAnimation {
+                                pendingStage = nil
+                            }
                         }
-                        .contentShape(.rect)
-                    }
+                    )
+                } else {
+                    stageList
                 }
             }
-            .listStyle(.insetGrouped)
-            .searchable(text: $searchText, prompt: "Search stages")
-            .navigationTitle("Select Growth Stage")
+            .navigationTitle(pendingStage != nil ? "" : "Select Growth Stage")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    if pendingStage == nil {
+                        Button("Cancel") { dismiss() }
+                    }
                 }
             }
         }
+    }
+
+    private var stageList: some View {
+        List {
+            ForEach(filteredStages) { stage in
+                Button {
+                    if showConfirmation, stage.imageName != nil {
+                        withAnimation {
+                            pendingStage = stage
+                        }
+                    } else {
+                        onSelect(stage)
+                        dismiss()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Text(stage.code)
+                            .font(.subheadline.weight(.bold).monospacedDigit())
+                            .foregroundStyle(.white)
+                            .frame(width: 48, height: 32)
+                            .background(Color.green.gradient, in: .rect(cornerRadius: 6))
+
+                        Text(stage.description)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+
+                        Spacer()
+
+                        if showConfirmation, stage.imageName != nil {
+                            Image(systemName: "photo")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .contentShape(.rect)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .searchable(text: $searchText, prompt: "Search stages")
     }
 }

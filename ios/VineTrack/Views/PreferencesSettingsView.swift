@@ -10,6 +10,7 @@ struct PreferencesSettingsView: View {
             trackingSection
             fillTimerSection
             yieldEstimationSection
+            growthStageSection
             photoSection
             timezoneSection
         }
@@ -168,6 +169,23 @@ struct PreferencesSettingsView: View {
             Text("Display")
         } footer: {
             Text("Choose how VineTrack appears. System matches your device setting.")
+        }
+    }
+
+    private var growthStageSection: some View {
+        Section {
+            Toggle("E-L Stage Confirmation", isOn: Binding(
+                get: { store.settings.elConfirmationEnabled },
+                set: { newVal in
+                    var s = store.settings
+                    s.elConfirmationEnabled = newVal
+                    store.updateSettings(s)
+                }
+            ))
+        } header: {
+            Text("Growth Stages")
+        } footer: {
+            Text("When enabled, selecting a growth stage shows a reference image for visual confirmation before applying.")
         }
     }
 
