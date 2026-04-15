@@ -445,10 +445,26 @@ struct VineyardSetupSettingsView: View {
                         .foregroundStyle(.tertiary)
                 }
             }
+
+            NavigationLink {
+                GrowthStageImagesSettingsView()
+            } label: {
+                HStack {
+                    Label("Growth Stage Images", systemImage: "photo.on.rectangle.angled")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    let customCount = GrowthStage.allStages.filter { store.hasCustomELStageImage(for: $0.code) }.count
+                    if customCount > 0 {
+                        Text("\(customCount) custom")
+                            .font(.subheadline)
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
         } header: {
             Text("Growth Stages")
         } footer: {
-            Text("Configure which E-L growth stages are available when dropping a Growth Stage pin.")
+            Text("Configure which E-L growth stages are available and manage reference images for visual confirmation.")
         }
     }
 }

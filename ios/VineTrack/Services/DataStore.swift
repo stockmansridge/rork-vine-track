@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import UIKit
 
 @Observable
 @MainActor
@@ -2118,6 +2119,57 @@ class DataStore {
             print("DataStore: Failed to decode \(key): \(error)")
             return nil
         }
+    }
+
+    // MARK: - Custom EL Stage Images
+
+    private static let elStageImagesDir: URL = {
+        let dir = storageDirectory.appendingPathComponent("ELStageImages", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
+    private func elStageImageURL(for vineyardId: UUID, code: String) -> URL {
+        let vineyardDir = Self.elStageImagesDir.appendingPathComponent(vineyardId.uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: vineyardDir, withIntermediateDirectories: true)
+        return vineyardDir.appendingPathComponent("\(code).jpg")
+    }
+
+    func customELStageImage(for code: String) -> UIImage? {
+        guard let vid = selectedVineyardId else { return nil }
+        let url = elStageImageURL(for: vid, code: code)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return UIImage(data: data)
+    }
+
+    func saveCustomELStageImage(_ image: UIImage, for code: String) {
+        guard let vid = selectedVineyardId else { return }
+        let url = elStageImageURL(for: vid, code: code)
+        if let data = image.jpegData(compressionQuality: 0.8) {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
+    func removeCustomELStageImage(for code: String) {
+        guard let vid = selectedVineyardId else { return }
+        let url = elStageImageURL(for: vid, code: code)
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    func hasCustomELStageImage(for code: String) -> Bool {
+        guard let vid = selectedVineyardId else { return false }
+        let url = elStageImageURL(for: vid, code: code)
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    func resolvedELStageImage(for stage: GrowthStage) -> UIImage? {
+        if let custom = customELStageImage(for: stage.code) {
+            return custom
+        }
+        if stage.imageName != nil {
+            return UIImage(named: stage.code)
+        }
+        return nil
     }
 
     // MARK: - Cloud Sync

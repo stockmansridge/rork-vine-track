@@ -60,7 +60,7 @@ struct GrowthStagePickerSheet: View {
         List {
             ForEach(filteredStages) { stage in
                 Button {
-                    if showConfirmation, stage.imageName != nil {
+                    if showConfirmation, (stage.imageName != nil || store.hasCustomELStageImage(for: stage.code)) {
                         withAnimation {
                             pendingStage = stage
                         }
@@ -83,7 +83,7 @@ struct GrowthStagePickerSheet: View {
 
                         Spacer()
 
-                        if showConfirmation, stage.imageName != nil {
+                        if showConfirmation, (stage.imageName != nil || store.hasCustomELStageImage(for: stage.code)) {
                             Image(systemName: "photo")
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)

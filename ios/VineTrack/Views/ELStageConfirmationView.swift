@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ELStageConfirmationView: View {
+    @Environment(DataStore.self) private var store
     let stage: GrowthStage
     let onConfirm: () -> Void
     let onBack: () -> Void
@@ -39,8 +40,8 @@ struct ELStageConfirmationView: View {
 
     private var stageImageCard: some View {
         Group {
-            if let imageName = stage.imageName {
-                Image(imageName)
+            if let resolved = store.resolvedELStageImage(for: stage) {
+                Image(uiImage: resolved)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .clipShape(.rect(cornerRadius: 16))
