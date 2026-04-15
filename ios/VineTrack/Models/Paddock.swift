@@ -12,6 +12,7 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
     var rowOffset: Double
     var vineSpacing: Double
     var vineCountOverride: Int?
+    var rowLengthOverride: Double?
     var flowPerEmitter: Double?
     var emitterSpacing: Double?
 
@@ -26,6 +27,7 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         rowOffset: Double = 0,
         vineSpacing: Double = 1.0,
         vineCountOverride: Int? = nil,
+        rowLengthOverride: Double? = nil,
         flowPerEmitter: Double? = nil,
         emitterSpacing: Double? = nil
     ) {
@@ -39,12 +41,13 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         self.rowOffset = rowOffset
         self.vineSpacing = vineSpacing
         self.vineCountOverride = vineCountOverride
+        self.rowLengthOverride = rowLengthOverride
         self.flowPerEmitter = flowPerEmitter
         self.emitterSpacing = emitterSpacing
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
-        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride, flowPerEmitter, emitterSpacing
+        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride, rowLengthOverride, flowPerEmitter, emitterSpacing
     }
 
     init(from decoder: Decoder) throws {
@@ -59,6 +62,7 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         rowOffset = try container.decodeIfPresent(Double.self, forKey: .rowOffset) ?? 0
         vineSpacing = try container.decodeIfPresent(Double.self, forKey: .vineSpacing) ?? 1.0
         vineCountOverride = try container.decodeIfPresent(Int.self, forKey: .vineCountOverride)
+        rowLengthOverride = try container.decodeIfPresent(Double.self, forKey: .rowLengthOverride)
         flowPerEmitter = try container.decodeIfPresent(Double.self, forKey: .flowPerEmitter)
         emitterSpacing = try container.decodeIfPresent(Double.self, forKey: .emitterSpacing)
     }
@@ -120,9 +124,13 @@ extension Paddock {
         }
     }
 
+    var effectiveTotalRowLength: Double {
+        rowLengthOverride ?? totalRowLengthMetres
+    }
+
     var estimatedVineCount: Int {
         guard vineSpacing > 0 else { return 0 }
-        return Int(totalRowLengthMetres / vineSpacing)
+        return Int(effectiveTotalRowLength / vineSpacing)
     }
 
     var effectiveVineCount: Int {
@@ -153,7 +161,7 @@ extension Paddock {
         guard let emitterSpacing, emitterSpacing > 0,
               let flowPerEmitter, flowPerEmitter > 0,
               !rows.isEmpty else { return nil }
-        return (totalRowLengthMetres / emitterSpacing) * flowPerEmitter
+        return (effectiveTotalRowLength / emitterSpacing) * flowPerEmitter
     }
 }
 

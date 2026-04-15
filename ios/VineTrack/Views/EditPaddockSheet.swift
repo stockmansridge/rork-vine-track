@@ -16,6 +16,7 @@ struct EditPaddockSheet: View {
     @State private var rowNumberAscending: Bool = true
     @State private var vineSpacing: Double = 1.0
     @State private var vineCountOverride: String = ""
+    @State private var rowLengthOverride: String = ""
     @State private var flowPerEmitterText: String = ""
     @State private var emitterSpacingText: String = ""
     @State private var showBoundaryEditor: Bool = false
@@ -80,6 +81,9 @@ struct EditPaddockSheet: View {
                     vineSpacing = paddock.vineSpacing
                     if let override = paddock.vineCountOverride {
                         vineCountOverride = "\(override)"
+                    }
+                    if let rlOverride = paddock.rowLengthOverride {
+                        rowLengthOverride = String(format: "%.0f", rlOverride)
                     }
                     if let flow = paddock.flowPerEmitter {
                         flowPerEmitterText = String(format: "%.1f", flow)
@@ -392,12 +396,13 @@ struct EditPaddockSheet: View {
             let dLon = (line.end.longitude - line.start.longitude) * mPerDegLon
             return total + sqrt(dLat * dLat + dLon * dLon)
         }
-        let estimatedVines = vineSpacing > 0 ? Int(totalLength / vineSpacing) : 0
+        let effectiveRowLength = Double(rowLengthOverride) ?? totalLength
+        let estimatedVines = vineSpacing > 0 ? Int(effectiveRowLength / vineSpacing) : 0
         let displayVines = Int(vineCountOverride) ?? estimatedVines
 
         return Section {
             HStack {
-                Text("Total Row Length")
+                Text("Calculated Row Length")
                     .font(.subheadline)
                 Spacer()
                 Text("\(String(format: "%.0f", totalLength)) m")
@@ -414,31 +419,51 @@ struct EditPaddockSheet: View {
                     .foregroundStyle(.blue)
             }
 
-            HStack {
-                Text("Vine Count")
-                    .font(.subheadline)
-                Spacer()
-                TextField("\(estimatedVines)", text: $vineCountOverride)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 100)
-                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
-            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Calculation Overrides")
+                    .font(.subheadline.weight(.semibold))
 
-            if vineCountOverride.isEmpty {
-                Label("Auto-calculated from row lengths and vine spacing", systemImage: "info.circle")
+                Label("Used for water usage & yield estimates only — does not affect trip path tracking.", systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else {
+
                 HStack {
-                    Label("Using manual override", systemImage: "pencil.circle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                    Text("Row Length")
+                        .font(.subheadline)
                     Spacer()
-                    Button("Reset") {
-                        vineCountOverride = ""
+                    TextField("\(String(format: "%.0f", totalLength))", text: $rowLengthOverride)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 100)
+                        .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                    Text("m")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Vine Count")
+                        .font(.subheadline)
+                    Spacer()
+                    TextField("\(estimatedVines)", text: $vineCountOverride)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 100)
+                        .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                }
+
+                if !rowLengthOverride.isEmpty || !vineCountOverride.isEmpty {
+                    HStack {
+                        Label("Manual override active", systemImage: "pencil.circle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button("Reset All") {
+                            rowLengthOverride = ""
+                            vineCountOverride = ""
+                        }
+                        .font(.caption)
                     }
-                    .font(.caption)
                 }
             }
         } header: {
@@ -449,7 +474,7 @@ struct EditPaddockSheet: View {
                 Text("Block Summary")
             }
         } footer: {
-            Text("Vine count is auto-generated from row lengths \u{00F7} vine spacing. You can override it by entering a custom value.")
+            Text("Row length and vine count are auto-calculated from boundary geometry. Override values here for more accurate water usage and yield calculations — trip path tracking always uses the mapped row geometry.")
         }
     }
 
@@ -490,6 +515,7 @@ struct EditPaddockSheet: View {
             existing.rowOffset = rowOffset
             existing.vineSpacing = vineSpacing
             existing.vineCountOverride = Int(vineCountOverride)
+            existing.rowLengthOverride = Double(rowLengthOverride)
             existing.flowPerEmitter = irrigationFlowPerEmitter
             existing.emitterSpacing = irrigationEmitterSpacing
             store.updatePaddock(existing)
@@ -503,6 +529,7 @@ struct EditPaddockSheet: View {
                 rowOffset: rowOffset,
                 vineSpacing: vineSpacing,
                 vineCountOverride: Int(vineCountOverride),
+                rowLengthOverride: Double(rowLengthOverride),
                 flowPerEmitter: irrigationFlowPerEmitter,
                 emitterSpacing: irrigationEmitterSpacing
             )

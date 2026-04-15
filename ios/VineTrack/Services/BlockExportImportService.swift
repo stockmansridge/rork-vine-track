@@ -53,7 +53,8 @@ struct BlockExportImportService {
                     rowWidth: paddock.rowWidth,
                     rowOffset: paddock.rowOffset,
                     vineSpacing: paddock.vineSpacing,
-                    vineCountOverride: paddock.vineCountOverride
+                    vineCountOverride: paddock.vineCountOverride,
+                    rowLengthOverride: paddock.rowLengthOverride
                 ))
                 imported += 1
             }
