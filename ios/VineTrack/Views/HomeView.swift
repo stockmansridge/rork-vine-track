@@ -127,9 +127,22 @@ struct HomeView: View {
         let leftButtons = Array(buttons.prefix(4))
         let rightButtons = Array(buttons.suffix(4))
 
-        return HStack(spacing: 16) {
-            buttonColumn(buttons: leftButtons, side: .left, label: "LEFT", mode: mode)
-            buttonColumn(buttons: rightButtons, side: .right, label: "RIGHT", mode: mode)
+        let leftGrowthStage = leftButtons.first { $0.isGrowthStageButton }
+        let leftRegular = leftButtons.filter { !$0.isGrowthStageButton }
+        let rightRegular = rightButtons.filter { !$0.isGrowthStageButton }
+
+        return VStack(spacing: 12) {
+            if let gsConfig = leftGrowthStage, mode == .growth {
+                GrowthStageWideButton(config: gsConfig) { side in
+                    handleGrowthStageButton(config: gsConfig, side: side)
+                }
+                .frame(height: 70)
+            }
+
+            HStack(spacing: 16) {
+                buttonColumn(buttons: mode == .growth ? leftRegular : leftButtons, side: .left, label: "LEFT", mode: mode)
+                buttonColumn(buttons: mode == .growth ? rightRegular : rightButtons, side: .right, label: "RIGHT", mode: mode)
+            }
         }
     }
 
@@ -299,6 +312,61 @@ struct HomeView: View {
             withAnimation {
                 showPinConfirmation = false
             }
+        }
+    }
+}
+
+struct GrowthStageWideButton: View {
+    let config: ButtonConfig
+    let action: (PinSide) -> Void
+
+    private var buttonColor: Color {
+        Color.fromString(config.color)
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                action(.left)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.left")
+                        .font(.caption.weight(.bold))
+                    Text("LEFT")
+                        .font(.caption.weight(.bold))
+                        .tracking(1)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(buttonColor.gradient, in: .rect(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 8) {
+                GrapeLeafIcon(size: 20)
+                Text(config.name)
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(buttonColor.gradient, in: .rect(cornerRadius: 12))
+            .allowsHitTesting(false)
+
+            Button {
+                action(.right)
+            } label: {
+                HStack(spacing: 8) {
+                    Text("RIGHT")
+                        .font(.caption.weight(.bold))
+                        .tracking(1)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(buttonColor.gradient, in: .rect(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
         }
     }
 }
