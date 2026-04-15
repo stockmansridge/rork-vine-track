@@ -1007,7 +1007,9 @@ class DataStore {
             rowDirection: 3.5,
             rowWidth: 2.8,
             rowOffset: 0,
-            vineSpacing: 1.0
+            vineSpacing: 1.0,
+            flowPerEmitter: 1.6,
+            emitterSpacing: 0.5
         )
 
         let pGruner = Paddock(
@@ -1024,7 +1026,9 @@ class DataStore {
             rowDirection: 9,
             rowWidth: 2.8,
             rowOffset: -0.5,
-            vineSpacing: 1.0
+            vineSpacing: 1.0,
+            flowPerEmitter: 1.6,
+            emitterSpacing: 0.5
         )
 
         let pShiraz = Paddock(
@@ -1041,7 +1045,9 @@ class DataStore {
             rowDirection: 9,
             rowWidth: 2.8,
             rowOffset: 0,
-            vineSpacing: 1.0
+            vineSpacing: 1.0,
+            flowPerEmitter: 1.6,
+            emitterSpacing: 0.5
         )
 
         let pPinotNoir = Paddock(
@@ -1067,7 +1073,9 @@ class DataStore {
             rowDirection: 9,
             rowWidth: 2.8,
             rowOffset: 0,
-            vineSpacing: 1.0
+            vineSpacing: 1.0,
+            flowPerEmitter: 1.6,
+            emitterSpacing: 0.5
         )
 
         let pPrimitivo = Paddock(
@@ -1084,7 +1092,9 @@ class DataStore {
             rowDirection: 9,
             rowWidth: 2.8,
             rowOffset: 0,
-            vineSpacing: 1.0
+            vineSpacing: 1.0,
+            flowPerEmitter: 1.6,
+            emitterSpacing: 0.5
         )
 
         let pCabFranc = Paddock(
@@ -1101,7 +1111,9 @@ class DataStore {
             rowDirection: 9,
             rowWidth: 2.8,
             rowOffset: 0,
-            vineSpacing: 1.0
+            vineSpacing: 1.0,
+            flowPerEmitter: 1.6,
+            emitterSpacing: 0.5
         )
 
         let pSauvBlanc = Paddock(
@@ -1123,7 +1135,9 @@ class DataStore {
             rowDirection: 9,
             rowWidth: 2.8,
             rowOffset: 0.5,
-            vineSpacing: 1.0
+            vineSpacing: 1.0,
+            flowPerEmitter: 1.6,
+            emitterSpacing: 0.5
         )
 
         let pMerlot = Paddock(
@@ -1140,7 +1154,9 @@ class DataStore {
             rowDirection: 9,
             rowWidth: 2.8,
             rowOffset: 0,
-            vineSpacing: 1.0
+            vineSpacing: 1.0,
+            flowPerEmitter: 1.6,
+            emitterSpacing: 0.5
         )
 
         let pPinotGris = Paddock(
@@ -1157,7 +1173,9 @@ class DataStore {
             rowDirection: 9,
             rowWidth: 2.8,
             rowOffset: 0,
-            vineSpacing: 1.0
+            vineSpacing: 1.0,
+            flowPerEmitter: 1.6,
+            emitterSpacing: 0.5
         )
 
         paddocks = [pShiraz, pPinotNoir, pGruner, pHouse, pPrimitivo, pCabFranc, pSauvBlanc, pMerlot, pPinotGris]
