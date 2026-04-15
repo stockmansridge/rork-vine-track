@@ -164,6 +164,22 @@ struct VineyardSetupSettingsView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                            if let mm = paddock.mmPerHour, let ml = paddock.mlPerHaPerHour {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "drop.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.blue)
+                                    Text(String(format: "%.4f ML/ha/hr", ml))
+                                        .font(.caption)
+                                        .foregroundStyle(.blue)
+                                    Text("\u{2022}")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(String(format: "%.2f mm/hr", mm))
+                                        .font(.caption)
+                                        .foregroundStyle(.blue)
+                                }
+                            }
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
