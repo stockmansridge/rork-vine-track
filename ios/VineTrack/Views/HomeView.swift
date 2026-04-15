@@ -127,14 +127,14 @@ struct HomeView: View {
         let leftButtons = Array(buttons.prefix(4))
         let rightButtons = Array(buttons.suffix(4))
 
-        let leftGrowthStage = leftButtons.first { $0.isGrowthStageButton }
+        let growthStageConfig = leftButtons.first { $0.isGrowthStageButton } ?? rightButtons.first { $0.isGrowthStageButton }
         let leftRegular = leftButtons.filter { !$0.isGrowthStageButton }
         let rightRegular = rightButtons.filter { !$0.isGrowthStageButton }
 
         return VStack(spacing: 12) {
-            if let gsConfig = leftGrowthStage, mode == .growth {
-                GrowthStageWideButton(config: gsConfig) { side in
-                    handleGrowthStageButton(config: gsConfig, side: side)
+            if let gsConfig = growthStageConfig, mode == .growth {
+                GrowthStageWideButton(config: gsConfig) {
+                    handleGrowthStageButton(config: gsConfig, side: .left)
                 }
                 .frame(height: 70)
             }
@@ -318,30 +318,14 @@ struct HomeView: View {
 
 struct GrowthStageWideButton: View {
     let config: ButtonConfig
-    let action: (PinSide) -> Void
+    let action: () -> Void
 
     private var buttonColor: Color {
         Color.fromString(config.color)
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button {
-                action(.left)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "chevron.left")
-                        .font(.caption.weight(.bold))
-                    Text("LEFT")
-                        .font(.caption.weight(.bold))
-                        .tracking(1)
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(buttonColor.gradient, in: .rect(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-
+        Button(action: action) {
             HStack(spacing: 8) {
                 GrapeLeafIcon(size: 20)
                 Text(config.name)
@@ -350,24 +334,8 @@ struct GrowthStageWideButton: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(buttonColor.gradient, in: .rect(cornerRadius: 12))
-            .allowsHitTesting(false)
-
-            Button {
-                action(.right)
-            } label: {
-                HStack(spacing: 8) {
-                    Text("RIGHT")
-                        .font(.caption.weight(.bold))
-                        .tracking(1)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(buttonColor.gradient, in: .rect(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
         }
+        .buttonStyle(.plain)
     }
 }
 
