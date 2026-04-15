@@ -1,0 +1,34 @@
+{
+  "theme": {
+    "style": "Warm Australian vineyard world rendered in deep olive greens, burnished earth browns, and golden amber light. The mood is grounded and premium — rich organic depth inspired by sun-baked soil and vine rows at golden hour. Backgrounds use layered volumetric warmth and subtle texture to feel rooted in the land without being literal, giving the app a confident, professional agricultural identity.",
+    "headlineFont": "font-family: 'Plus Jakarta Sans', sans-serif; @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@800&display=swap');",
+    "headlineFontSize": 130,
+    "mockupIds": {
+      "iphone": "silver",
+      "ipad": "silver"
+    },
+    "palette": {
+      "primary": "#263318",
+      "secondary": "#7A4E2D",
+      "accent": "#C8913A"
+    }
+  },
+  "slides": [
+    {
+      "label": "Spray Program",
+      "backgroundPrompt": "Abstract 3D rendered scene of sweeping liquid silk ribbons curling from the lower-left to upper-right in deep forest olive, warm burnished amber, and rich mahogany brown, their surfaces catching soft cinematic light from the lower-right. Mid-ground layers of translucent frosted glass sheets add depth and subtle refraction, with fine particulate dust suspended in the warm volumetric glow. The upper 30% fades to a calm, near-black deep olive with smooth atmospheric haze for text readability. 8K quality, ultra smooth gradients, premium feel, no text, no letters, no UI elements, no device mockups.",
+      "backgroundUrl": "https://r2-pub.rork.com/app-store-screenshots/9d8d451d-4402-4417-b237-ec57d714ec37.png"
+    },
+    {
+      "label": "Vineyard Setup",
+      "backgroundPrompt": "Abstract digital art featuring a constellation of large diffused amber and aged-bronze light spheres drifting across a vast deep charcoal-olive expanse, each emitting soft radial halos that bleed into one another with cinematic warmth from the left edge. Scattered translucent geometric shards catch thin lines of golden side-light, creating layered depth against the dark organic background. The upper 30% is open, dark, and calm — a smooth gradient into near-black deep green. 8K quality, ultra smooth gradients, premium feel, no text, no letters, no UI elements, no device mockups.",
+      "backgroundUrl": "https://r2-pub.rork.com/app-store-screenshots/e6aa792c-7b57-4612-bcea-b50b4387f7b8.png"
+    }
+  ],
+  "headlines": {
+    "en": {
+      "Spray Program": "Spray<br>On Track",
+      "Vineyard Setup": "Vineyard<br>Ready"
+    }
+  }
+}

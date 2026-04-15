@@ -1,27 +1,17 @@
 [
   {
-    "id": "7632f05b-ed31-4ad2-9354-30b3358974d8",
-    "label": "Home Screen",
-    "url": "https://r2-pub.rork.com/generated-images/7e3ace72-89e7-4831-afe2-50d3564a5774.png"
+    "id": "fca802fd-0c03-4e70-ba31-308339c0ac26",
+    "label": "Spray Program",
+    "url": "https://r2-pub.rork.com/app-store-screenshots/fca802fd-0c03-4e70-ba31-308339c0ac26.png"
   },
   {
-    "id": "6ab866d3-1e18-45f8-8fb5-29fdda15d507",
-    "label": "Pins Map View",
-    "url": "https://r2-pub.rork.com/generated-images/4f85d79a-31a9-454a-a2b8-04ef86608925.png"
+    "id": "d7df4c9c-bd9e-4a23-bd1b-b09b5f9e7e6b",
+    "label": "Settings",
+    "url": "https://r2-pub.rork.com/app-store-screenshots/d7df4c9c-bd9e-4a23-bd1b-b09b5f9e7e6b.png"
   },
   {
-    "id": "641b29e4-43a2-4143-836c-3d8f0bf1cead",
-    "label": "Active Trip",
-    "url": "https://r2-pub.rork.com/generated-images/1cb04fc2-a824-4e53-abfb-745e80a637ea.png"
-  },
-  {
-    "id": "360a7ca6-86ba-41f4-aeb2-76356589f634",
-    "label": "Pins List",
-    "url": "https://r2-pub.rork.com/generated-images/72412fe3-9c10-49f1-9560-e5dbf3b38cf2.png"
-  },
-  {
-    "id": "fc4526a1-bc4a-4ced-bb3f-74595e13cc32",
-    "label": "Settings & Vineyard",
-    "url": "https://r2-pub.rork.com/generated-images/c075c2c0-0e70-4304-85f1-32c590415617.png"
+    "id": "b96f02a7-ee91-4b93-8691-b01f5864f1bc",
+    "label": "Vineyard Setup",
+    "url": "https://r2-pub.rork.com/app-store-screenshots/b96f02a7-ee91-4b93-8691-b01f5864f1bc.png"
   }
 ]
