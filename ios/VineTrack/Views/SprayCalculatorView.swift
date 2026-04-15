@@ -77,6 +77,7 @@ struct SprayCalculatorView: View {
                         growthStageSection
                         equipmentSelection
                         waterRateSection
+                        irrigationDataSection
                         chemicalLinesSection
                         notesSection
                         actionButtons
@@ -731,6 +732,101 @@ struct SprayCalculatorView: View {
         .onAppear {
             if sprayRateText.isEmpty {
                 sprayRateText = String(format: "%.0f", waterRateEntry.litresPerHa)
+            }
+        }
+    }
+
+    // MARK: - Irrigation Data
+
+    private var irrigationDataSection: some View {
+        let selectedPaddocks = store.paddocks.filter { selectedPaddockIds.contains($0.id) }
+        let paddocksWithIrrigation = selectedPaddocks.filter { $0.litresPerHaPerHour != nil }
+
+        return Group {
+            if !paddocksWithIrrigation.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionHeader(title: "Irrigation Data", icon: "drop.circle.fill")
+                    Text("Based on dripper spacing & flow rates")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    VStack(spacing: 0) {
+                        ForEach(paddocksWithIrrigation) { paddock in
+                            if let lPerHaHr = paddock.litresPerHaPerHour,
+                               let mlPerHaHr = paddock.mlPerHaPerHour,
+                               let mmHr = paddock.mmPerHour {
+                                VStack(spacing: 8) {
+                                    HStack {
+                                        Text(paddock.name)
+                                            .font(.subheadline.weight(.semibold))
+                                        Spacer()
+                                    }
+
+                                    HStack(spacing: 16) {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("L/ha/hr")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            Text(String(format: "%.0f", lPerHaHr))
+                                                .font(.title3.bold())
+                                                .foregroundStyle(.blue)
+                                        }
+
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("ML/ha/hr")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            Text(String(format: "%.4f", mlPerHaHr))
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(.blue)
+                                        }
+
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("mm/hr")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            Text(String(format: "%.2f", mmHr))
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(.teal)
+                                        }
+
+                                        Spacer()
+                                    }
+                                }
+                                .padding(12)
+
+                                if paddock.id != paddocksWithIrrigation.last?.id {
+                                    Divider().padding(.leading, 12)
+                                }
+                            }
+                        }
+                    }
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(.rect(cornerRadius: 10))
+
+                    if paddocksWithIrrigation.count > 1 {
+                        let avgLPerHaHr = paddocksWithIrrigation.compactMap(\.litresPerHaPerHour).reduce(0, +) / Double(paddocksWithIrrigation.count)
+                        let avgMlPerHaHr = avgLPerHaHr / 1_000_000.0
+                        let avgMmHr = avgMlPerHaHr * 100.0
+
+                        HStack(spacing: 16) {
+                            Image(systemName: "chart.bar.fill")
+                                .foregroundStyle(.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Average across \(paddocksWithIrrigation.count) blocks")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("\(String(format: "%.0f", avgLPerHaHr)) L/ha/hr  \u{2022}  \(String(format: "%.4f", avgMlPerHaHr)) ML/ha/hr  \u{2022}  \(String(format: "%.2f", avgMmHr)) mm/hr")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.blue)
+                            }
+                            Spacer()
+                        }
+                        .padding(10)
+                        .background(Color.blue.opacity(0.08))
+                        .clipShape(.rect(cornerRadius: 8))
+                    }
+                }
             }
         }
     }
