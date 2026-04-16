@@ -27,8 +27,6 @@ struct SettingsView: View {
                 PendingInvitationsView()
                 vineyardSection
                 setupSection
-                yieldEstimationSection
-                reportsSection
                 accountNavSection
                 supportSection
                 appInfoSection
