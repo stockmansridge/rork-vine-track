@@ -1,11 +1,18 @@
 import SwiftUI
 import CoreLocation
 
-struct HomeView: View {
+struct PinDropView: View {
+    let initialMode: PinMode
+
     @Environment(DataStore.self) private var store
     @Environment(LocationService.self) private var locationService
     @Environment(AuthService.self) private var authService
     @State private var currentMode: PinMode = .repairs
+
+    init(initialMode: PinMode = .repairs) {
+        self.initialMode = initialMode
+        _currentMode = State(initialValue: initialMode)
+    }
     @State private var lastDroppedPin: VinePin?
     @State private var showPinConfirmation: Bool = false
     @State private var showCamera: Bool = false

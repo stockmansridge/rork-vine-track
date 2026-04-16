@@ -77,7 +77,7 @@ struct ContentView: View {
     private var mainTabView: some View {
         TabView(selection: Bindable(store).selectedTab) {
             Tab("Home", systemImage: "house.fill", value: 0) {
-                HomeView()
+                DashboardView()
             }
             Tab("Pins", systemImage: "mappin.and.ellipse", value: 1) {
                 PinsView()
