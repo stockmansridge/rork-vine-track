@@ -6,7 +6,7 @@ struct DashboardView: View {
 
     @State private var showPinDrop: Bool = false
     @State private var pinDropMode: PinMode = .repairs
-    @State private var showYieldEstimation: Bool = false
+    @State private var showYieldHub: Bool = false
     @State private var showGrowthStageReport: Bool = false
     @State private var showTripTypeChoice: Bool = false
     @State private var showStartSheet: Bool = false
@@ -69,8 +69,8 @@ struct DashboardView: View {
             .navigationDestination(isPresented: $showPinDrop) {
                 PinDropView(initialMode: pinDropMode)
             }
-            .navigationDestination(isPresented: $showYieldEstimation) {
-                YieldEstimationView()
+            .navigationDestination(isPresented: $showYieldHub) {
+                YieldHubView()
             }
             .navigationDestination(isPresented: $showGrowthStageReport) {
                 GrowthStageReportView()
@@ -304,7 +304,7 @@ struct DashboardView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            VStack(spacing: 8) {
                 if let iconView {
                     iconView
                 } else if let icon {
@@ -312,15 +312,13 @@ struct DashboardView: View {
                         .font(.title3.weight(.semibold))
                 }
                 Text(title)
-                    .font(.subheadline.weight(.bold))
-                Spacer()
-                Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
-                    .opacity(0.7)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+            .frame(height: 80)
             .background(
                 LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing),
                 in: .rect(cornerRadius: 14)
@@ -343,7 +341,7 @@ struct DashboardView: View {
                     icon: "chart.bar.fill",
                     color: .orange
                 ) {
-                    showYieldEstimation = true
+                    showYieldHub = true
                 }
 
                 toolCard(
