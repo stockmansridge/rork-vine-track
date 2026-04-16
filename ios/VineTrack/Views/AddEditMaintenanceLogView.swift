@@ -1,0 +1,245 @@
+import SwiftUI
+
+struct AddEditMaintenanceLogView: View {
+    @Environment(DataStore.self) private var store
+    @Environment(AuthService.self) private var authService
+    @Environment(\.dismiss) private var dismiss
+
+    let existingLog: MaintenanceLog?
+
+    @State private var itemName: String = ""
+    @State private var hours: String = ""
+    @State private var workCompleted: String = ""
+    @State private var partsUsed: String = ""
+    @State private var partsCost: String = ""
+    @State private var labourCost: String = ""
+    @State private var date: Date = Date()
+    @State private var invoicePhotoData: Data?
+    @State private var showCamera: Bool = false
+    @State private var showPhotoSource: Bool = false
+    @State private var showDeleteAlert: Bool = false
+
+    private var isEditing: Bool { existingLog != nil }
+
+    init(existingLog: MaintenanceLog? = nil) {
+        self.existingLog = existingLog
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Item / Machine") {
+                    TextField("e.g. John Deere 5075E, Water Pump", text: $itemName)
+                }
+
+                Section("Service Details") {
+                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                    HStack {
+                        Text("Hours")
+                        Spacer()
+                        TextField("0", text: $hours)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
+                    }
+                }
+
+                Section("Work Completed") {
+                    TextField("Describe work completed...", text: $workCompleted, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+
+                Section("Parts Used") {
+                    TextField("List parts used...", text: $partsUsed, axis: .vertical)
+                        .lineLimit(2...5)
+                }
+
+                Section("Costs") {
+                    HStack {
+                        Text("Parts Cost")
+                        Spacer()
+                        Text(currencySymbol)
+                            .foregroundStyle(.secondary)
+                        TextField("0.00", text: $partsCost)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
+                    }
+                    HStack {
+                        Text("Labour Cost")
+                        Spacer()
+                        Text(currencySymbol)
+                            .foregroundStyle(.secondary)
+                        TextField("0.00", text: $labourCost)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
+                    }
+                    HStack {
+                        Text("Total")
+                            .fontWeight(.semibold)
+                        Spacer()
+                        Text(computedTotal, format: .currency(code: currencyCode))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(VineyardTheme.earthBrown)
+                    }
+                }
+
+                Section("Invoice Photo") {
+                    if let photoData = invoicePhotoData, let uiImage = UIImage(data: photoData) {
+                        VStack(spacing: 12) {
+                            Color(.secondarySystemBackground)
+                                .frame(height: 200)
+                                .overlay {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .allowsHitTesting(false)
+                                }
+                                .clipShape(.rect(cornerRadius: 12))
+
+                            HStack {
+                                Button {
+                                    showPhotoSource = true
+                                } label: {
+                                    Label("Replace", systemImage: "arrow.triangle.2.circlepath")
+                                        .font(.subheadline)
+                                }
+
+                                Spacer()
+
+                                Button(role: .destructive) {
+                                    withAnimation { invoicePhotoData = nil }
+                                } label: {
+                                    Label("Remove", systemImage: "trash")
+                                        .font(.subheadline)
+                                }
+                            }
+                        }
+                    } else {
+                        Button {
+                            showPhotoSource = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "camera.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.white)
+                                    .frame(width: 40, height: 40)
+                                    .background(VineyardTheme.earthBrown.gradient, in: .rect(cornerRadius: 10))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Add Invoice Photo")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    Text("Take a photo or choose from library")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if isEditing {
+                    Section {
+                        Button(role: .destructive) {
+                            showDeleteAlert = true
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Label("Delete Record", systemImage: "trash")
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(isEditing ? "Edit Record" : "New Maintenance")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { saveLog() }
+                        .fontWeight(.semibold)
+                        .disabled(itemName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .confirmationDialog("Add Photo", isPresented: $showPhotoSource) {
+                Button("Take Photo") {
+                    showCamera = true
+                }
+                Button("Choose from Library") {
+                    showCamera = true
+                }
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraImagePicker { data in
+                    if let data {
+                        invoicePhotoData = data
+                    }
+                }
+                .ignoresSafeArea()
+            }
+            .alert("Delete Record", isPresented: $showDeleteAlert) {
+                Button("Delete", role: .destructive) {
+                    if let log = existingLog {
+                        store.deleteMaintenanceLog(log)
+                    }
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to delete this maintenance record?")
+            }
+            .onAppear {
+                if let log = existingLog {
+                    itemName = log.itemName
+                    hours = log.hours > 0 ? String(format: "%.1f", log.hours) : ""
+                    workCompleted = log.workCompleted
+                    partsUsed = log.partsUsed
+                    partsCost = log.partsCost > 0 ? String(format: "%.2f", log.partsCost) : ""
+                    labourCost = log.labourCost > 0 ? String(format: "%.2f", log.labourCost) : ""
+                    date = log.date
+                    invoicePhotoData = log.invoicePhotoData
+                }
+            }
+        }
+    }
+
+    private var computedTotal: Double {
+        (Double(partsCost) ?? 0) + (Double(labourCost) ?? 0)
+    }
+
+    private var currencyCode: String {
+        Locale.current.currency?.identifier ?? "USD"
+    }
+
+    private var currencySymbol: String {
+        Locale.current.currencySymbol ?? "$"
+    }
+
+    private func saveLog() {
+        let trimmedName = itemName.trimmingCharacters(in: .whitespaces)
+        guard !trimmedName.isEmpty else { return }
+
+        var log = existingLog ?? MaintenanceLog()
+        log.itemName = trimmedName
+        log.hours = Double(hours) ?? 0
+        log.workCompleted = workCompleted.trimmingCharacters(in: .whitespacesAndNewlines)
+        log.partsUsed = partsUsed.trimmingCharacters(in: .whitespacesAndNewlines)
+        log.partsCost = Double(partsCost) ?? 0
+        log.labourCost = Double(labourCost) ?? 0
+        log.date = date
+        log.invoicePhotoData = invoicePhotoData
+        log.createdBy = authService.userName.isEmpty ? nil : authService.userName
+
+        if isEditing {
+            store.updateMaintenanceLog(log)
+        } else {
+            store.addMaintenanceLog(log)
+        }
+        dismiss()
+    }
+}

@@ -32,6 +32,7 @@ class DataStore {
     var yieldSessions: [YieldEstimationSession] = []
     var damageRecords: [DamageRecord] = []
     var historicalYieldRecords: [HistoricalYieldRecord] = []
+    var maintenanceLogs: [MaintenanceLog] = []
 
     var selectedTab: Int = 0
     var cloudSync: CloudSyncService?
@@ -58,6 +59,7 @@ class DataStore {
     private let yieldSessionsKey = "vinetrack_yield_sessions"
     private let damageRecordsKey = "vinetrack_damage_records"
     private let historicalYieldRecordsKey = "vinetrack_historical_yield_records"
+    private let maintenanceLogsKey = "vinetrack_maintenance_logs"
 
     private static let storageDirectory: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -163,6 +165,9 @@ class DataStore {
 
         let allHistoricalYield: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
         historicalYieldRecords = allHistoricalYield.filter { $0.vineyardId == vid }
+
+        let allMaintenanceLogs: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
+        maintenanceLogs = allMaintenanceLogs.filter { $0.vineyardId == vid }
 
         if operatorCategories.isEmpty {
             let defaultCategory = OperatorCategory(vineyardId: vid, name: "Tractor Operator", costPerHour: 40)
@@ -692,6 +697,28 @@ class DataStore {
         return factor
     }
 
+    // MARK: - Maintenance Logs
+
+    func addMaintenanceLog(_ log: MaintenanceLog) {
+        guard let vid = selectedVineyardId else { return }
+        var newLog = log
+        newLog.vineyardId = vid
+        maintenanceLogs.insert(newLog, at: 0)
+        saveAllMaintenanceLogs()
+        analytics?.track("maintenance_log_created", data: ["item": log.itemName])
+    }
+
+    func updateMaintenanceLog(_ log: MaintenanceLog) {
+        guard let index = maintenanceLogs.firstIndex(where: { $0.id == log.id }) else { return }
+        maintenanceLogs[index] = log
+        saveAllMaintenanceLogs()
+    }
+
+    func deleteMaintenanceLog(_ log: MaintenanceLog) {
+        maintenanceLogs.removeAll { $0.id == log.id }
+        saveAllMaintenanceLogs()
+    }
+
     // MARK: - Historical Yield Records
 
     func addHistoricalYieldRecord(_ record: HistoricalYieldRecord) {
@@ -908,7 +935,7 @@ class DataStore {
     }
 
     func deleteAllData() {
-        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey, yieldSessionsKey, damageRecordsKey]
+        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey, yieldSessionsKey, damageRecordsKey, maintenanceLogsKey]
         for key in keys {
             let fileURL = Self.storageDirectory.appendingPathComponent("\(key).json")
             try? FileManager.default.removeItem(at: fileURL)
@@ -937,6 +964,7 @@ class DataStore {
         yieldSessions = []
         damageRecords = []
         historicalYieldRecords = []
+        maintenanceLogs = []
     }
 
     func clearInMemoryState() {
@@ -961,6 +989,7 @@ class DataStore {
         yieldSessions = []
         damageRecords = []
         historicalYieldRecords = []
+        maintenanceLogs = []
     }
 
     // MARK: - Demo Data
@@ -2316,6 +2345,16 @@ class DataStore {
         save(all, key: damageRecordsKey)
     }
 
+    private func saveAllMaintenanceLogs() {
+        var all: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
+        if let vid = selectedVineyardId {
+            all.removeAll { $0.vineyardId == vid }
+        }
+        all.append(contentsOf: maintenanceLogs)
+        save(all, key: maintenanceLogsKey)
+        syncDataToCloud(dataType: "maintenance_logs")
+    }
+
     private func saveAllHistoricalYieldRecords() {
         var all: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
         if let vid = selectedVineyardId {
@@ -2442,6 +2481,7 @@ class DataStore {
             case "tractors": return tractors as [Tractor]
             case "fuel_purchases": return fuelPurchases as [FuelPurchase]
             case "operator_categories": return operatorCategories as [OperatorCategory]
+            case "maintenance_logs": return maintenanceLogs as [MaintenanceLog]
             default: return [] as [String]
             }
         }()

@@ -13,6 +13,8 @@ struct DashboardView: View {
     @State private var showSprayTripSetup: Bool = false
     @State private var showSprayCalculator: Bool = false
     @State private var showVineyardDetails: Bool = false
+    @State private var showMaintenanceLog: Bool = false
+    @Environment(\.accessControl) private var accessControl
 
     private var vineyard: Vineyard? { store.selectedVineyard }
 
@@ -43,6 +45,9 @@ struct DashboardView: View {
                     vineyardSummaryCard
                     quickActionsSection
                     vineyardToolsSection
+                    if accessControl?.isManager == true {
+                        adminToolsSection
+                    }
                     recentActivitySection
                 }
                 .padding(.horizontal)
@@ -113,6 +118,9 @@ struct DashboardView: View {
                 showSprayTripSetup = false
             }) {
                 SprayCalculatorView()
+            }
+            .navigationDestination(isPresented: $showMaintenanceLog) {
+                MaintenanceLogListView()
             }
         }
     }
@@ -409,6 +417,59 @@ struct DashboardView: View {
             .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Admin Tools
+
+    private var adminToolsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Text("Admin Tools")
+                    .font(.headline)
+                Image(systemName: "lock.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                showMaintenanceLog = true
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "wrench.and.screwdriver.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(VineyardTheme.earthBrown.gradient, in: .rect(cornerRadius: 12))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Maintenance Log")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text(maintenanceLogSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(14)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var maintenanceLogSubtitle: String {
+        let logs = store.maintenanceLogs
+        guard !logs.isEmpty else { return "No records yet" }
+        let total = logs.reduce(0) { $0 + $1.totalCost }
+        let currencyCode = Locale.current.currency?.identifier ?? "USD"
+        return "\(logs.count) record\(logs.count == 1 ? "" : "s") \u{2022} \(total.formatted(.currency(code: currencyCode)))"
     }
 
     // MARK: - Recent Activity
