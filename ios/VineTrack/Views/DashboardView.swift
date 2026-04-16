@@ -8,6 +8,11 @@ struct DashboardView: View {
     @State private var pinDropMode: PinMode = .repairs
     @State private var showYieldEstimation: Bool = false
     @State private var showGrowthStageReport: Bool = false
+    @State private var showTripTypeChoice: Bool = false
+    @State private var showStartSheet: Bool = false
+    @State private var showSprayTripSetup: Bool = false
+    @State private var showSprayCalculator: Bool = false
+    @State private var showVineyardDetails: Bool = false
 
     private var vineyard: Vineyard? { store.selectedVineyard }
 
@@ -69,6 +74,45 @@ struct DashboardView: View {
             }
             .navigationDestination(isPresented: $showGrowthStageReport) {
                 GrowthStageReportView()
+            }
+            .navigationDestination(isPresented: $showVineyardDetails) {
+                VineyardDetailsView()
+            }
+            .sheet(isPresented: $showTripTypeChoice) {
+                TripTypeChoiceSheet { tripType in
+                    showTripTypeChoice = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        switch tripType {
+                        case .maintenance:
+                            showStartSheet = true
+                        case .spray:
+                            showSprayTripSetup = true
+                        }
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showStartSheet) {
+                StartTripSheet()
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showSprayTripSetup) {
+                SprayTripSetupSheet(
+                    onSelectProgram: { _ in
+                        showSprayCalculator = true
+                    },
+                    onCreateNew: {
+                        showSprayCalculator = true
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showSprayCalculator, onDismiss: {
+                showSprayTripSetup = false
+            }) {
+                SprayCalculatorView()
             }
         }
     }
@@ -145,6 +189,15 @@ struct DashboardView: View {
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
+        .onTapGesture {
+            showVineyardDetails = true
+        }
+        .overlay(alignment: .bottomTrailing) {
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tertiary)
+                .padding(16)
+        }
     }
 
     private var activeTripBadge: some View {
@@ -225,7 +278,11 @@ struct DashboardView: View {
                     icon: "steeringwheel",
                     gradient: [Color.blue, Color.blue.opacity(0.8)]
                 ) {
-                    store.selectedTab = 2
+                    if store.activeTrip != nil {
+                        store.selectedTab = 2
+                    } else {
+                        showTripTypeChoice = true
+                    }
                 }
 
                 quickActionButton(
