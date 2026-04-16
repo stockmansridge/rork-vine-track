@@ -126,6 +126,7 @@ struct LoginView: View {
                         withAnimation(.easeInOut(duration: 0.25)) {
                             isSignUp.toggle()
                             authService.errorMessage = nil
+                            authService.showEmailConfirmation = false
                         }
                     } label: {
                         Text(isSignUp ? "Already have an account? **Sign In**" : "Don't have an account? **Sign Up**")
@@ -179,6 +180,26 @@ struct LoginView: View {
                     }
                 }
                 .padding(.horizontal, 32)
+
+                if authService.showEmailConfirmation {
+                    VStack(spacing: 8) {
+                        Image(systemName: "envelope.badge")
+                            .font(.title2)
+                            .foregroundStyle(VineyardTheme.olive)
+                        Text("Check your email")
+                            .font(.subheadline.weight(.semibold))
+                        Text("We sent a confirmation link to **\(email)**. Please verify your email, then sign in.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(.rect(cornerRadius: 12))
+                    .padding(.top, 12)
+                    .padding(.horizontal, 32)
+                }
 
                 if let error = authService.errorMessage {
                     Text(error)

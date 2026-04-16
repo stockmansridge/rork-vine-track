@@ -18,6 +18,7 @@ class AuthService {
     var isDemoMode: Bool = false
     var pendingInvitations: [TeamInvitation] = []
     var isDeletingAccount: Bool = false
+    var showEmailConfirmation: Bool = false
 
     private let signedInKey = "vinetrack_signed_in"
     private let userNameKey = "vinetrack_user_name"
@@ -165,12 +166,16 @@ class AuthService {
                 password: password,
                 data: ["full_name": .string(name)]
             )
-            userId = result.user.id.uuidString
-            userName = name
-            userEmail = email
-            isSignedIn = true
-            persistUserLocally()
-            await createProfileIfNeeded()
+            if result.session != nil {
+                userId = result.user.id.uuidString
+                userName = name
+                userEmail = email
+                isSignedIn = true
+                persistUserLocally()
+                await createProfileIfNeeded()
+            } else {
+                showEmailConfirmation = true
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
