@@ -1,58 +1,28 @@
 {
   "theme": {
-    "style": "Deep Australian vineyard country aesthetic: rich forest-green backgrounds with warm burgundy and harvest-gold accents evoking red Australian soil and late-afternoon light over canopy rows. Premium and earthy, with a confident professional mood — textured depth, warm directional lighting, and sophisticated dark tones that feel both rugged and refined. Each slide lives in the same dark-green and burgundy world with golden amber highlights, keeping the deck cohesive across all feature reveals.",
+    "style": "Deep Australian wine country mood built on forest-green darkness, warm burgundy richness, and harvest-gold warmth. Backgrounds draw from organic flowing forms, earthy textures, and cinematic directional lighting that evoke the drama of late-afternoon sun over vine rows. The palette stays grounded and premium — never garish — with a confident rurality that speaks directly to professional grape growers.",
     "headlineFont": "font-family: 'Plus Jakarta Sans', sans-serif; @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@800&display=swap');",
-    "headlineFontSize": 120,
+    "headlineFontSize": 128,
     "mockupIds": {
       "iphone": "silver",
       "ipad": "silver"
     },
     "palette": {
-      "primary": "#1A3328",
-      "secondary": "#6E2639",
-      "accent": "#C9943A"
+      "primary": "#1B3A2D",
+      "secondary": "#6B1F2A",
+      "accent": "#C9952E"
     }
   },
   "slides": [
     {
-      "label": "Summary Page",
-      "backgroundPrompt": "Abstract digital art featuring sweeping arcs of deep forest green (#1A3328) and warm harvest gold (#C9943A) ribbons curving diagonally from the lower-left corner upward, blending into rich dark green in the upper third, with a soft volumetric amber glow diffusing at the center-right. Subtle layered translucent planes catch the warm light, adding depth and a premium textured feel with fine grain across the entire composition. Upper 30% is calm near-black forest green for text readability. 8K quality, ultra smooth gradients, premium feel, no text, no letters, no UI elements, no device mockups",
-      "backgroundUrl": "https://r2-pub.rork.com/app-store-screenshots/c064e365-cebd-45f7-8b2a-b10d08d94bbf.png"
-    },
-    {
-      "label": "Repairs",
-      "backgroundPrompt": "Abstract 3D rendered scene with angular fractured geometric shards in deep burgundy (#6E2639) and dark forest green, lit dramatically from the upper-left with a sharp beam of warm amber light casting long hard shadows across the faceted surfaces. The upper region fades to near-black, while shards in the lower half catch rich crimson and gold rim lighting creating vivid contrast and cinematic depth. Fine metallic dust particles drift across the frame adding atmosphere. 8K quality, ultra smooth gradients, premium feel, no text, no letters, no UI elements, no device mockups",
-      "backgroundUrl": "https://r2-pub.rork.com/app-store-screenshots/a829869f-9adb-468c-897e-5fc1933586c6.png"
-    },
-    {
-      "label": "Growth",
-      "backgroundPrompt": "Abstract digital painting of organic liquid forms rising from the bottom of the frame in deep forest green (#1A3328) and emerald, curling upward into soft flowing tendrils that dissolve into warm harvest gold (#C9943A) and amber at mid-frame. A diffused warm glow emanates softly from the center-right, and the upper 30% settles into a calm dark teal-black. Subtle depth-of-field blur on edges adds painterly texture and dimensional warmth. 8K quality, ultra smooth gradients, premium feel, no text, no letters, no UI elements, no device mockups",
-      "backgroundUrl": "https://r2-pub.rork.com/app-store-screenshots/4e7fdd6d-9f25-481f-a924-a05afd1d2e40.png"
-    },
-    {
-      "label": "Pins",
-      "backgroundPrompt": "Abstract digital art depicting a vast dark forest-green (#1A3328) expanse scattered with a constellation of tiny warm golden (#C9943A) luminous points connected by ultra-thin amber threads, forming an irregular geometric web across the frame. A soft diffused amber glow pools gently in the lower-center, while the upper third remains dark and serene with only faint distant dots visible. Fine atmospheric haze adds depth between the luminous threads and the dark background. 8K quality, ultra smooth gradients, premium feel, no text, no letters, no UI elements, no device mockups",
-      "backgroundUrl": "https://r2-pub.rork.com/app-store-screenshots/15f44cca-53b7-4c73-9ab6-32e49886e115.png"
-    },
-    {
-      "label": "Yield Estimate",
-      "backgroundPrompt": "Abstract 3D rendered scene with a large softly glowing amber sphere bleeding warm harvest gold (#C9943A) and deep burgundy (#6E2639) light from the lower-right, sending long horizontal gradient bands across a dark forest-green (#1A3328) base. Sweeping molten gold arcs trail from the sphere across the mid-frame, and wisps of translucent burgundy smoke drift lazily upward toward a calm near-black upper region. Subtle volumetric light rays fan outward from the sphere's edge. 8K quality, ultra smooth gradients, premium feel, no text, no letters, no UI elements, no device mockups",
-      "backgroundUrl": "https://r2-pub.rork.com/app-store-screenshots/a3269cd9-ba1a-411f-920d-cb5f1027479d.png"
-    },
-    {
-      "label": "Spray Program",
-      "backgroundPrompt": "Abstract digital art with multiple layered frosted glass planes stacked at steep angles in deep forest green (#1A3328) and dark burgundy (#6E2639), each thin edge catching a bright line of warm amber (#C9943A) rim light against dramatic deep shadows between the layers. Fine luminous particles drift through the gaps between planes catching the warm light, and the upper 30% fades cleanly to dark near-black green for contrast. Subtle grain texture across all surfaces adds a premium tactile quality. 8K quality, ultra smooth gradients, premium feel, no text, no letters, no UI elements, no device mockups",
-      "backgroundUrl": "https://r2-pub.rork.com/app-store-screenshots/7198aede-0d98-4299-8a6c-2b10d337ff05.png"
+      "label": "Vineyard Details",
+      "backgroundPrompt": "Abstract 3D rendered environment featuring broad sweeping ribbons of deep forest-green silk arcing from the lower-left corner upward, interwoven with deep burgundy and oxblood curves that twist through the mid-frame with organic tension, warm harvest-gold light spilling from the lower-right edge and casting long soft shadows across layered translucent surfaces. The upper 30% fades into calm, near-black forest-green darkness ideal for headline readability, while the lower regions carry rich earthy texture with subtle grain, volumetric amber glow, and depth-of-field blur softening the edges. 8K quality, ultra smooth gradients, premium feel, no text, no letters, no UI elements, no device mockups.",
+      "backgroundUrl": "https://r2-pub.rork.com/app-store-screenshots/cf850fb4-0131-4ddd-a776-9a1a27cf7170.png"
     }
   ],
   "headlines": {
     "en": {
-      "Summary Page": "Full Vineyard<br>Control",
-      "Repairs": "Log Repairs<br>Fast",
-      "Growth": "Monitor<br>Vine Growth",
-      "Pins": "Map Every<br>Block",
-      "Yield Estimate": "Estimate<br>Your Yield",
-      "Spray Program": "Spray On<br>Schedule"
+      "Vineyard Details": "Every Block<br>One View"
     }
   }
 }
