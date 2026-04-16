@@ -46,7 +46,9 @@ struct AccountSettingsView: View {
                 .alert("Delete Account?", isPresented: $showDeleteAccountAlert) {
                     Button("Cancel", role: .cancel) {}
                     Button("Delete Everything", role: .destructive) {
-                        authService.deleteAccount(dataStore: store)
+                        Task {
+                            await authService.deleteAccount(dataStore: store)
+                        }
                     }
                 } message: {
                     Text("This will permanently delete your account, all vineyards, blocks, pins, trips, and settings. This action cannot be undone.")
@@ -63,5 +65,25 @@ struct AccountSettingsView: View {
             }
         }
         .navigationTitle("Account")
+        .overlay {
+            if authService.isDeletingAccount {
+                ZStack {
+                    Color.black.opacity(0.3).ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("Deleting account...")
+                            .font(.headline)
+                        Text("Removing all your data from our servers")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(32)
+                    .background(.ultraThickMaterial)
+                    .clipShape(.rect(cornerRadius: 16))
+                }
+            }
+        }
+        .allowsHitTesting(!authService.isDeletingAccount)
     }
 }

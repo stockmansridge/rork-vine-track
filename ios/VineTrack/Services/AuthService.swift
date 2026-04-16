@@ -17,6 +17,7 @@ class AuthService {
     var userId: String?
     var isDemoMode: Bool = false
     var pendingInvitations: [TeamInvitation] = []
+    var isDeletingAccount: Bool = false
 
     private let signedInKey = "vinetrack_signed_in"
     private let userNameKey = "vinetrack_user_name"
@@ -244,11 +245,79 @@ class AuthService {
         UserDefaults.standard.removeObject(forKey: userEmailKey)
     }
 
-    func deleteAccount(dataStore: DataStore) {
-        Task {
-            try? await supabase.auth.signOut()
+    func deleteAccount(dataStore: DataStore) async {
+        guard isSupabaseConfigured, let uid = userId else {
+            dataStore.deleteAllData()
+            signOut()
+            return
         }
+
+        isDeletingAccount = true
+        errorMessage = nil
+
+        do {
+            let ownedVineyards: [VineyardRecord] = try await supabase.from("vineyards")
+                .select()
+                .eq("owner_id", value: uid)
+                .execute()
+                .value
+
+            let ownedIds = ownedVineyards.map { $0.id }
+
+            for vineyardId in ownedIds {
+                try await supabase.from("vineyard_data")
+                    .delete()
+                    .eq("vineyard_id", value: vineyardId)
+                    .execute()
+
+                try await supabase.from("invitations")
+                    .delete()
+                    .eq("vineyard_id", value: vineyardId)
+                    .execute()
+
+                try await supabase.from("vineyard_members")
+                    .delete()
+                    .eq("vineyard_id", value: vineyardId)
+                    .execute()
+            }
+
+            try await supabase.from("vineyards")
+                .delete()
+                .eq("owner_id", value: uid)
+                .execute()
+
+            try await supabase.from("vineyard_members")
+                .delete()
+                .eq("user_id", value: uid)
+                .execute()
+
+            try? await supabase.from("analytics_events")
+                .delete()
+                .eq("user_id", value: uid)
+                .execute()
+
+            try? await supabase.from("support_requests")
+                .delete()
+                .eq("user_id", value: uid)
+                .execute()
+
+            try? await supabase.from("disclaimer_acceptances")
+                .delete()
+                .eq("user_id", value: uid)
+                .execute()
+
+            try await supabase.from("profiles")
+                .delete()
+                .eq("id", value: uid)
+                .execute()
+
+            try? await supabase.rpc("delete_user_account").execute()
+        } catch {
+            print("Account deletion error: \(error)")
+        }
+
         dataStore.deleteAllData()
+        isDeletingAccount = false
         signOut()
     }
 
