@@ -1021,27 +1021,6 @@ class DataStore {
         save(vineyards, key: vineyardsKey)
         selectedVineyardId = demoVineyard.id
 
-        let pHouse = Paddock(
-            id: UUID(uuidString: "66AA78AC-AE8D-466C-97BF-E11190E037D6")!,
-            vineyardId: demoVineyardId,
-            name: "House",
-            polygonPoints: [
-                CoordinatePoint(latitude: -33.293789934927624, longitude: 148.95383582182913),
-                CoordinatePoint(latitude: -33.294139177410614, longitude: 148.95382125295797),
-                CoordinatePoint(latitude: -33.2941399247259, longitude: 148.9540872369286),
-                CoordinatePoint(latitude: -33.29380400586172, longitude: 148.9541078003952)
-            ],
-            rows: Array((110...118).reversed()).map { n in
-                PaddockRow(number: n, startPoint: CoordinatePoint(latitude: 0, longitude: 0), endPoint: CoordinatePoint(latitude: 0, longitude: 0))
-            },
-            rowDirection: 3.5,
-            rowWidth: 2.8,
-            rowOffset: 0,
-            vineSpacing: 1.0,
-            flowPerEmitter: 1.6,
-            emitterSpacing: 0.5
-        )
-
         let pGruner = Paddock(
             id: UUID(uuidString: "715EE7B8-B5FC-4A4B-A9E9-F8A30F9D62D4")!,
             vineyardId: demoVineyardId,
@@ -1208,7 +1187,7 @@ class DataStore {
             emitterSpacing: 0.5
         )
 
-        paddocks = [pShiraz, pPinotNoir, pGruner, pHouse, pPrimitivo, pCabFranc, pSauvBlanc, pMerlot, pPinotGris]
+        paddocks = [pShiraz, pPinotNoir, pGruner, pPrimitivo, pCabFranc, pSauvBlanc, pMerlot, pPinotGris]
         var allPaddocks: [Paddock] = loadData(key: paddocksKey) ?? []
         allPaddocks.append(contentsOf: paddocks)
         save(allPaddocks, key: paddocksKey)
