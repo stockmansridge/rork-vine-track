@@ -365,6 +365,12 @@ private struct BlockInfoCard: View {
                 if let spacing = paddock.emitterSpacing {
                     irrigationStat(label: "Emitter Spacing", value: String(format: "%.1f m", spacing))
                 }
+                if let totalEmitters = paddock.totalEmitters {
+                    irrigationStat(label: "Emitters", value: "\(totalEmitters)")
+                }
+                if let lVineHr = paddock.litresPerVinePerHour {
+                    irrigationStat(label: "L/Vine/Hr", value: String(format: "%.1f", lVineHr))
+                }
                 if let lph = paddock.litresPerHour {
                     irrigationStat(label: "Block L/hr", value: formatLitresPerHour(lph))
                 }
@@ -524,6 +530,12 @@ private struct BlockDetailSheet: View {
                         }
                         if let spacing = paddock.emitterSpacing {
                             LabeledContent("Emitter Spacing", value: String(format: "%.1f m", spacing))
+                        }
+                        if let totalEmitters = paddock.totalEmitters {
+                            LabeledContent("Emitters", value: "\(totalEmitters)")
+                        }
+                        if let lVineHr = paddock.litresPerVinePerHour {
+                            LabeledContent("L/Vine/Hr", value: String(format: "%.1f", lVineHr))
                         }
                         if let lph = paddock.litresPerHour {
                             LabeledContent("Block L/hr", value: String(format: "%.0f", lph))

@@ -163,6 +163,17 @@ extension Paddock {
               !rows.isEmpty else { return nil }
         return (effectiveTotalRowLength / emitterSpacing) * flowPerEmitter
     }
+
+    var totalEmitters: Int? {
+        guard let emitterSpacing, emitterSpacing > 0 else { return nil }
+        return Int(effectiveTotalRowLength / emitterSpacing)
+    }
+
+    var litresPerVinePerHour: Double? {
+        guard let flowPerEmitter, let emitterSpacing, emitterSpacing > 0, vineSpacing > 0 else { return nil }
+        let emittersPerVine = vineSpacing / emitterSpacing
+        return emittersPerVine * flowPerEmitter
+    }
 }
 
 nonisolated struct PaddockRow: Codable, Identifiable, Sendable, Hashable {
