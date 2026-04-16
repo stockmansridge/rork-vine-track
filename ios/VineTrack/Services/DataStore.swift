@@ -1586,6 +1586,250 @@ class DataStore {
         var allSprayRecords: [SprayRecord] = loadData(key: sprayRecordsKey) ?? []
         allSprayRecords.append(contentsOf: sprayRecords)
         save(allSprayRecords, key: sprayRecordsKey)
+
+        // MARK: Demo Pins
+
+        let demoPins: [VinePin] = [
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29520, longitude: 148.95770,
+                heading: 9, buttonName: "Irrigation", buttonColor: "blue",
+                side: .left, mode: .repairs,
+                paddockId: pShiraz.id, rowNumber: 18,
+                timestamp: cal.date(byAdding: .day, value: -20, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip1Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29485, longitude: 148.95778,
+                heading: 9, buttonName: "Broken Post", buttonColor: "brown",
+                side: .right, mode: .repairs,
+                paddockId: pShiraz.id, rowNumber: 22,
+                timestamp: cal.date(byAdding: .day, value: -20, to: now)!,
+                createdBy: "Demo User", isCompleted: true,
+                completedBy: "Demo User",
+                completedAt: cal.date(byAdding: .day, value: -15, to: now)!,
+                tripId: trip1Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29555, longitude: 148.95762,
+                heading: 9, buttonName: "Vine Issue", buttonColor: "green",
+                side: .left, mode: .repairs,
+                paddockId: pShiraz.id, rowNumber: 16,
+                timestamp: cal.date(byAdding: .day, value: -19, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip1Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29580, longitude: 148.95810,
+                heading: 9, buttonName: "Irrigation", buttonColor: "blue",
+                side: .right, mode: .repairs,
+                paddockId: pGruner.id, rowNumber: 5,
+                timestamp: cal.date(byAdding: .day, value: -13, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip2Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29510, longitude: 148.95820,
+                heading: 9, buttonName: "Broken Post", buttonColor: "brown",
+                side: .left, mode: .repairs,
+                paddockId: pGruner.id, rowNumber: 9,
+                timestamp: cal.date(byAdding: .day, value: -13, to: now)!,
+                createdBy: "Demo User", isCompleted: true,
+                completedBy: "Demo User",
+                completedAt: cal.date(byAdding: .day, value: -8, to: now)!,
+                tripId: trip2Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29470, longitude: 148.95828,
+                heading: 9, buttonName: "Other", buttonColor: "red",
+                side: .right, mode: .repairs,
+                paddockId: pGruner.id, rowNumber: 12,
+                timestamp: cal.date(byAdding: .day, value: -12, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip2Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29540, longitude: 148.95700,
+                heading: 9, buttonName: "Irrigation", buttonColor: "blue",
+                side: .left, mode: .repairs,
+                paddockId: pPrimitivo.id, rowNumber: 33,
+                timestamp: cal.date(byAdding: .day, value: -6, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip3Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29500, longitude: 148.95710,
+                heading: 9, buttonName: "Broken Post", buttonColor: "brown",
+                side: .right, mode: .repairs,
+                paddockId: pPrimitivo.id, rowNumber: 35,
+                timestamp: cal.date(byAdding: .day, value: -6, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip3Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29530, longitude: 148.95440,
+                heading: 9, buttonName: "Vine Issue", buttonColor: "green",
+                side: .left, mode: .repairs,
+                paddockId: pPinotNoir.id, rowNumber: 75,
+                timestamp: cal.date(byAdding: .day, value: -2, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip4Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29490, longitude: 148.95450,
+                heading: 9, buttonName: "Irrigation", buttonColor: "blue",
+                side: .right, mode: .repairs,
+                paddockId: pPinotNoir.id, rowNumber: 80,
+                timestamp: cal.date(byAdding: .day, value: -2, to: now)!,
+                createdBy: "Demo User", isCompleted: true,
+                completedBy: "Demo User",
+                completedAt: cal.date(byAdding: .day, value: -1, to: now)!,
+                tripId: trip4Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29460, longitude: 148.95460,
+                heading: 9, buttonName: "Other", buttonColor: "red",
+                side: .left, mode: .repairs,
+                paddockId: pPinotNoir.id, rowNumber: 85,
+                timestamp: cal.date(byAdding: .day, value: -2, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip4Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29560, longitude: 148.95670,
+                heading: 9, buttonName: "Broken Post", buttonColor: "brown",
+                side: .right, mode: .repairs,
+                paddockId: pCabFranc.id, rowNumber: 40,
+                timestamp: cal.date(byAdding: .day, value: -4, to: now)!,
+                createdBy: "Demo User", isCompleted: false
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29530, longitude: 148.95650,
+                heading: 9, buttonName: "Irrigation", buttonColor: "blue",
+                side: .left, mode: .repairs,
+                paddockId: pMerlot.id, rowNumber: 48,
+                timestamp: cal.date(byAdding: .day, value: -5, to: now)!,
+                createdBy: "Demo User", isCompleted: true,
+                completedBy: "Demo User",
+                completedAt: cal.date(byAdding: .day, value: -3, to: now)!
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29550, longitude: 148.95610,
+                heading: 9, buttonName: "Vine Issue", buttonColor: "green",
+                side: .right, mode: .repairs,
+                paddockId: pSauvBlanc.id, rowNumber: 62,
+                timestamp: cal.date(byAdding: .day, value: -1, to: now)!,
+                createdBy: "Demo User", isCompleted: false
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29515, longitude: 148.95775,
+                heading: 9, buttonName: "Growth Stage", buttonColor: "darkgreen",
+                side: .left, mode: .growth,
+                paddockId: pShiraz.id, rowNumber: 20,
+                timestamp: cal.date(byAdding: .day, value: -18, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip1Id, growthStageCode: "EL15"
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29480, longitude: 148.95785,
+                heading: 9, buttonName: "Powdery", buttonColor: "gray",
+                side: .right, mode: .growth,
+                paddockId: pShiraz.id, rowNumber: 24,
+                timestamp: cal.date(byAdding: .day, value: -17, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip1Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29550, longitude: 148.95815,
+                heading: 9, buttonName: "Downy", buttonColor: "yellow",
+                side: .left, mode: .growth,
+                paddockId: pGruner.id, rowNumber: 3,
+                timestamp: cal.date(byAdding: .day, value: -12, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip2Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29500, longitude: 148.95825,
+                heading: 9, buttonName: "Growth Stage", buttonColor: "darkgreen",
+                side: .right, mode: .growth,
+                paddockId: pGruner.id, rowNumber: 7,
+                timestamp: cal.date(byAdding: .day, value: -11, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip2Id, growthStageCode: "EL19"
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29525, longitude: 148.95435,
+                heading: 9, buttonName: "Blackberries", buttonColor: "red",
+                side: .left, mode: .growth,
+                paddockId: pPinotNoir.id, rowNumber: 78,
+                timestamp: cal.date(byAdding: .day, value: -2, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip4Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29470, longitude: 148.95455,
+                heading: 9, buttonName: "Growth Stage", buttonColor: "darkgreen",
+                side: .right, mode: .growth,
+                paddockId: pPinotNoir.id, rowNumber: 88,
+                timestamp: cal.date(byAdding: .day, value: -1, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip4Id, growthStageCode: "EL23"
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29545, longitude: 148.95695,
+                heading: 9, buttonName: "Powdery", buttonColor: "gray",
+                side: .left, mode: .growth,
+                paddockId: pPrimitivo.id, rowNumber: 34,
+                timestamp: cal.date(byAdding: .day, value: -5, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                tripId: trip3Id
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29520, longitude: 148.95640,
+                heading: 9, buttonName: "Downy", buttonColor: "yellow",
+                side: .right, mode: .growth,
+                paddockId: pPinotGris.id, rowNumber: 54,
+                timestamp: cal.date(byAdding: .day, value: -3, to: now)!,
+                createdBy: "Demo User", isCompleted: false
+            ),
+            VinePin(
+                vineyardId: demoVineyardId,
+                latitude: -33.29570, longitude: 148.95615,
+                heading: 9, buttonName: "Growth Stage", buttonColor: "darkgreen",
+                side: .left, mode: .growth,
+                paddockId: pSauvBlanc.id, rowNumber: 60,
+                timestamp: cal.date(byAdding: .day, value: -1, to: now)!,
+                createdBy: "Demo User", isCompleted: false,
+                growthStageCode: "EL27"
+            ),
+        ]
+
+        pins = demoPins
+        var allPins: [VinePin] = loadData(key: pinsKey) ?? []
+        allPins.append(contentsOf: demoPins)
+        save(allPins, key: pinsKey)
     }
 
     // MARK: - Computed
