@@ -45,9 +45,6 @@ struct DashboardView: View {
                     vineyardSummaryCard
                     quickActionsSection
                     vineyardToolsSection
-                    if accessControl?.isManager == true {
-                        adminToolsSection
-                    }
                     recentActivitySection
                 }
                 .padding(.horizontal)
@@ -361,6 +358,44 @@ struct DashboardView: View {
                     showGrowthStageReport = true
                 }
             }
+
+            if accessControl?.isManager == true {
+                Button {
+                    showMaintenanceLog = true
+                } label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: "wrench.and.screwdriver.fill")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(VineyardTheme.earthBrown.gradient, in: .rect(cornerRadius: 12))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 4) {
+                                Text("Maintenance Log")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                Image(systemName: "lock.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(maintenanceLogSubtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(14)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -419,50 +454,6 @@ struct DashboardView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Admin Tools
-
-    private var adminToolsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Text("Admin Tools")
-                    .font(.headline)
-                Image(systemName: "lock.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Button {
-                showMaintenanceLog = true
-            } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "wrench.and.screwdriver.fill")
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(VineyardTheme.earthBrown.gradient, in: .rect(cornerRadius: 12))
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Maintenance Log")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                        Text(maintenanceLogSubtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(14)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
-            }
-            .buttonStyle(.plain)
-        }
-    }
 
     private var maintenanceLogSubtitle: String {
         let logs = store.maintenanceLogs
