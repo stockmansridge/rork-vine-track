@@ -1,0 +1,59 @@
+{
+  "versionLocalizationId": "d9dbd3ff-3c7a-49fd-99c5-4d04bdacaf42",
+  "path": ".asc/reports/screenshots-upload/failures-1776315183893921043.json",
+  "deviceType": "IPHONE_65",
+  "displayType": "APP_IPHONE_65",
+  "setId": "70fdf7c0-372c-4be3-8dd7-e43b31585ab8",
+  "orderedIds": [
+    "b6ba9b63-53be-4234-a9f1-c36a1451598a",
+    "e3cd1053-0cc2-41e7-a555-3a1fe97481b8",
+    "2ecd14ff-ccf2-400f-9ec6-788e48f81c8a",
+    "fc519dab-0d55-4cdb-a4d2-0c724d38a4bb",
+    "1ba3e198-8d9e-4cea-8e7a-71234a7dd15e",
+    "722afa98-bc68-4702-a31e-bcccb6752308",
+    "4921d08f-07a1-4481-855f-c5b7e21c36a8",
+    "0d28eb22-b99c-4217-8871-751e2d7483b4",
+    "af5cbb98-e51c-40a8-b553-70a47dac2071",
+    "74b0728c-f8f3-479f-a4c5-883e1654da5b"
+  ],
+  "pendingFiles": [
+    "/home/user/rork-app/screenshots/iphone/en/04_pins.png",
+    "/home/user/rork-app/screenshots/iphone/en/05_yield_estimate.png",
+    "/home/user/rork-app/screenshots/iphone/en/06_spray_program.png"
+  ],
+  "results": [
+    {
+      "fileName": "01_summary_page.png",
+      "filePath": "/home/user/rork-app/screenshots/iphone/en/01_summary_page.png",
+      "assetId": "4921d08f-07a1-4481-855f-c5b7e21c36a8",
+      "state": "COMPLETE"
+    },
+    {
+      "fileName": "01_vineyard_details.png",
+      "filePath": "/home/user/rork-app/screenshots/iphone/en/01_vineyard_details.png",
+      "assetId": "0d28eb22-b99c-4217-8871-751e2d7483b4",
+      "state": "COMPLETE"
+    },
+    {
+      "fileName": "02_repairs.png",
+      "filePath": "/home/user/rork-app/screenshots/iphone/en/02_repairs.png",
+      "assetId": "af5cbb98-e51c-40a8-b553-70a47dac2071",
+      "state": "COMPLETE"
+    },
+    {
+      "fileName": "03_growth.png",
+      "filePath": "/home/user/rork-app/screenshots/iphone/en/03_growth.png",
+      "assetId": "74b0728c-f8f3-479f-a4c5-883e1654da5b",
+      "state": "COMPLETE"
+    }
+  ],
+  "failures": [
+    {
+      "fileName": "04_pins.png",
+      "filePath": "/home/user/rork-app/screenshots/iphone/en/04_pins.png",
+      "error": "Too many screenshots.: Set: 70fdf7c0-372c-4be3-8dd7-e43b31585ab8 has already 10 appScreenshots"
+    }
+  ],
+  "error": "Too many screenshots.: Set: 70fdf7c0-372c-4be3-8dd7-e43b31585ab8 has already 10 appScreenshots",
+  "generatedAt": "2026-04-16T04:53:03Z"
+}
