@@ -39,33 +39,35 @@ extension GrapeVariety {
     static func defaults(for vineyardId: UUID) -> [GrapeVariety] {
         // Optimal growing degree days (base 10°C) to harvest ripeness.
         // Values are typical ranges from viticulture references.
+        // Approx BEDD (Biologically Effective Degree Days) values from viticulture reference table.
+        // Midpoint used for ranges.
         let data: [(String, Double)] = [
-            ("Chardonnay", 1250),
-            ("Pinot Noir", 1150),
-            ("Pinot Gris", 1200),
-            ("Sauvignon Blanc", 1300),
+            ("Chardonnay", 1145),
+            ("Pinot Gris / Grigio", 1100),
             ("Riesling", 1200),
-            ("Gruner Veltliner", 1300),
-            ("Merlot", 1450),
-            ("Cabernet Franc", 1500),
-            ("Cabernet Sauvignon", 1650),
-            ("Shiraz", 1550),
-            ("Syrah", 1550),
-            ("Tempranillo", 1500),
-            ("Sangiovese", 1550),
-            ("Nebbiolo", 1700),
-            ("Zinfandel", 1600),
-            ("Primitivo", 1600),
-            ("Malbec", 1500),
-            ("Grenache", 1700),
-            ("Mourvedre", 1800),
-            ("Viognier", 1400),
-            ("Semillon", 1350),
-            ("Muscat", 1350),
-            ("Chenin Blanc", 1350),
-            ("Gewurztraminer", 1250),
-            ("Barbera", 1550),
-            ("Montepulciano", 1600)
+            ("Sauvignon Blanc", 1150),
+            ("Semillon", 1200),
+            ("Chenin Blanc", 1250),
+            ("Gewurztraminer", 1150),
+            ("Viognier", 1260),
+            ("Shiraz", 1255),
+            ("Merlot", 1250),
+            ("Cabernet Franc", 1255),
+            ("Cabernet Sauvignon", 1310),
+            ("Pinot Noir", 1145),
+            ("Tempranillo", 1230),
+            ("Sangiovese", 1285),
+            ("Grenache", 1365),
+            ("Mataro / Mourvedre", 1440),
+            ("Barbera", 1285),
+            ("Malbec", 1230),
+            ("Colombard", 1300),
+            ("Muscat Gordo Blanco", 1350),
+            ("Fiano", 1320),
+            ("Prosecco", 1410),
+            ("Vermentino", 1290),
+            ("Gruner Veltliner", 1200),
+            ("Primitivo", 1200)
         ]
         return data.map { GrapeVariety(vineyardId: vineyardId, name: $0.0, optimalGDD: $0.1, isBuiltIn: true) }
     }

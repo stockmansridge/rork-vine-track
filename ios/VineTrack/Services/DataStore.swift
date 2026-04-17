@@ -176,6 +176,15 @@ class DataStore {
         if grapeVarieties.isEmpty {
             grapeVarieties = GrapeVariety.defaults(for: vid)
             saveAllGrapeVarieties()
+        } else {
+            let defaults = GrapeVariety.defaults(for: vid)
+            let existingBuiltInNames = Set(grapeVarieties.filter { $0.isBuiltIn }.map { $0.name })
+            let defaultNames = Set(defaults.map { $0.name })
+            if existingBuiltInNames != defaultNames {
+                grapeVarieties.removeAll { $0.isBuiltIn }
+                grapeVarieties.append(contentsOf: defaults)
+                saveAllGrapeVarieties()
+            }
         }
 
         if operatorCategories.isEmpty {
