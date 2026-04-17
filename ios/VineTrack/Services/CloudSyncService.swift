@@ -404,6 +404,15 @@ class CloudSyncService {
             result.append(("spray_equipment", vid, sprayEquip))
             result.append(("tractors", vid, tractorItems))
             result.append(("fuel_purchases", vid, fuelItems))
+
+            let yieldSessions = store.yieldSessions.filter { $0.vineyardId == vid }
+            let damageRecords = store.damageRecords.filter { $0.vineyardId == vid }
+            let historicalYield = store.historicalYieldRecords.filter { $0.vineyardId == vid }
+            let maintenanceLogs = store.maintenanceLogs.filter { $0.vineyardId == vid }
+            result.append(("yield_sessions", vid, yieldSessions))
+            result.append(("damage_records", vid, damageRecords))
+            result.append(("historical_yield_records", vid, historicalYield))
+            result.append(("maintenance_logs", vid, maintenanceLogs))
         }
         return result
     }
@@ -495,6 +504,34 @@ class CloudSyncService {
                 store.replaceFuelPurchases(items, for: vineyardId)
             } else {
                 store.mergeFuelPurchases(items, for: vineyardId)
+            }
+        case "yield_sessions":
+            let items = try decoder.decode([YieldEstimationSession].self, from: jsonData)
+            if replace {
+                store.replaceYieldSessions(items, for: vineyardId)
+            } else {
+                store.mergeYieldSessions(items, for: vineyardId)
+            }
+        case "damage_records":
+            let items = try decoder.decode([DamageRecord].self, from: jsonData)
+            if replace {
+                store.replaceDamageRecords(items, for: vineyardId)
+            } else {
+                store.mergeDamageRecords(items, for: vineyardId)
+            }
+        case "historical_yield_records":
+            let items = try decoder.decode([HistoricalYieldRecord].self, from: jsonData)
+            if replace {
+                store.replaceHistoricalYieldRecords(items, for: vineyardId)
+            } else {
+                store.mergeHistoricalYieldRecords(items, for: vineyardId)
+            }
+        case "maintenance_logs":
+            let items = try decoder.decode([MaintenanceLog].self, from: jsonData)
+            if replace {
+                store.replaceMaintenanceLogs(items, for: vineyardId)
+            } else {
+                store.mergeMaintenanceLogs(items, for: vineyardId)
             }
         default:
             break

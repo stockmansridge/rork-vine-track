@@ -2322,6 +2322,7 @@ class DataStore {
         }
         all.append(contentsOf: damageRecords)
         save(all, key: damageRecordsKey)
+        syncDataToCloud(dataType: "damage_records")
     }
 
     private func saveAllMaintenanceLogs() {
@@ -2341,6 +2342,7 @@ class DataStore {
         }
         all.append(contentsOf: historicalYieldRecords)
         save(all, key: historicalYieldRecordsKey)
+        syncDataToCloud(dataType: "historical_yield_records")
     }
 
     private func saveAllYieldSessions() {
@@ -2350,6 +2352,101 @@ class DataStore {
         }
         all.append(contentsOf: yieldSessions)
         save(all, key: yieldSessionsKey)
+        syncDataToCloud(dataType: "yield_sessions")
+    }
+
+    // MARK: - Cloud Merge: Yield / Damage / Maintenance
+
+    func replaceYieldSessions(_ remote: [YieldEstimationSession], for vineyardId: UUID) {
+        var all: [YieldEstimationSession] = loadData(key: yieldSessionsKey) ?? []
+        all.removeAll { $0.vineyardId == vineyardId }
+        all.append(contentsOf: remote)
+        save(all, key: yieldSessionsKey)
+        if selectedVineyardId == vineyardId {
+            yieldSessions = remote
+        }
+    }
+
+    func mergeYieldSessions(_ remote: [YieldEstimationSession], for vineyardId: UUID) {
+        var all: [YieldEstimationSession] = loadData(key: yieldSessionsKey) ?? []
+        for item in remote {
+            if !all.contains(where: { $0.id == item.id }) {
+                all.append(item)
+            }
+        }
+        save(all, key: yieldSessionsKey)
+        if selectedVineyardId == vineyardId {
+            yieldSessions = all.filter { $0.vineyardId == vineyardId }
+        }
+    }
+
+    func replaceDamageRecords(_ remote: [DamageRecord], for vineyardId: UUID) {
+        var all: [DamageRecord] = loadData(key: damageRecordsKey) ?? []
+        all.removeAll { $0.vineyardId == vineyardId }
+        all.append(contentsOf: remote)
+        save(all, key: damageRecordsKey)
+        if selectedVineyardId == vineyardId {
+            damageRecords = remote
+        }
+    }
+
+    func mergeDamageRecords(_ remote: [DamageRecord], for vineyardId: UUID) {
+        var all: [DamageRecord] = loadData(key: damageRecordsKey) ?? []
+        for item in remote {
+            if !all.contains(where: { $0.id == item.id }) {
+                all.append(item)
+            }
+        }
+        save(all, key: damageRecordsKey)
+        if selectedVineyardId == vineyardId {
+            damageRecords = all.filter { $0.vineyardId == vineyardId }
+        }
+    }
+
+    func replaceHistoricalYieldRecords(_ remote: [HistoricalYieldRecord], for vineyardId: UUID) {
+        var all: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
+        all.removeAll { $0.vineyardId == vineyardId }
+        all.append(contentsOf: remote)
+        save(all, key: historicalYieldRecordsKey)
+        if selectedVineyardId == vineyardId {
+            historicalYieldRecords = remote
+        }
+    }
+
+    func mergeHistoricalYieldRecords(_ remote: [HistoricalYieldRecord], for vineyardId: UUID) {
+        var all: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
+        for item in remote {
+            if !all.contains(where: { $0.id == item.id }) {
+                all.append(item)
+            }
+        }
+        save(all, key: historicalYieldRecordsKey)
+        if selectedVineyardId == vineyardId {
+            historicalYieldRecords = all.filter { $0.vineyardId == vineyardId }
+        }
+    }
+
+    func replaceMaintenanceLogs(_ remote: [MaintenanceLog], for vineyardId: UUID) {
+        var all: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
+        all.removeAll { $0.vineyardId == vineyardId }
+        all.append(contentsOf: remote)
+        save(all, key: maintenanceLogsKey)
+        if selectedVineyardId == vineyardId {
+            maintenanceLogs = remote
+        }
+    }
+
+    func mergeMaintenanceLogs(_ remote: [MaintenanceLog], for vineyardId: UUID) {
+        var all: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
+        for item in remote {
+            if !all.contains(where: { $0.id == item.id }) {
+                all.append(item)
+            }
+        }
+        save(all, key: maintenanceLogsKey)
+        if selectedVineyardId == vineyardId {
+            maintenanceLogs = all.filter { $0.vineyardId == vineyardId }
+        }
     }
 
     private func saveAllCustomPatterns() {
@@ -2461,6 +2558,9 @@ class DataStore {
             case "fuel_purchases": return fuelPurchases as [FuelPurchase]
             case "operator_categories": return operatorCategories as [OperatorCategory]
             case "maintenance_logs": return maintenanceLogs as [MaintenanceLog]
+            case "yield_sessions": return yieldSessions as [YieldEstimationSession]
+            case "damage_records": return damageRecords as [DamageRecord]
+            case "historical_yield_records": return historicalYieldRecords as [HistoricalYieldRecord]
             default: return [] as [String]
             }
         }()
