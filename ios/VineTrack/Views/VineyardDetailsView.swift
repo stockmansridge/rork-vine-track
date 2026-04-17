@@ -88,6 +88,7 @@ struct VineyardDetailsView: View {
                 blocksSection
                 pinsOverviewSection
                 seasonSummarySection
+                VineyardCostsSection()
             }
             .padding(.horizontal)
             .padding(.bottom, 24)
