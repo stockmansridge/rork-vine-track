@@ -29,6 +29,7 @@ struct VineyardSetupSettingsView: View {
         Form {
             vineyardMapSection
             paddocksSection
+            grapeVarietiesSection
             blockExportImportSection
             buttonsSection
             growthStageSection
@@ -217,6 +218,27 @@ struct VineyardSetupSettingsView: View {
             Text("Blocks")
         } footer: {
             Text("Define block boundaries and row layouts for your vineyard.")
+        }
+    }
+
+    private var grapeVarietiesSection: some View {
+        Section {
+            NavigationLink {
+                GrapeVarietyManagementView()
+            } label: {
+                HStack {
+                    Label("Grape Varieties", systemImage: "leaf.circle")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text("\(store.grapeVarieties.count)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Varieties")
+        } footer: {
+            Text("Master list of grape varieties and their optimal ripeness (Growing Degree Days). Used when assigning varieties to blocks.")
         }
     }
 

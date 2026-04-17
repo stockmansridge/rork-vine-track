@@ -33,6 +33,7 @@ class DataStore {
     var damageRecords: [DamageRecord] = []
     var historicalYieldRecords: [HistoricalYieldRecord] = []
     var maintenanceLogs: [MaintenanceLog] = []
+    var grapeVarieties: [GrapeVariety] = []
 
     var selectedTab: Int = 0
     var cloudSync: CloudSyncService?
@@ -60,6 +61,7 @@ class DataStore {
     private let damageRecordsKey = "vinetrack_damage_records"
     private let historicalYieldRecordsKey = "vinetrack_historical_yield_records"
     private let maintenanceLogsKey = "vinetrack_maintenance_logs"
+    private let grapeVarietiesKey = "vinetrack_grape_varieties"
 
     private static let storageDirectory: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -168,6 +170,13 @@ class DataStore {
 
         let allMaintenanceLogs: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
         maintenanceLogs = allMaintenanceLogs.filter { $0.vineyardId == vid }
+
+        let allGrapeVarieties: [GrapeVariety] = loadData(key: grapeVarietiesKey) ?? []
+        grapeVarieties = allGrapeVarieties.filter { $0.vineyardId == vid }
+        if grapeVarieties.isEmpty {
+            grapeVarieties = GrapeVariety.defaults(for: vid)
+            saveAllGrapeVarieties()
+        }
 
         if operatorCategories.isEmpty {
             let defaultCategory = OperatorCategory(vineyardId: vid, name: "Tractor Operator", costPerHour: 40)
@@ -717,6 +726,40 @@ class DataStore {
     func deleteMaintenanceLog(_ log: MaintenanceLog) {
         maintenanceLogs.removeAll { $0.id == log.id }
         saveAllMaintenanceLogs()
+    }
+
+    // MARK: - Grape Varieties
+
+    func addGrapeVariety(_ variety: GrapeVariety) {
+        guard let vid = selectedVineyardId else { return }
+        var v = variety
+        v.vineyardId = vid
+        grapeVarieties.append(v)
+        saveAllGrapeVarieties()
+    }
+
+    func updateGrapeVariety(_ variety: GrapeVariety) {
+        guard let index = grapeVarieties.firstIndex(where: { $0.id == variety.id }) else { return }
+        grapeVarieties[index] = variety
+        saveAllGrapeVarieties()
+    }
+
+    func deleteGrapeVariety(_ variety: GrapeVariety) {
+        grapeVarieties.removeAll { $0.id == variety.id }
+        saveAllGrapeVarieties()
+    }
+
+    func grapeVariety(for id: UUID) -> GrapeVariety? {
+        grapeVarieties.first { $0.id == id }
+    }
+
+    private func saveAllGrapeVarieties() {
+        var all: [GrapeVariety] = loadData(key: grapeVarietiesKey) ?? []
+        if let vid = selectedVineyardId {
+            all.removeAll { $0.vineyardId == vid }
+        }
+        all.append(contentsOf: grapeVarieties)
+        save(all, key: grapeVarietiesKey)
     }
 
     // MARK: - Historical Yield Records

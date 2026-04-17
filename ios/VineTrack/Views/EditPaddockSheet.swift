@@ -19,6 +19,8 @@ struct EditPaddockSheet: View {
     @State private var rowLengthOverride: String = ""
     @State private var flowPerEmitterText: String = ""
     @State private var emitterSpacingText: String = ""
+    @State private var varietyAllocations: [PaddockVarietyAllocation] = []
+    @State private var showAddVariety: Bool = false
     @State private var showBoundaryEditor: Bool = false
     @State private var showFullscreenRowConfig: Bool = false
 
@@ -34,6 +36,7 @@ struct EditPaddockSheet: View {
                     rowNumberingSection
                 }
                 vineSpacingSection
+                varietiesSection
                 irrigationSection
                 if polygonPoints.count > 2 && rowCount > 0 {
                     blockSummarySection
@@ -91,6 +94,7 @@ struct EditPaddockSheet: View {
                     if let spacing = paddock.emitterSpacing {
                         emitterSpacingText = String(format: "%.2f", spacing)
                     }
+                    varietyAllocations = paddock.varietyAllocations
                     if let firstRow = paddock.rows.first, let lastRow = paddock.rows.last {
                         rowNumberAscending = lastRow.number >= firstRow.number
                         rowStartNumber = min(firstRow.number, lastRow.number)
@@ -365,6 +369,100 @@ struct EditPaddockSheet: View {
         }
     }
 
+    private var availableVarieties: [GrapeVariety] {
+        let usedIds = Set(varietyAllocations.map { $0.varietyId })
+        return store.grapeVarieties
+            .filter { !usedIds.contains($0.id) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private var totalVarietyPercent: Double {
+        varietyAllocations.reduce(0) { $0 + $1.percent }
+    }
+
+    private var varietiesSection: some View {
+        Section {
+            ForEach(varietyAllocations) { allocation in
+                let variety = store.grapeVariety(for: allocation.varietyId)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(variety?.name ?? "Unknown")
+                            .font(.subheadline.weight(.semibold))
+                        if let v = variety {
+                            Text("Optimal: \(Int(v.optimalGDD)) GDD")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    TextField("0", value: binding(for: allocation.id), format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 60)
+                        .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                    Text("%")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        varietyAllocations.removeAll { $0.id == allocation.id }
+                    } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if !availableVarieties.isEmpty {
+                Menu {
+                    ForEach(availableVarieties) { variety in
+                        Button(variety.name) {
+                            let remaining = max(0, 100 - totalVarietyPercent)
+                            let suggested = varietyAllocations.isEmpty ? 100.0 : remaining
+                            varietyAllocations.append(PaddockVarietyAllocation(varietyId: variety.id, percent: suggested))
+                        }
+                    }
+                } label: {
+                    Label("Add Variety", systemImage: "plus.circle")
+                        .foregroundStyle(.blue)
+                }
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "leaf.circle.fill")
+                    .foregroundStyle(VineyardTheme.leafGreen)
+                    .font(.caption)
+                Text("Grape Varieties")
+                Spacer()
+                if !varietyAllocations.isEmpty {
+                    Text("Total: \(Int(totalVarietyPercent))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(abs(totalVarietyPercent - 100) < 0.5 ? VineyardTheme.leafGreen : .orange)
+                }
+            }
+        } footer: {
+            if varietyAllocations.isEmpty {
+                Text("Add varieties planted in this block. Manage the master list in Settings → Vineyard Setup → Grape Varieties.")
+            } else if abs(totalVarietyPercent - 100) >= 0.5 {
+                Text("Percentages should total 100%. Currently: \(Int(totalVarietyPercent))%.")
+                    .foregroundStyle(.orange)
+            } else {
+                Text("Percentages total 100%.")
+            }
+        }
+    }
+
+    private func binding(for allocationId: UUID) -> Binding<Double> {
+        Binding(
+            get: { varietyAllocations.first(where: { $0.id == allocationId })?.percent ?? 0 },
+            set: { newValue in
+                if let index = varietyAllocations.firstIndex(where: { $0.id == allocationId }) {
+                    varietyAllocations[index].percent = newValue
+                }
+            }
+        )
+    }
+
     private var vineSpacingSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 4) {
@@ -518,6 +616,7 @@ struct EditPaddockSheet: View {
             existing.rowLengthOverride = Double(rowLengthOverride)
             existing.flowPerEmitter = irrigationFlowPerEmitter
             existing.emitterSpacing = irrigationEmitterSpacing
+            existing.varietyAllocations = varietyAllocations
             store.updatePaddock(existing)
         } else {
             let newPaddock = Paddock(
@@ -531,7 +630,8 @@ struct EditPaddockSheet: View {
                 vineCountOverride: Int(vineCountOverride),
                 rowLengthOverride: Double(rowLengthOverride),
                 flowPerEmitter: irrigationFlowPerEmitter,
-                emitterSpacing: irrigationEmitterSpacing
+                emitterSpacing: irrigationEmitterSpacing,
+                varietyAllocations: varietyAllocations
             )
             store.addPaddock(newPaddock)
         }

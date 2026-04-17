@@ -15,6 +15,7 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
     var rowLengthOverride: Double?
     var flowPerEmitter: Double?
     var emitterSpacing: Double?
+    var varietyAllocations: [PaddockVarietyAllocation]
 
     init(
         id: UUID = UUID(),
@@ -29,7 +30,8 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         vineCountOverride: Int? = nil,
         rowLengthOverride: Double? = nil,
         flowPerEmitter: Double? = nil,
-        emitterSpacing: Double? = nil
+        emitterSpacing: Double? = nil,
+        varietyAllocations: [PaddockVarietyAllocation] = []
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -44,10 +46,11 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         self.rowLengthOverride = rowLengthOverride
         self.flowPerEmitter = flowPerEmitter
         self.emitterSpacing = emitterSpacing
+        self.varietyAllocations = varietyAllocations
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
-        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride, rowLengthOverride, flowPerEmitter, emitterSpacing
+        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride, rowLengthOverride, flowPerEmitter, emitterSpacing, varietyAllocations
     }
 
     init(from decoder: Decoder) throws {
@@ -65,6 +68,7 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         rowLengthOverride = try container.decodeIfPresent(Double.self, forKey: .rowLengthOverride)
         flowPerEmitter = try container.decodeIfPresent(Double.self, forKey: .flowPerEmitter)
         emitterSpacing = try container.decodeIfPresent(Double.self, forKey: .emitterSpacing)
+        varietyAllocations = try container.decodeIfPresent([PaddockVarietyAllocation].self, forKey: .varietyAllocations) ?? []
     }
 }
 

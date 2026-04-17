@@ -6,6 +6,7 @@ struct VineyardDetailsView: View {
     @Environment(DataStore.self) private var store
     @Environment(LocationService.self) private var locationService
     @State private var selectedPaddock: Paddock? = nil
+    @State private var degreeDayService = DegreeDayService()
 
     private var vineyard: Vineyard? { store.selectedVineyard }
     private var paddocks: [Paddock] { store.orderedPaddocks }
@@ -85,6 +86,8 @@ struct VineyardDetailsView: View {
             VStack(spacing: 20) {
                 mapSection
                 vineyardStatsSection
+                degreeDaysSection
+                varietyRipenessSection
                 blocksSection
                 pinsOverviewSection
                 seasonSummarySection
@@ -96,6 +99,141 @@ struct VineyardDetailsView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Vineyard Details")
         .navigationBarTitleDisplayMode(.large)
+        .task(id: store.settings.weatherStationId) {
+            await refreshDegreeDays()
+        }
+    }
+
+    private func refreshDegreeDays() async {
+        guard let stationId = store.settings.weatherStationId, !stationId.isEmpty else { return }
+        await degreeDayService.fetchSeasonGDD(stationId: stationId, seasonStart: seasonStartDate)
+    }
+
+    fileprivate struct VarietyAggregate: Identifiable {
+        let id: UUID
+        let name: String
+        let optimalGDD: Double
+        let hectares: Double
+        let totalVineyardHa: Double
+        var sharePercent: Double { totalVineyardHa > 0 ? (hectares / totalVineyardHa) * 100 : 0 }
+    }
+
+    private var varietyAggregates: [VarietyAggregate] {
+        var totals: [UUID: Double] = [:]
+        var totalHa: Double = 0
+        for paddock in paddocks {
+            let blockArea = paddock.areaHectares
+            totalHa += blockArea
+            for alloc in paddock.varietyAllocations {
+                totals[alloc.varietyId, default: 0] += blockArea * (alloc.percent / 100.0)
+            }
+        }
+        return totals.compactMap { id, ha -> VarietyAggregate? in
+            guard let variety = store.grapeVariety(for: id) else { return nil }
+            return VarietyAggregate(
+                id: id,
+                name: variety.name,
+                optimalGDD: variety.optimalGDD,
+                hectares: ha,
+                totalVineyardHa: totalHa
+            )
+        }
+        .sorted { $0.hectares > $1.hectares }
+    }
+
+    private var degreeDaysSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Growing Degree Days")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    Task { await refreshDegreeDays() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption.weight(.semibold))
+                }
+                .disabled(degreeDayService.isLoading)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "thermometer.sun.fill")
+                        .foregroundStyle(.orange)
+                    if let gdd = degreeDayService.seasonGDD {
+                        Text("\(Int(gdd))")
+                            .font(.system(.largeTitle, design: .rounded).weight(.bold).monospacedDigit())
+                        Text("°C\u{00B7}days")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else if degreeDayService.isLoading {
+                        ProgressView()
+                        Text("Loading…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("—")
+                            .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+
+                if degreeDayService.seasonGDD != nil {
+                    Text("Season to date (\(degreeDayService.daysCovered) days, base 10°C)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let error = degreeDayService.errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else if (store.settings.weatherStationId ?? "").isEmpty {
+                    Text("Set a weather station in Vineyard Setup to track degree days.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+        }
+    }
+
+    private var varietyRipenessSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Variety Ripeness")
+                .font(.headline)
+
+            if varietyAggregates.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "leaf")
+                            .font(.title2)
+                            .foregroundStyle(.tertiary)
+                        Text("No varieties assigned")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text("Edit a block to assign grape varieties.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.vertical, 24)
+                    Spacer()
+                }
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(varietyAggregates) { agg in
+                        VarietyRipenessRow(
+                            aggregate: agg,
+                            seasonGDD: degreeDayService.seasonGDD
+                        )
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Map
@@ -566,5 +704,73 @@ private struct BlockDetailSheet: View {
             .navigationTitle(paddock.name)
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+}
+
+// MARK: - Variety Ripeness Row
+
+private struct VarietyRipenessRow: View {
+    let aggregate: VineyardDetailsView.VarietyAggregate
+    let seasonGDD: Double?
+
+    private var progress: Double {
+        guard let gdd = seasonGDD, aggregate.optimalGDD > 0 else { return 0 }
+        return min(1.0, max(0, gdd / aggregate.optimalGDD))
+    }
+
+    private var progressPercent: Int {
+        Int(progress * 100)
+    }
+
+    private var progressColor: Color {
+        switch progress {
+        case 0..<0.33: return .blue
+        case 0.33..<0.66: return .teal
+        case 0.66..<0.9: return VineyardTheme.leafGreen
+        case 0.9..<1.0: return .orange
+        default: return .red
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(aggregate.name)
+                    .font(.subheadline.weight(.bold))
+                Spacer()
+                Text(String(format: "%.1f ha • %.0f%%", aggregate.hectares, aggregate.sharePercent))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color(.tertiarySystemFill))
+                    Capsule()
+                        .fill(progressColor.gradient)
+                        .frame(width: max(4, geo.size.width * progress))
+                }
+            }
+            .frame(height: 8)
+
+            HStack {
+                if seasonGDD != nil {
+                    Text("\(progressPercent)% of optimal")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(progressColor)
+                } else {
+                    Text("Awaiting GDD data")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("Target \(Int(aggregate.optimalGDD)) GDD")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
     }
 }
