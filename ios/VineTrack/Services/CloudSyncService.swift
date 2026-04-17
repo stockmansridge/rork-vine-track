@@ -413,6 +413,11 @@ class CloudSyncService {
             result.append(("damage_records", vid, damageRecords))
             result.append(("historical_yield_records", vid, historicalYield))
             result.append(("maintenance_logs", vid, maintenanceLogs))
+
+            let operatorCategories = store.allOperatorCategories.filter { $0.vineyardId == vid }
+            let buttonTemplates = store.allButtonTemplates.filter { $0.vineyardId == vid }
+            result.append(("operator_categories", vid, operatorCategories))
+            result.append(("button_templates", vid, buttonTemplates))
         }
         return result
     }
@@ -532,6 +537,20 @@ class CloudSyncService {
                 store.replaceMaintenanceLogs(items, for: vineyardId)
             } else {
                 store.mergeMaintenanceLogs(items, for: vineyardId)
+            }
+        case "operator_categories":
+            let items = try decoder.decode([OperatorCategory].self, from: jsonData)
+            if replace {
+                store.replaceOperatorCategories(items, for: vineyardId)
+            } else {
+                store.mergeOperatorCategories(items, for: vineyardId)
+            }
+        case "button_templates":
+            let items = try decoder.decode([ButtonTemplate].self, from: jsonData)
+            if replace {
+                store.replaceButtonTemplates(items, for: vineyardId)
+            } else {
+                store.mergeButtonTemplates(items, for: vineyardId)
             }
         default:
             break

@@ -1957,6 +1957,56 @@ class DataStore {
         }
     }
 
+    func mergeOperatorCategories(_ remote: [OperatorCategory], for vineyardId: UUID) {
+        var all: [OperatorCategory] = loadData(key: operatorCategoriesKey) ?? []
+        for item in remote {
+            if let index = all.firstIndex(where: { $0.id == item.id }) {
+                all[index] = item
+            } else {
+                all.append(item)
+            }
+        }
+        save(all, key: operatorCategoriesKey)
+        if selectedVineyardId == vineyardId {
+            operatorCategories = all.filter { $0.vineyardId == vineyardId }
+        }
+    }
+
+    func replaceOperatorCategories(_ remote: [OperatorCategory], for vineyardId: UUID) {
+        var all: [OperatorCategory] = loadData(key: operatorCategoriesKey) ?? []
+        all.removeAll { $0.vineyardId == vineyardId }
+        all.append(contentsOf: remote)
+        save(all, key: operatorCategoriesKey)
+        if selectedVineyardId == vineyardId {
+            operatorCategories = remote
+        }
+    }
+
+    func mergeButtonTemplates(_ remote: [ButtonTemplate], for vineyardId: UUID) {
+        var all: [ButtonTemplate] = loadData(key: buttonTemplatesKey) ?? []
+        for item in remote {
+            if let index = all.firstIndex(where: { $0.id == item.id }) {
+                all[index] = item
+            } else {
+                all.append(item)
+            }
+        }
+        save(all, key: buttonTemplatesKey)
+        if selectedVineyardId == vineyardId {
+            buttonTemplates = all.filter { $0.vineyardId == vineyardId }
+        }
+    }
+
+    func replaceButtonTemplates(_ remote: [ButtonTemplate], for vineyardId: UUID) {
+        var all: [ButtonTemplate] = loadData(key: buttonTemplatesKey) ?? []
+        all.removeAll { $0.vineyardId == vineyardId }
+        all.append(contentsOf: remote)
+        save(all, key: buttonTemplatesKey)
+        if selectedVineyardId == vineyardId {
+            buttonTemplates = remote
+        }
+    }
+
     func mergeCustomPatterns(_ remote: [SavedCustomPattern], for vineyardId: UUID) {
         var all: [SavedCustomPattern] = loadData(key: customPatternsKey) ?? []
         for item in remote {
@@ -2557,6 +2607,7 @@ class DataStore {
             case "tractors": return tractors as [Tractor]
             case "fuel_purchases": return fuelPurchases as [FuelPurchase]
             case "operator_categories": return operatorCategories as [OperatorCategory]
+            case "button_templates": return buttonTemplates as [ButtonTemplate]
             case "maintenance_logs": return maintenanceLogs as [MaintenanceLog]
             case "yield_sessions": return yieldSessions as [YieldEstimationSession]
             case "damage_records": return damageRecords as [DamageRecord]
