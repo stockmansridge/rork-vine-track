@@ -8,6 +8,8 @@ struct AddEditMaintenanceLogView: View {
     let existingLog: MaintenanceLog?
 
     @State private var itemName: String = ""
+    @State private var showCustomItem: Bool = false
+    @State private var customItemName: String = ""
     @State private var hours: String = ""
     @State private var workCompleted: String = ""
     @State private var partsUsed: String = ""
@@ -29,7 +31,50 @@ struct AddEditMaintenanceLogView: View {
         NavigationStack {
             Form {
                 Section("Item / Machine") {
-                    TextField("e.g. John Deere 5075E, Water Pump", text: $itemName)
+                    Menu {
+                        if !store.tractors.isEmpty {
+                            Section("Tractors") {
+                                ForEach(store.tractors) { tractor in
+                                    Button(tractor.displayName) {
+                                        itemName = tractor.displayName
+                                        showCustomItem = false
+                                    }
+                                }
+                            }
+                        }
+                        if !store.sprayEquipment.isEmpty {
+                            Section("Equipment") {
+                                ForEach(store.sprayEquipment) { eq in
+                                    Button(eq.name) {
+                                        itemName = eq.name
+                                        showCustomItem = false
+                                    }
+                                }
+                            }
+                        }
+                        Divider()
+                        Button {
+                            showCustomItem = true
+                            itemName = customItemName
+                        } label: {
+                            Label("Custom…", systemImage: "pencil")
+                        }
+                    } label: {
+                        HStack {
+                            Text(itemName.isEmpty ? "Select item" : itemName)
+                                .foregroundStyle(itemName.isEmpty ? .secondary : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if showCustomItem {
+                        TextField("e.g. Water Pump", text: $customItemName)
+                            .onChange(of: customItemName) { _, newValue in
+                                itemName = newValue
+                            }
+                    }
                 }
 
                 Section("Service Details") {
@@ -196,6 +241,12 @@ struct AddEditMaintenanceLogView: View {
             .onAppear {
                 if let log = existingLog {
                     itemName = log.itemName
+                    let matchesTractor = store.tractors.contains { $0.displayName == log.itemName }
+                    let matchesEquipment = store.sprayEquipment.contains { $0.name == log.itemName }
+                    if !matchesTractor && !matchesEquipment && !log.itemName.isEmpty {
+                        showCustomItem = true
+                        customItemName = log.itemName
+                    }
                     hours = log.hours > 0 ? String(format: "%.1f", log.hours) : ""
                     workCompleted = log.workCompleted
                     partsUsed = log.partsUsed
