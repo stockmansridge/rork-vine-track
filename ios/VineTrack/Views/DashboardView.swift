@@ -14,6 +14,7 @@ struct DashboardView: View {
     @State private var showSprayCalculator: Bool = false
     @State private var showVineyardDetails: Bool = false
     @State private var showMaintenanceLog: Bool = false
+    @State private var showWorkTaskCalculator: Bool = false
     @Environment(\.accessControl) private var accessControl
 
     private var vineyard: Vineyard? { store.selectedVineyard }
@@ -118,6 +119,9 @@ struct DashboardView: View {
             }
             .navigationDestination(isPresented: $showMaintenanceLog) {
                 MaintenanceLogListView()
+            }
+            .navigationDestination(isPresented: $showWorkTaskCalculator) {
+                WorkTaskCalculatorView()
             }
         }
     }
@@ -374,6 +378,37 @@ struct DashboardView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
                         Text(maintenanceLogSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(14)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showWorkTaskCalculator = true
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "person.2.badge.gearshape.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color.indigo.gradient, in: .rect(cornerRadius: 12))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Work Task Calculator")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("Estimate labour cost by worker type")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
