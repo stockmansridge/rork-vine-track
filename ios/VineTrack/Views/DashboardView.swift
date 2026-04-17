@@ -359,43 +359,36 @@ struct DashboardView: View {
                 }
             }
 
-            if accessControl?.isManager == true {
-                Button {
-                    showMaintenanceLog = true
-                } label: {
-                    HStack(spacing: 14) {
-                        Image(systemName: "wrench.and.screwdriver.fill")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .background(VineyardTheme.earthBrown.gradient, in: .rect(cornerRadius: 12))
+            Button {
+                showMaintenanceLog = true
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "wrench.and.screwdriver.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(VineyardTheme.earthBrown.gradient, in: .rect(cornerRadius: 12))
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 4) {
-                                Text("Maintenance Log")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                Image(systemName: "lock.fill")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text(maintenanceLogSubtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.tertiary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Maintenance Log")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text(maintenanceLogSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
-                    .padding(14)
-                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.plain)
+                .padding(14)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
             }
+            .buttonStyle(.plain)
         }
     }
 
