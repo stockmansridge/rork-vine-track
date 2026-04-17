@@ -93,6 +93,7 @@ class AuthService {
         }
 
         errorMessage = nil
+        clearDemoSessionIfNeeded()
 
         GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController) { [weak self] result, error in
             Task { @MainActor in
@@ -154,6 +155,7 @@ class AuthService {
             return
         }
 
+        clearDemoSessionIfNeeded()
         Task {
             await supabaseSignUp(name: trimmedName, email: trimmedEmail, password: password)
         }
@@ -194,6 +196,7 @@ class AuthService {
             return
         }
 
+        clearDemoSessionIfNeeded()
         Task {
             await supabaseSignIn(email: trimmedEmail, password: password)
         }
@@ -213,6 +216,16 @@ class AuthService {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func clearDemoSessionIfNeeded() {
+        guard isDemoMode else { return }
+        isDemoMode = false
+        isSignedIn = false
+        userName = ""
+        userEmail = ""
+        userProfileURL = nil
+        userId = nil
     }
 
     func enterDemoMode() {
@@ -331,6 +344,7 @@ class AuthService {
             errorMessage = "Cloud service is not configured. Please try again later."
             return
         }
+        clearDemoSessionIfNeeded()
         let nonce = randomNonceString()
         currentNonce = nonce
         let hashedNonce = sha256(nonce)
