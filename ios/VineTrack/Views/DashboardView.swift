@@ -363,67 +363,25 @@ struct DashboardView: View {
                 }
             }
 
-            Button {
-                showMaintenanceLog = true
-            } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "wrench.and.screwdriver.fill")
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(VineyardTheme.earthBrown.gradient, in: .rect(cornerRadius: 12))
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Maintenance Log")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                        Text(maintenanceLogSubtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tertiary)
+            HStack(spacing: 12) {
+                toolCard(
+                    title: "Maintenance Log",
+                    subtitle: maintenanceLogSubtitle,
+                    icon: "wrench.and.screwdriver.fill",
+                    color: VineyardTheme.earthBrown
+                ) {
+                    showMaintenanceLog = true
                 }
-                .padding(14)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
-            }
-            .buttonStyle(.plain)
 
-            Button {
-                showWorkTaskCalculator = true
-            } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "person.2.badge.gearshape.fill")
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Color.indigo.gradient, in: .rect(cornerRadius: 12))
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Work Task Calculator")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                        Text("Estimate labour cost by worker type")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tertiary)
+                toolCard(
+                    title: "Work Task Calculator",
+                    subtitle: "Estimate labour cost",
+                    icon: "person.2.badge.gearshape.fill",
+                    color: .indigo
+                ) {
+                    showWorkTaskCalculator = true
                 }
-                .padding(14)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
             }
-            .buttonStyle(.plain)
         }
     }
 
