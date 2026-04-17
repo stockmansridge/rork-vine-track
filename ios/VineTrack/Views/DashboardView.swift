@@ -434,7 +434,7 @@ struct DashboardView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 130)
+            .frame(height: 140)
             .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
         }
         .buttonStyle(.plain)
