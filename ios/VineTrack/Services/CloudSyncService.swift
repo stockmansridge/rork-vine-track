@@ -28,6 +28,15 @@ nonisolated struct VineyardMemberRecord: Codable, Sendable {
     let joined_at: String?
 }
 
+nonisolated struct ELStageImageManifestEntry: Codable, Sendable, Equatable {
+    let code: String
+    let updated_at: String
+}
+
+nonisolated struct ELStageImageManifest: Codable, Sendable {
+    let entries: [ELStageImageManifestEntry]
+}
+
 nonisolated enum SyncStatus: Sendable {
     case idle
     case syncing
@@ -350,6 +359,31 @@ class CloudSyncService {
         }
     }
 
+    // MARK: - Storage (vineyard assets)
+
+    private let assetsBucket = "vineyard-assets"
+
+    func uploadELStageImage(_ data: Data, vineyardId: UUID, code: String) async throws {
+        guard isConfigured else { return }
+        let path = "\(vineyardId.uuidString)/el-stage-images/\(code).jpg"
+        _ = try await supabase.storage.from(assetsBucket).upload(
+            path,
+            data: data,
+            options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true)
+        )
+    }
+
+    func downloadELStageImage(vineyardId: UUID, code: String) async throws -> Data {
+        let path = "\(vineyardId.uuidString)/el-stage-images/\(code).jpg"
+        return try await supabase.storage.from(assetsBucket).download(path: path)
+    }
+
+    func removeELStageImage(vineyardId: UUID, code: String) async {
+        guard isConfigured else { return }
+        let path = "\(vineyardId.uuidString)/el-stage-images/\(code).jpg"
+        _ = try? await supabase.storage.from(assetsBucket).remove(paths: [path])
+    }
+
     func deleteVineyardFromCloud(_ vineyardId: UUID) async {
         guard isConfigured else { return }
         do {
@@ -418,6 +452,9 @@ class CloudSyncService {
             let buttonTemplates = store.allButtonTemplates.filter { $0.vineyardId == vid }
             result.append(("operator_categories", vid, operatorCategories))
             result.append(("button_templates", vid, buttonTemplates))
+
+            let manifest = store.elStageImageManifest(for: vid)
+            result.append(("el_stage_images_manifest", vid, manifest))
         }
         return result
     }
@@ -552,6 +589,9 @@ class CloudSyncService {
             } else {
                 store.mergeButtonTemplates(items, for: vineyardId)
             }
+        case "el_stage_images_manifest":
+            let manifest = try decoder.decode(ELStageImageManifest.self, from: jsonData)
+            store.applyELStageImageManifest(manifest, for: vineyardId, using: self)
         default:
             break
         }

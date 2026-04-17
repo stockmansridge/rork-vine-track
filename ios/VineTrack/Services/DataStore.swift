@@ -2554,8 +2554,14 @@ class DataStore {
     func saveCustomELStageImage(_ image: UIImage, for code: String) {
         guard let vid = selectedVineyardId else { return }
         let url = elStageImageURL(for: vid, code: code)
-        if let data = image.jpegData(compressionQuality: 0.8) {
-            try? data.write(to: url, options: .atomic)
+        guard let data = image.jpegData(compressionQuality: 0.8) else { return }
+        try? data.write(to: url, options: .atomic)
+        updateELStageImageManifest(vineyardId: vid, code: code, removed: false)
+        if let sync = cloudSync {
+            Task {
+                try? await sync.uploadELStageImage(data, vineyardId: vid, code: code)
+                syncDataToCloud(dataType: "el_stage_images_manifest")
+            }
         }
     }
 
@@ -2563,6 +2569,77 @@ class DataStore {
         guard let vid = selectedVineyardId else { return }
         let url = elStageImageURL(for: vid, code: code)
         try? FileManager.default.removeItem(at: url)
+        updateELStageImageManifest(vineyardId: vid, code: code, removed: true)
+        if let sync = cloudSync {
+            Task {
+                await sync.removeELStageImage(vineyardId: vid, code: code)
+                syncDataToCloud(dataType: "el_stage_images_manifest")
+            }
+        }
+    }
+
+    // MARK: - EL Stage Image Manifest
+
+    private static let elStageImagesManifestKey = "vinetrack_el_stage_images_manifest"
+
+    private func loadManifestDict() -> [String: [String: String]] {
+        (UserDefaults.standard.dictionary(forKey: Self.elStageImagesManifestKey) as? [String: [String: String]]) ?? [:]
+    }
+
+    private func saveManifestDict(_ dict: [String: [String: String]]) {
+        UserDefaults.standard.set(dict, forKey: Self.elStageImagesManifestKey)
+    }
+
+    func elStageImageManifest(for vineyardId: UUID) -> ELStageImageManifest {
+        let dict = loadManifestDict()
+        let entries = (dict[vineyardId.uuidString] ?? [:]).map {
+            ELStageImageManifestEntry(code: $0.key, updated_at: $0.value)
+        }.sorted { $0.code < $1.code }
+        return ELStageImageManifest(entries: entries)
+    }
+
+    private func updateELStageImageManifest(vineyardId: UUID, code: String, removed: Bool) {
+        var dict = loadManifestDict()
+        var vineyardEntries = dict[vineyardId.uuidString] ?? [:]
+        if removed {
+            vineyardEntries.removeValue(forKey: code)
+        } else {
+            vineyardEntries[code] = ISO8601DateFormatter().string(from: Date())
+        }
+        dict[vineyardId.uuidString] = vineyardEntries
+        saveManifestDict(dict)
+    }
+
+    func applyELStageImageManifest(_ manifest: ELStageImageManifest, for vineyardId: UUID, using sync: CloudSyncService) {
+        var dict = loadManifestDict()
+        let previous = dict[vineyardId.uuidString] ?? [:]
+        var next: [String: String] = [:]
+        for entry in manifest.entries {
+            next[entry.code] = entry.updated_at
+        }
+        dict[vineyardId.uuidString] = next
+        saveManifestDict(dict)
+
+        for (code, _) in previous where next[code] == nil {
+            let url = elStageImageURL(for: vineyardId, code: code)
+            try? FileManager.default.removeItem(at: url)
+        }
+
+        for entry in manifest.entries {
+            let url = elStageImageURL(for: vineyardId, code: entry.code)
+            let exists = FileManager.default.fileExists(atPath: url.path)
+            let prevStamp = previous[entry.code]
+            if exists && prevStamp == entry.updated_at { continue }
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    let data = try await sync.downloadELStageImage(vineyardId: vineyardId, code: entry.code)
+                    try data.write(to: url, options: .atomic)
+                } catch {
+                    print("DataStore: Failed to download EL stage image \(entry.code): \(error)")
+                }
+            }
+        }
     }
 
     func hasCustomELStageImage(for code: String) -> Bool {
@@ -2612,6 +2689,7 @@ class DataStore {
             case "yield_sessions": return yieldSessions as [YieldEstimationSession]
             case "damage_records": return damageRecords as [DamageRecord]
             case "historical_yield_records": return historicalYieldRecords as [HistoricalYieldRecord]
+            case "el_stage_images_manifest": return elStageImageManifest(for: vid)
             default: return [] as [String]
             }
         }()
