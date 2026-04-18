@@ -236,6 +236,13 @@ struct PinDropView: View {
             growthStageCode: stage.code
         )
 
+        if stage.code == "EL4", let pid = resolvedPaddockId,
+           let idx = store.paddocks.firstIndex(where: { $0.id == pid }) {
+            var updated = store.paddocks[idx]
+            updated.budburstDate = Date()
+            store.updatePaddock(updated)
+        }
+
         if store.settings.autoPhotoPrompt {
             pendingPin = pin
             showPhotoPromptAlert = true
