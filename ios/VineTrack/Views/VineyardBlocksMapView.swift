@@ -8,6 +8,7 @@ struct VineyardBlocksMapView: View {
     var onAddBlock: (() -> Void)? = nil
     @State private var position: MapCameraPosition = .automatic
     @State private var hasSetInitialPosition: Bool = false
+    @State private var showFullScreen: Bool = false
 
     private var paddocks: [Paddock] {
         store.orderedPaddocks
@@ -74,9 +75,7 @@ struct VineyardBlocksMapView: View {
 
                 if paddocks.contains(where: { $0.polygonPoints.count > 2 }) {
                     Button {
-                        withAnimation(.smooth(duration: 0.4)) {
-                            fitAllBlocks()
-                        }
+                        showFullScreen = true
                     } label: {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.subheadline.weight(.semibold))
@@ -89,6 +88,13 @@ struct VineyardBlocksMapView: View {
             .padding(8)
         }
         .frame(height: 280)
+        .fullScreenCover(isPresented: $showFullScreen) {
+            FullScreenBlocksMapView(
+                paddocks: paddocks,
+                blockColors: blockColors,
+                onSelectPaddock: { selectedPaddock = $0 }
+            )
+        }
         .onAppear {
             locationService.requestPermission()
             locationService.startUpdating()
@@ -126,6 +132,79 @@ struct VineyardBlocksMapView: View {
         let minLon = allPoints.map(\.longitude).min()!
         let maxLon = allPoints.map(\.longitude).max()!
 
+        let center = CLLocationCoordinate2D(
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLon + maxLon) / 2
+        )
+        let span = MKCoordinateSpan(
+            latitudeDelta: (maxLat - minLat) * 1.4 + 0.001,
+            longitudeDelta: (maxLon - minLon) * 1.4 + 0.001
+        )
+        position = .region(MKCoordinateRegion(center: center, span: span))
+    }
+}
+
+struct FullScreenBlocksMapView: View {
+    let paddocks: [Paddock]
+    let blockColors: [UUID: Color]
+    let onSelectPaddock: (Paddock) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var position: MapCameraPosition = .automatic
+
+    var body: some View {
+        NavigationStack {
+            ZStack(alignment: .topTrailing) {
+                Map(position: $position) {
+                    ForEach(paddocks) { paddock in
+                        if paddock.polygonPoints.count > 2 {
+                            let color = blockColors[paddock.id] ?? .blue
+                            MapPolygon(coordinates: paddock.polygonPoints.map { $0.coordinate })
+                                .foregroundStyle(color.opacity(0.25))
+                                .stroke(color, lineWidth: 2.5)
+
+                            Annotation("", coordinate: paddock.polygonPoints.centroid) {
+                                Button {
+                                    onSelectPaddock(paddock)
+                                    dismiss()
+                                } label: {
+                                    Text(paddock.name)
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            (blockColors[paddock.id] ?? .blue).opacity(0.85),
+                                            in: .capsule
+                                        )
+                                        .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+                                }
+                            }
+                        }
+                    }
+                    UserAnnotation()
+                }
+                .mapStyle(.hybrid)
+                .ignoresSafeArea()
+            }
+            .navigationTitle("Blocks Map")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                }
+            }
+            .onAppear { fitAllBlocks() }
+        }
+    }
+
+    private func fitAllBlocks() {
+        let allPoints = paddocks.flatMap { $0.polygonPoints }
+        guard !allPoints.isEmpty else { return }
+        let minLat = allPoints.map(\.latitude).min()!
+        let maxLat = allPoints.map(\.latitude).max()!
+        let minLon = allPoints.map(\.longitude).min()!
+        let maxLon = allPoints.map(\.longitude).max()!
         let center = CLLocationCoordinate2D(
             latitude: (minLat + maxLat) / 2,
             longitude: (minLon + maxLon) / 2
