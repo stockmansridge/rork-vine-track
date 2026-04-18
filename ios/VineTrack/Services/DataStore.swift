@@ -1103,6 +1103,10 @@ class DataStore {
         save(vineyards, key: vineyardsKey)
         selectedVineyardId = demoVineyard.id
 
+        var demoSettings = AppSettings(vineyardId: demoVineyardId)
+        demoSettings.weatherStationId = "INEWSOUT1775"
+        updateSettings(demoSettings)
+
         grapeVarieties = GrapeVariety.defaults(for: demoVineyardId)
         var allGrapeVarietiesStore: [GrapeVariety] = loadData(key: grapeVarietiesKey) ?? []
         allGrapeVarietiesStore.removeAll { $0.vineyardId == demoVineyardId }
