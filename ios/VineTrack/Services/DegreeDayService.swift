@@ -337,7 +337,17 @@ class DegreeDayService {
     }
 
     private func fetchDailyTemps(stationId: String, dateString: String) async -> FetchOutcome {
-        let urlString = "https://api.weather.com/v2/pws/history/daily?stationId=\(stationId)&format=json&units=m&date=\(dateString)&numericPrecision=decimal&apiKey=\(apiKey)"
+        let dailyOutcome = await fetchFromEndpoint(path: "daily", stationId: stationId, dateString: dateString)
+        if dailyOutcome.result != nil { return dailyOutcome }
+        // Fall back to hourly history and derive high/low — WU's daily summary is often
+        // missing for older dates even when the hourly observations exist.
+        let hourlyOutcome = await fetchFromEndpoint(path: "all", stationId: stationId, dateString: dateString)
+        if hourlyOutcome.result != nil { return hourlyOutcome }
+        return dailyOutcome
+    }
+
+    private func fetchFromEndpoint(path: String, stationId: String, dateString: String) async -> FetchOutcome {
+        let urlString = "https://api.weather.com/v2/pws/history/\(path)?stationId=\(stationId)&format=json&units=m&date=\(dateString)&numericPrecision=decimal&apiKey=\(apiKey)"
         guard let url = URL(string: urlString) else {
             return FetchOutcome(result: nil, statusDescription: "Invalid URL")
         }
@@ -346,6 +356,9 @@ class DegreeDayService {
             let (data, response) = try await URLSession.shared.data(from: url)
             guard let http = response as? HTTPURLResponse else {
                 return FetchOutcome(result: nil, statusDescription: "No HTTP response")
+            }
+            if http.statusCode == 204 {
+                return FetchOutcome(result: nil, statusDescription: "204 No Content")
             }
             if http.statusCode != 200 {
                 let body = String(data: data.prefix(120), encoding: .utf8) ?? ""
@@ -357,17 +370,40 @@ class DegreeDayService {
             let entries = (json["observations"] as? [[String: Any]])
                 ?? (json["summaries"] as? [[String: Any]])
                 ?? []
-            guard let obs = entries.first else {
+            if entries.isEmpty {
                 let keys = json.keys.sorted().joined(separator: ",")
                 return FetchOutcome(result: nil, statusDescription: "Empty response (keys: \(keys))")
             }
-            let metric = (obs["metric"] as? [String: Any]) ?? obs
-            let tempHigh = parseDouble(metric["tempHigh"]) ?? parseDouble(metric["tempMax"]) ?? parseDouble(obs["tempHigh"])
-            let tempLow = parseDouble(metric["tempLow"]) ?? parseDouble(metric["tempMin"]) ?? parseDouble(obs["tempLow"])
-            guard let high = tempHigh, let low = tempLow else {
-                return FetchOutcome(result: nil, statusDescription: "Missing tempHigh/tempLow")
+
+            if path == "daily" {
+                let obs = entries[0]
+                let metric = (obs["metric"] as? [String: Any]) ?? obs
+                let tempHigh = parseDouble(metric["tempHigh"]) ?? parseDouble(metric["tempMax"]) ?? parseDouble(obs["tempHigh"])
+                let tempLow = parseDouble(metric["tempLow"]) ?? parseDouble(metric["tempMin"]) ?? parseDouble(obs["tempLow"])
+                guard let high = tempHigh, let low = tempLow else {
+                    return FetchOutcome(result: nil, statusDescription: "Missing tempHigh/tempLow")
+                }
+                return FetchOutcome(result: DailyTempResult(high: high, low: low), statusDescription: "200 OK")
+            } else {
+                // Hourly: derive high/low from all observations.
+                var high: Double = -.greatestFiniteMagnitude
+                var low: Double = .greatestFiniteMagnitude
+                var samples = 0
+                for obs in entries {
+                    let metric = (obs["metric"] as? [String: Any]) ?? obs
+                    let t = parseDouble(metric["tempAvg"])
+                        ?? parseDouble(metric["temp"])
+                        ?? parseDouble(obs["temp"])
+                    let hi = parseDouble(metric["tempHigh"]) ?? t
+                    let lo = parseDouble(metric["tempLow"]) ?? t
+                    if let hi = hi { high = max(high, hi); samples += 1 }
+                    if let lo = lo { low = min(low, lo) }
+                }
+                guard samples > 0, high > -.greatestFiniteMagnitude, low < .greatestFiniteMagnitude else {
+                    return FetchOutcome(result: nil, statusDescription: "Hourly missing temps")
+                }
+                return FetchOutcome(result: DailyTempResult(high: high, low: low), statusDescription: "200 OK (hourly)")
             }
-            return FetchOutcome(result: DailyTempResult(high: high, low: low), statusDescription: "200 OK")
         } catch {
             return FetchOutcome(result: nil, statusDescription: "Network error: \(error.localizedDescription)")
         }
@@ -378,7 +414,8 @@ class DegreeDayService {
         if status.contains("401") || status.contains("403") { return "Auth error" }
         if status.contains("204") { return "No data (204)" }
         if status.hasPrefix("HTTP 5") { return "WU server error" }
-        if status.contains("Empty") { return "Station didn\u{2019}t report" }
+        if status.contains("Empty") || status.contains("204") { return "Station didn\u{2019}t report" }
+        if status.contains("Hourly missing") { return "Hourly data incomplete" }
         if status.contains("Missing tempHigh") { return "Missing temps" }
         if status.contains("Network") { return "Network error" }
         if status.contains("Bad JSON") { return "Bad JSON" }
