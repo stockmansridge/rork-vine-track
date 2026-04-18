@@ -22,7 +22,15 @@ struct EditPaddockSheet: View {
     @State private var varietyAllocations: [PaddockVarietyAllocation] = []
     @State private var budburstDate: Date = Date()
     @State private var hasBudburstDate: Bool = false
+    @State private var floweringDate: Date = Date()
+    @State private var hasFloweringDate: Bool = false
+    @State private var veraisonDate: Date = Date()
+    @State private var hasVeraisonDate: Bool = false
+    @State private var harvestDate: Date = Date()
+    @State private var hasHarvestDate: Bool = false
     @State private var plantingYearText: String = ""
+    @State private var calculationModeOverride: GDDCalculationMode? = nil
+    @State private var resetModeOverride: GDDResetMode? = nil
     @State private var showAddVariety: Bool = false
     @State private var showBoundaryEditor: Bool = false
     @State private var showFullscreenRowConfig: Bool = false
@@ -40,6 +48,7 @@ struct EditPaddockSheet: View {
                 }
                 vineSpacingSection
                 phenologySection
+                gddOverrideSection
                 varietiesSection
                 irrigationSection
                 if polygonPoints.count > 2 && rowCount > 0 {
@@ -103,6 +112,20 @@ struct EditPaddockSheet: View {
                         budburstDate = bd
                         hasBudburstDate = true
                     }
+                    if let fd = paddock.floweringDate {
+                        floweringDate = fd
+                        hasFloweringDate = true
+                    }
+                    if let vd = paddock.veraisonDate {
+                        veraisonDate = vd
+                        hasVeraisonDate = true
+                    }
+                    if let hd = paddock.harvestDate {
+                        harvestDate = hd
+                        hasHarvestDate = true
+                    }
+                    calculationModeOverride = paddock.calculationModeOverride
+                    resetModeOverride = paddock.resetModeOverride
                     if let py = paddock.plantingYear {
                         plantingYearText = "\(py)"
                     }
@@ -388,6 +411,28 @@ struct EditPaddockSheet: View {
             if hasBudburstDate {
                 DatePicker("Budburst", selection: $budburstDate, displayedComponents: .date)
             }
+
+            Toggle(isOn: $hasFloweringDate) {
+                Label("Flowering Date Set", systemImage: "camera.macro")
+            }
+            if hasFloweringDate {
+                DatePicker("Flowering", selection: $floweringDate, displayedComponents: .date)
+            }
+
+            Toggle(isOn: $hasVeraisonDate) {
+                Label("Veraison Date Set", systemImage: "circle.lefthalf.filled")
+            }
+            if hasVeraisonDate {
+                DatePicker("Veraison", selection: $veraisonDate, displayedComponents: .date)
+            }
+
+            Toggle(isOn: $hasHarvestDate) {
+                Label("Harvest Date Set", systemImage: "basket")
+            }
+            if hasHarvestDate {
+                DatePicker("Harvest", selection: $harvestDate, displayedComponents: .date)
+            }
+
             HStack {
                 Label("Planting Year", systemImage: "calendar")
                 Spacer()
@@ -405,7 +450,40 @@ struct EditPaddockSheet: View {
                 Text("Phenology")
             }
         } footer: {
-            Text("Budburst date is the start of GDD/BEDD accumulation for this block. Set it each season for accurate ripeness tracking.")
+            Text("Set key phenology dates each season. Degree-day accumulation starts from the Reset Point selected below (budburst is typical for ripeness tracking).")
+        }
+    }
+
+    private var gddOverrideSection: some View {
+        let defaultMode = store.settings.calculationMode
+        let defaultReset = store.settings.resetMode
+        return Section {
+            Picker(selection: $calculationModeOverride) {
+                Text("Vineyard Default (\(defaultMode.shortName))").tag(GDDCalculationMode?.none)
+                ForEach(GDDCalculationMode.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(Optional(mode))
+                }
+            } label: {
+                Label("Calculation", systemImage: "thermometer.sun")
+            }
+
+            Picker(selection: $resetModeOverride) {
+                Text("Vineyard Default (\(defaultReset.displayName))").tag(GDDResetMode?.none)
+                ForEach(GDDResetMode.allCases, id: \.self) { mode in
+                    Label(mode.displayName, systemImage: mode.iconName).tag(Optional(mode))
+                }
+            } label: {
+                Label("Reset Point", systemImage: "arrow.counterclockwise")
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "thermometer.medium")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+                Text("Degree Days Override")
+            }
+        } footer: {
+            Text("Leave on “Vineyard Default” to inherit from Vineyard Setup. Override per block if, for example, you want to track ripening from flowering on this block only.")
         }
     }
 
@@ -658,7 +736,12 @@ struct EditPaddockSheet: View {
             existing.emitterSpacing = irrigationEmitterSpacing
             existing.varietyAllocations = varietyAllocations
             existing.budburstDate = hasBudburstDate ? budburstDate : nil
+            existing.floweringDate = hasFloweringDate ? floweringDate : nil
+            existing.veraisonDate = hasVeraisonDate ? veraisonDate : nil
+            existing.harvestDate = hasHarvestDate ? harvestDate : nil
             existing.plantingYear = Int(plantingYearText)
+            existing.calculationModeOverride = calculationModeOverride
+            existing.resetModeOverride = resetModeOverride
             store.updatePaddock(existing)
         } else {
             let newPaddock = Paddock(
@@ -675,7 +758,12 @@ struct EditPaddockSheet: View {
                 emitterSpacing: irrigationEmitterSpacing,
                 varietyAllocations: varietyAllocations,
                 budburstDate: hasBudburstDate ? budburstDate : nil,
-                plantingYear: Int(plantingYearText)
+                floweringDate: hasFloweringDate ? floweringDate : nil,
+                veraisonDate: hasVeraisonDate ? veraisonDate : nil,
+                harvestDate: hasHarvestDate ? harvestDate : nil,
+                plantingYear: Int(plantingYearText),
+                calculationModeOverride: calculationModeOverride,
+                resetModeOverride: resetModeOverride
             )
             store.addPaddock(newPaddock)
         }

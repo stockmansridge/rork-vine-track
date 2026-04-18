@@ -17,7 +17,12 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
     var emitterSpacing: Double?
     var varietyAllocations: [PaddockVarietyAllocation]
     var budburstDate: Date?
+    var floweringDate: Date?
+    var veraisonDate: Date?
+    var harvestDate: Date?
     var plantingYear: Int?
+    var calculationModeOverride: GDDCalculationMode?
+    var resetModeOverride: GDDResetMode?
 
     init(
         id: UUID = UUID(),
@@ -35,7 +40,12 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         emitterSpacing: Double? = nil,
         varietyAllocations: [PaddockVarietyAllocation] = [],
         budburstDate: Date? = nil,
-        plantingYear: Int? = nil
+        floweringDate: Date? = nil,
+        veraisonDate: Date? = nil,
+        harvestDate: Date? = nil,
+        plantingYear: Int? = nil,
+        calculationModeOverride: GDDCalculationMode? = nil,
+        resetModeOverride: GDDResetMode? = nil
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -52,11 +62,16 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         self.emitterSpacing = emitterSpacing
         self.varietyAllocations = varietyAllocations
         self.budburstDate = budburstDate
+        self.floweringDate = floweringDate
+        self.veraisonDate = veraisonDate
+        self.harvestDate = harvestDate
         self.plantingYear = plantingYear
+        self.calculationModeOverride = calculationModeOverride
+        self.resetModeOverride = resetModeOverride
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
-        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride, rowLengthOverride, flowPerEmitter, emitterSpacing, varietyAllocations, budburstDate, plantingYear
+        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride, rowLengthOverride, flowPerEmitter, emitterSpacing, varietyAllocations, budburstDate, floweringDate, veraisonDate, harvestDate, plantingYear, calculationModeOverride, resetModeOverride
     }
 
     init(from decoder: Decoder) throws {
@@ -76,7 +91,12 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         emitterSpacing = try container.decodeIfPresent(Double.self, forKey: .emitterSpacing)
         varietyAllocations = try container.decodeIfPresent([PaddockVarietyAllocation].self, forKey: .varietyAllocations) ?? []
         budburstDate = try container.decodeIfPresent(Date.self, forKey: .budburstDate)
+        floweringDate = try container.decodeIfPresent(Date.self, forKey: .floweringDate)
+        veraisonDate = try container.decodeIfPresent(Date.self, forKey: .veraisonDate)
+        harvestDate = try container.decodeIfPresent(Date.self, forKey: .harvestDate)
         plantingYear = try container.decodeIfPresent(Int.self, forKey: .plantingYear)
+        calculationModeOverride = try container.decodeIfPresent(GDDCalculationMode.self, forKey: .calculationModeOverride)
+        resetModeOverride = try container.decodeIfPresent(GDDResetMode.self, forKey: .resetModeOverride)
     }
 }
 
@@ -103,6 +123,23 @@ nonisolated struct CoordinatePoint: Codable, Identifiable, Sendable, Hashable {
 }
 
 extension Paddock {
+    func effectiveCalculationMode(defaultMode: GDDCalculationMode) -> GDDCalculationMode {
+        calculationModeOverride ?? defaultMode
+    }
+
+    func effectiveResetMode(defaultMode: GDDResetMode) -> GDDResetMode {
+        resetModeOverride ?? defaultMode
+    }
+
+    func resetDate(for mode: GDDResetMode, seasonStart: Date) -> Date? {
+        switch mode {
+        case .seasonStart: return seasonStart
+        case .budburst: return budburstDate
+        case .flowering: return floweringDate
+        case .veraison: return veraisonDate
+        }
+    }
+
     var areaHectares: Double {
         let points = polygonPoints
         guard points.count >= 3 else { return 0 }

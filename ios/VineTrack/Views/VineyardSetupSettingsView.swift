@@ -443,15 +443,35 @@ struct VineyardSetupSettingsView: View {
                     Label("Use Block Centroid", systemImage: "scope")
                 }
             }
-            Toggle(isOn: Binding(
-                get: { store.settings.useBEDD },
+            Picker(selection: Binding(
+                get: { store.settings.calculationMode },
                 set: { newValue in
                     var s = store.settings
-                    s.useBEDD = newValue
+                    s.calculationMode = newValue
+                    s.useBEDD = newValue.useBEDD
                     store.updateSettings(s)
                 }
             )) {
-                Label("Use BEDD (recommended)", systemImage: "thermometer.sun")
+                ForEach(GDDCalculationMode.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            } label: {
+                Label("Calculation", systemImage: "thermometer.sun")
+            }
+
+            Picker(selection: Binding(
+                get: { store.settings.resetMode },
+                set: { newValue in
+                    var s = store.settings
+                    s.resetMode = newValue
+                    store.updateSettings(s)
+                }
+            )) {
+                ForEach(GDDResetMode.allCases, id: \.self) { mode in
+                    Label(mode.displayName, systemImage: mode.iconName).tag(mode)
+                }
+            } label: {
+                Label("Reset Point", systemImage: "arrow.counterclockwise")
             }
         } header: {
             HStack(spacing: 6) {
@@ -461,7 +481,7 @@ struct VineyardSetupSettingsView: View {
                 Text("Vineyard Location")
             }
         } footer: {
-            Text("Coordinates and elevation improve degree-day accuracy. BEDD applies a 19°C cap, day-length factor by latitude, and a diurnal-range bonus.")
+            Text("Coordinates and elevation improve degree-day accuracy. Standard GDD is base 10°C. BEDD caps daily temps at 19°C, adds a diurnal-range bonus, and applies a day-length factor from latitude. Reset Point determines when accumulation starts each season (overridable per block).")
         }
     }
 

@@ -91,7 +91,7 @@ struct VineTrackApp: App {
             stationId: stationId,
             seasonStart: currentSeasonStart(),
             latitude: store.settings.vineyardLatitude ?? store.paddockCentroidLatitude,
-            useBEDD: store.settings.useBEDD
+            useBEDD: store.settings.calculationMode.useBEDD
         )
     }
 

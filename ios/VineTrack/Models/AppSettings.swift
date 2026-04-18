@@ -59,6 +59,8 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
     var vineyardLongitude: Double?
     var vineyardElevationMetres: Double?
     var useBEDD: Bool
+    var calculationMode: GDDCalculationMode
+    var resetMode: GDDResetMode
 
     init(
         id: UUID = UUID(),
@@ -86,7 +88,9 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         vineyardLatitude: Double? = nil,
         vineyardLongitude: Double? = nil,
         vineyardElevationMetres: Double? = nil,
-        useBEDD: Bool = true
+        useBEDD: Bool = true,
+        calculationMode: GDDCalculationMode = .bedd,
+        resetMode: GDDResetMode = .budburst
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -114,6 +118,8 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         self.vineyardLongitude = vineyardLongitude
         self.vineyardElevationMetres = vineyardElevationMetres
         self.useBEDD = useBEDD
+        self.calculationMode = calculationMode
+        self.resetMode = resetMode
     }
 
     init(from decoder: Decoder) throws {
@@ -144,6 +150,12 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         vineyardLongitude = try container.decodeIfPresent(Double.self, forKey: .vineyardLongitude)
         vineyardElevationMetres = try container.decodeIfPresent(Double.self, forKey: .vineyardElevationMetres)
         useBEDD = try container.decodeIfPresent(Bool.self, forKey: .useBEDD) ?? true
+        if let mode = try container.decodeIfPresent(GDDCalculationMode.self, forKey: .calculationMode) {
+            calculationMode = mode
+        } else {
+            calculationMode = useBEDD ? .bedd : .gdd
+        }
+        resetMode = try container.decodeIfPresent(GDDResetMode.self, forKey: .resetMode) ?? .budburst
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
@@ -152,6 +164,6 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         case autoPhotoPrompt, enabledGrowthStageCodes, weatherStationId
         case defaultWaterVolume, defaultSprayRate, defaultConcentrationFactor
         case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance, fillTimerEnabled, samplesPerHectare, defaultBlockBunchWeightsGrams, elConfirmationEnabled
-        case vineyardLatitude, vineyardLongitude, vineyardElevationMetres, useBEDD
+        case vineyardLatitude, vineyardLongitude, vineyardElevationMetres, useBEDD, calculationMode, resetMode
     }
 }

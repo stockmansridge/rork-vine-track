@@ -48,11 +48,16 @@ struct VineyardDetailsView: View {
         let cal = Calendar.current
         let now = Date()
         let oneYearAgo = cal.date(byAdding: .year, value: -1, to: now) ?? now
-        let recent = paddocks.compactMap { $0.budburstDate }.filter { $0 <= now && $0 >= oneYearAgo }
-        if let earliest = recent.min() {
+        let seasonStart = defaultSeasonStartDate
+        let resetDefault = store.settings.resetMode
+        let dates: [Date] = paddocks.compactMap { paddock in
+            let mode = paddock.effectiveResetMode(defaultMode: resetDefault)
+            return paddock.resetDate(for: mode, seasonStart: seasonStart)
+        }.filter { $0 <= now && $0 >= oneYearAgo }
+        if let earliest = dates.min() {
             return cal.startOfDay(for: earliest)
         }
-        return defaultSeasonStartDate
+        return seasonStart
     }
 
     private func gddSinceBudburst(for aggregate: VarietyAggregate) -> Double? {
@@ -60,19 +65,29 @@ struct VineyardDetailsView: View {
         let cal = Calendar.current
         let now = Date()
         let oneYearAgo = cal.date(byAdding: .year, value: -1, to: now) ?? now
+        let seasonStart = defaultSeasonStartDate
+        let resetDefault = store.settings.resetMode
+        let modeDefault = store.settings.calculationMode
         let blocks = paddocks.filter { paddock in
             paddock.varietyAllocations.contains(where: { $0.varietyId == aggregate.id })
         }
-        let dates: [Date] = blocks.compactMap { $0.budburstDate }.filter { $0 <= now && $0 >= oneYearAgo }
-        guard let earliest = dates.min() else { return nil }
-        let result = degreeDayService.computeGDD(
-            stationId: stationId,
-            from: cal.startOfDay(for: earliest),
-            to: cal.startOfDay(for: now),
-            latitude: effectiveLatitude,
-            useBEDD: store.settings.useBEDD
-        )
-        return result.gdd
+        var totals: [Double] = []
+        for block in blocks {
+            let resetMode = block.effectiveResetMode(defaultMode: resetDefault)
+            guard let resetDate = block.resetDate(for: resetMode, seasonStart: seasonStart),
+                  resetDate <= now, resetDate >= oneYearAgo else { continue }
+            let calcMode = block.effectiveCalculationMode(defaultMode: modeDefault)
+            let result = degreeDayService.computeGDD(
+                stationId: stationId,
+                from: cal.startOfDay(for: resetDate),
+                to: cal.startOfDay(for: now),
+                latitude: effectiveLatitude,
+                useBEDD: calcMode.useBEDD
+            )
+            totals.append(result.gdd)
+        }
+        guard !totals.isEmpty else { return nil }
+        return totals.reduce(0, +) / Double(totals.count)
     }
 
     private var seasonTrips: [Trip] {
@@ -145,7 +160,7 @@ struct VineyardDetailsView: View {
             stationId: stationId,
             seasonStart: seasonStartDate,
             latitude: effectiveLatitude,
-            useBEDD: store.settings.useBEDD
+            useBEDD: store.settings.calculationMode.useBEDD
         )
     }
 
@@ -203,9 +218,9 @@ struct VineyardDetailsView: View {
 
     private var gddInfoPopover: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(store.settings.useBEDD ? "BEDD Formula" : "GDD Formula")
+            Text(store.settings.calculationMode == .bedd ? "BEDD Formula" : "GDD Formula")
                 .font(.headline)
-            if store.settings.useBEDD {
+            if store.settings.calculationMode == .bedd {
                 Text("BEDD = max(0, ((min(Tmax,19) + min(Tmin,19))/2) − 10) + diurnal bonus")
                     .font(.caption)
                 Text("• Daily temps capped at 19°C")
@@ -225,7 +240,10 @@ struct VineyardDetailsView: View {
                 Text("Latitude: \(String(format: "%.3f°", lat))")
                     .font(.caption)
             }
-            Text("Toggle BEDD/GDD and set vineyard coordinates in Settings → Vineyard Setup.")
+            Divider()
+            Text("Reset Point: \(store.settings.resetMode.displayName)").font(.subheadline.weight(.semibold))
+            Text("Variety ripeness uses each block’s own reset date (budburst, flowering, etc).").font(.caption2).foregroundStyle(.secondary)
+            Text("Change calculation, reset point, and coordinates in Settings → Vineyard Setup.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
@@ -238,7 +256,7 @@ struct VineyardDetailsView: View {
     private var degreeDaysSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(store.settings.useBEDD ? "Biologically Effective Degree Days" : "Growing Degree Days")
+                Text(store.settings.calculationMode == .bedd ? "Biologically Effective Degree Days" : "Growing Degree Days")
                     .font(.headline)
                 Spacer()
                 gddInfoButton
@@ -276,7 +294,7 @@ struct VineyardDetailsView: View {
 
                 if degreeDayService.seasonGDD != nil {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Season to date (\(degreeDayService.daysCovered) days, base 10°C\(store.settings.useBEDD ? ", capped 19°C" : ""))")
+                        Text("Season to date (\(degreeDayService.daysCovered) days, base 10°C\(store.settings.calculationMode == .bedd ? ", capped 19°C" : "")) • from \(store.settings.resetMode.displayName)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         if let lat = effectiveLatitude {
