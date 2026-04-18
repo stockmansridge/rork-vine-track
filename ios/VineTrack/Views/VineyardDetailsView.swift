@@ -318,17 +318,6 @@ struct VineyardDetailsView: View {
                                 .foregroundStyle(.orange)
                                 .padding(.top, 4)
                         }
-                        if let diag = degreeDayService.lastDiagnostics {
-                            DisclosureGroup("Diagnostics") {
-                                Text(diag)
-                                    .font(.caption2.monospaced())
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .textSelection(.enabled)
-                            }
-                            .font(.caption2)
-                            .padding(.top, 4)
-                        }
                     }
                 } else if let error = degreeDayService.errorMessage {
                     Text(error)

@@ -223,9 +223,8 @@ class DegreeDayService {
                         .joined(separator: ", ")
                     diagnostics.append("Failures — \(summary)")
                 }
-                if lastFetchSucceeded == 0, let sample = firstStatusSample {
-                    diagnostics.append("WU sample: \(sample)")
-                    errorMessage = "Weather Underground request failed: \(sample). Check station ID."
+                if lastFetchSucceeded == 0, firstStatusSample != nil {
+                    errorMessage = "Some missing days/records."
                 }
             }
         } else if !missingDates.isEmpty {
@@ -388,8 +387,7 @@ class DegreeDayService {
                 ?? (json["summaries"] as? [[String: Any]])
                 ?? []
             if entries.isEmpty {
-                let keys = json.keys.sorted().joined(separator: ",")
-                return FetchOutcome(result: nil, statusDescription: "Empty response (keys: \(keys))")
+                return FetchOutcome(result: nil, statusDescription: "Some missing days/records")
             }
 
             if path == "daily" {
@@ -431,7 +429,7 @@ class DegreeDayService {
         if status.contains("401") || status.contains("403") { return "Auth error" }
         if status.contains("204") { return "No data (204)" }
         if status.hasPrefix("HTTP 5") { return "WU server error" }
-        if status.contains("Empty") || status.contains("204") { return "Station didn\u{2019}t report" }
+        if status.contains("Empty") || status.contains("204") || status.contains("missing days") { return "Station didn\u{2019}t report" }
         if status.contains("Hourly missing") { return "Hourly data incomplete" }
         if status.contains("Missing tempHigh") { return "Missing temps" }
         if status.contains("Network") { return "Network error" }
