@@ -171,9 +171,11 @@ class DegreeDayService {
             diagnostics.append("Supabase not configured.")
         }
 
-        // 2. Determine missing dates and fetch from Weather Underground
+        // 2. Determine missing dates and fetch from Weather Underground.
+        // WU PWS history allows ~1500/day on the free tier, so we can safely
+        // pull an entire season in one pass.
         let missingDates: [Date] = dates.filter { stationTemps[Self.wuDateFormatter.string(from: $0)] == nil }
-        let maxFetch = 200
+        let maxFetch = 500
         let toFetch = Array(missingDates.suffix(maxFetch))
         diagnostics.append("Season dates: \(dates.count) • missing: \(missingDates.count) • will fetch: \(toFetch.count)")
 
@@ -230,15 +232,30 @@ class DegreeDayService {
             errorMessage = "Weather Underground API key not configured."
         }
 
-        // 3. Persist to Supabase
+        // 3. Persist to Supabase in chunks so a large batch doesn't exceed request limits.
         if isSupabaseConfigured && !newRecords.isEmpty {
-            do {
-                try await supabase
-                    .from("weather_daily_gdd")
-                    .upsert(newRecords, onConflict: "station_id,date")
-                    .execute()
-            } catch {
-                print("DegreeDayService: Supabase upsert failed: \(error)")
+            let chunkSize = 100
+            var persisted = 0
+            var upsertError: String?
+            for start in stride(from: 0, to: newRecords.count, by: chunkSize) {
+                let end = min(start + chunkSize, newRecords.count)
+                let chunk = Array(newRecords[start..<end])
+                do {
+                    try await supabase
+                        .from("weather_daily_gdd")
+                        .upsert(chunk, onConflict: "station_id,date")
+                        .execute()
+                    persisted += chunk.count
+                } catch {
+                    upsertError = error.localizedDescription
+                    print("DegreeDayService: Supabase upsert failed: \(error)")
+                    break
+                }
+            }
+            if let upsertError {
+                diagnostics.append("Supabase upsert failed after \(persisted) rows: \(upsertError)")
+            } else {
+                diagnostics.append("Supabase upserted: \(persisted) rows")
             }
         }
 
