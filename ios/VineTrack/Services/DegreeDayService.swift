@@ -351,6 +351,52 @@ class DegreeDayService {
         return GDDComputeResult(gdd: total, daysCovered: count, expectedDays: expected, interpolatedDays: interpolated, firstDate: first, lastDate: last)
     }
 
+    /// Returns per-day GDD values (with missing days interpolated) plus a running cumulative total.
+    func dailyGDDSeries(stationId: String, from start: Date, to end: Date, latitude: Double?, useBEDD: Bool) -> [(date: Date, daily: Double, cumulative: Double, interpolated: Bool)] {
+        let cal = Calendar.current
+        let startDay = cal.startOfDay(for: start)
+        let endDay = cal.startOfDay(for: end)
+        var allDays: [Date] = []
+        var d = startDay
+        while d < endDay {
+            allDays.append(d)
+            d = cal.date(byAdding: .day, value: 1, to: d) ?? endDay
+        }
+        guard let stationTemps = temps[stationId] else { return [] }
+        var raw: [DailyTemp?] = allDays.map { stationTemps[Self.wuDateFormatter.string(from: $0)] }
+        var filled = raw
+        var interpolatedFlags = Array(repeating: false, count: raw.count)
+        for i in 0..<filled.count where filled[i] == nil {
+            var highs: [Double] = []
+            var lows: [Double] = []
+            var j = i - 1
+            while j >= 0 && highs.count < 3 {
+                if let t = raw[j] { highs.append(t.high); lows.append(t.low) }
+                j -= 1
+            }
+            var k = i + 1
+            while k < raw.count && highs.count < 6 {
+                if let t = raw[k] { highs.append(t.high); lows.append(t.low) }
+                k += 1
+            }
+            guard !highs.isEmpty else { continue }
+            let avgHigh = highs.reduce(0, +) / Double(highs.count)
+            let avgLow = lows.reduce(0, +) / Double(lows.count)
+            filled[i] = DailyTemp(high: avgHigh, low: avgLow)
+            interpolatedFlags[i] = true
+        }
+        var cumulative: Double = 0
+        var result: [(date: Date, daily: Double, cumulative: Double, interpolated: Bool)] = []
+        for (idx, day) in allDays.enumerated() {
+            guard let temp = filled[idx] else { continue }
+            let value = useBEDD ? beddDay(high: temp.high, low: temp.low, latitude: latitude, date: day)
+                                : max(0, ((temp.high + temp.low) / 2.0) - baseTemp)
+            cumulative += value
+            result.append((date: day, daily: value, cumulative: cumulative, interpolated: interpolatedFlags[idx]))
+        }
+        return result
+    }
+
     private func beddDay(high: Double, low: Double, latitude: Double?, date: Date) -> Double {
         let cappedHigh = min(high, beddCap)
         let cappedLow = min(low, beddCap)

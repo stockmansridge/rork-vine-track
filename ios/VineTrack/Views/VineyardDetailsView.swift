@@ -396,11 +396,17 @@ struct VineyardDetailsView: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(varietyAggregates) { agg in
-                        VarietyRipenessRow(
-                            aggregate: agg,
-                            seasonGDD: gddSinceBudburst(for: agg) ?? degreeDayService.seasonGDD,
-                            usesBlockBudburst: gddSinceBudburst(for: agg) != nil
-                        )
+                        NavigationLink {
+                            VarietyGDDDetailView(varietyId: agg.id)
+                        } label: {
+                            VarietyRipenessRow(
+                                aggregate: agg,
+                                seasonGDD: gddSinceBudburst(for: agg) ?? degreeDayService.seasonGDD,
+                                usesBlockBudburst: gddSinceBudburst(for: agg) != nil,
+                                showsDisclosure: true
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -895,6 +901,7 @@ private struct VarietyRipenessRow: View {
     let aggregate: VineyardDetailsView.VarietyAggregate
     let seasonGDD: Double?
     var usesBlockBudburst: Bool = false
+    var showsDisclosure: Bool = false
 
     private var progress: Double {
         guard let gdd = seasonGDD, aggregate.optimalGDD > 0 else { return 0 }
@@ -922,6 +929,11 @@ private struct VarietyRipenessRow: View {
                 Text(String(format: "%.1f ha • %.0f%%", aggregate.hectares, aggregate.sharePercent))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                if showsDisclosure {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             GeometryReader { geo in
