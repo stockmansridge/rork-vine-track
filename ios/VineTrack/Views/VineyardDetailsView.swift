@@ -5,8 +5,8 @@ import CoreLocation
 struct VineyardDetailsView: View {
     @Environment(DataStore.self) private var store
     @Environment(LocationService.self) private var locationService
+    @Environment(DegreeDayService.self) private var degreeDayService
     @State private var selectedPaddock: Paddock? = nil
-    @State private var degreeDayService = DegreeDayService()
 
     private var vineyard: Vineyard? { store.selectedVineyard }
     private var paddocks: [Paddock] { store.orderedPaddocks }
@@ -109,6 +109,10 @@ struct VineyardDetailsView: View {
         await degreeDayService.fetchSeasonGDD(stationId: stationId, seasonStart: seasonStartDate)
     }
 
+    private func formatRangeDate(_ date: Date) -> String {
+        date.formatted(.dateTime.day().month(.abbreviated).year())
+    }
+
     fileprivate struct VarietyAggregate: Identifiable {
         let id: UUID
         let name: String
@@ -180,9 +184,21 @@ struct VineyardDetailsView: View {
                 }
 
                 if degreeDayService.seasonGDD != nil {
-                    Text("Season to date (\(degreeDayService.daysCovered) days, base 10°C)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Season to date (\(degreeDayService.daysCovered) days, base 10°C)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let first = degreeDayService.firstDateCovered, let last = degreeDayService.lastDateCovered {
+                            Text("Data: \(formatRangeDate(first)) – \(formatRangeDate(last))")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        if let updated = degreeDayService.lastUpdated {
+                            Text("Last updated \(updated.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                 } else if let error = degreeDayService.errorMessage {
                     Text(error)
                         .font(.caption)

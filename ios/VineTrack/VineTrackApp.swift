@@ -11,6 +11,7 @@ struct VineTrackApp: App {
     @State private var adminService = AdminService()
     @State private var tripTrackingService = TripTrackingService()
     @State private var storeViewModel = StoreViewModel()
+    @State private var degreeDayService = DegreeDayService()
     @State private var accessControl: AccessControl?
 
     init() {
@@ -33,6 +34,7 @@ struct VineTrackApp: App {
                 .environment(adminService)
                 .environment(tripTrackingService)
                 .environment(storeViewModel)
+                .environment(degreeDayService)
                 .environment(\.accessControl, accessControl)
                 .task {
                     accessControl = AccessControl(store: store, authService: authService)
@@ -40,6 +42,10 @@ struct VineTrackApp: App {
                     store.cloudSync = cloudSync
                     store.analytics = analytics
                     tripTrackingService.configure(store: store, locationService: locationService)
+                    await refreshDailyGDDIfNeeded()
+                }
+                .onChange(of: store.selectedVineyardId) { _, _ in
+                    Task { await refreshDailyGDDIfNeeded() }
                 }
                 .onAppear {
                     authService.restorePreviousSignIn()
@@ -76,5 +82,28 @@ struct VineTrackApp: App {
                     }
                 }
         }
+    }
+
+    private func refreshDailyGDDIfNeeded() async {
+        guard let stationId = store.settings.weatherStationId, !stationId.isEmpty else { return }
+        guard degreeDayService.needsDailyRefresh(for: stationId) else { return }
+        await degreeDayService.fetchSeasonGDD(stationId: stationId, seasonStart: currentSeasonStart())
+    }
+
+    private func currentSeasonStart() -> Date {
+        let cal = Calendar.current
+        let now = Date()
+        let month = store.settings.seasonStartMonth
+        let day = store.settings.seasonStartDay
+        let currentMonth = cal.component(.month, from: now)
+        let currentDay = cal.component(.day, from: now)
+        let year = cal.component(.year, from: now)
+        let startYear: Int
+        if currentMonth > month || (currentMonth == month && currentDay >= day) {
+            startYear = year
+        } else {
+            startYear = year - 1
+        }
+        return cal.date(from: DateComponents(year: startYear, month: month, day: day)) ?? now
     }
 }
