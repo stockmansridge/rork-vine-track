@@ -55,6 +55,10 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
     var samplesPerHectare: Int
     var defaultBlockBunchWeightsGrams: [UUID: Double]
     var elConfirmationEnabled: Bool
+    var vineyardLatitude: Double?
+    var vineyardLongitude: Double?
+    var vineyardElevationMetres: Double?
+    var useBEDD: Bool
 
     init(
         id: UUID = UUID(),
@@ -78,7 +82,11 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         fillTimerEnabled: Bool = false,
         samplesPerHectare: Int = 20,
         defaultBlockBunchWeightsGrams: [UUID: Double] = [:],
-        elConfirmationEnabled: Bool = true
+        elConfirmationEnabled: Bool = true,
+        vineyardLatitude: Double? = nil,
+        vineyardLongitude: Double? = nil,
+        vineyardElevationMetres: Double? = nil,
+        useBEDD: Bool = true
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -102,6 +110,10 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         self.samplesPerHectare = samplesPerHectare
         self.defaultBlockBunchWeightsGrams = defaultBlockBunchWeightsGrams
         self.elConfirmationEnabled = elConfirmationEnabled
+        self.vineyardLatitude = vineyardLatitude
+        self.vineyardLongitude = vineyardLongitude
+        self.vineyardElevationMetres = vineyardElevationMetres
+        self.useBEDD = useBEDD
     }
 
     init(from decoder: Decoder) throws {
@@ -128,6 +140,10 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         samplesPerHectare = try container.decodeIfPresent(Int.self, forKey: .samplesPerHectare) ?? 20
         defaultBlockBunchWeightsGrams = try container.decodeIfPresent([UUID: Double].self, forKey: .defaultBlockBunchWeightsGrams) ?? [:]
         elConfirmationEnabled = try container.decodeIfPresent(Bool.self, forKey: .elConfirmationEnabled) ?? true
+        vineyardLatitude = try container.decodeIfPresent(Double.self, forKey: .vineyardLatitude)
+        vineyardLongitude = try container.decodeIfPresent(Double.self, forKey: .vineyardLongitude)
+        vineyardElevationMetres = try container.decodeIfPresent(Double.self, forKey: .vineyardElevationMetres)
+        useBEDD = try container.decodeIfPresent(Bool.self, forKey: .useBEDD) ?? true
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
@@ -136,5 +152,6 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         case autoPhotoPrompt, enabledGrowthStageCodes, weatherStationId
         case defaultWaterVolume, defaultSprayRate, defaultConcentrationFactor
         case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance, fillTimerEnabled, samplesPerHectare, defaultBlockBunchWeightsGrams, elConfirmationEnabled
+        case vineyardLatitude, vineyardLongitude, vineyardElevationMetres, useBEDD
     }
 }

@@ -87,7 +87,12 @@ struct VineTrackApp: App {
     private func refreshDailyGDDIfNeeded() async {
         guard let stationId = store.settings.weatherStationId, !stationId.isEmpty else { return }
         guard degreeDayService.needsDailyRefresh(for: stationId) else { return }
-        await degreeDayService.fetchSeasonGDD(stationId: stationId, seasonStart: currentSeasonStart())
+        await degreeDayService.fetchSeasonGDD(
+            stationId: stationId,
+            seasonStart: currentSeasonStart(),
+            latitude: store.settings.vineyardLatitude ?? store.paddockCentroidLatitude,
+            useBEDD: store.settings.useBEDD
+        )
     }
 
     private func currentSeasonStart() -> Date {

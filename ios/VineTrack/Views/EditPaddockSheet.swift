@@ -20,6 +20,9 @@ struct EditPaddockSheet: View {
     @State private var flowPerEmitterText: String = ""
     @State private var emitterSpacingText: String = ""
     @State private var varietyAllocations: [PaddockVarietyAllocation] = []
+    @State private var budburstDate: Date = Date()
+    @State private var hasBudburstDate: Bool = false
+    @State private var plantingYearText: String = ""
     @State private var showAddVariety: Bool = false
     @State private var showBoundaryEditor: Bool = false
     @State private var showFullscreenRowConfig: Bool = false
@@ -36,6 +39,7 @@ struct EditPaddockSheet: View {
                     rowNumberingSection
                 }
                 vineSpacingSection
+                phenologySection
                 varietiesSection
                 irrigationSection
                 if polygonPoints.count > 2 && rowCount > 0 {
@@ -95,6 +99,13 @@ struct EditPaddockSheet: View {
                         emitterSpacingText = String(format: "%.2f", spacing)
                     }
                     varietyAllocations = paddock.varietyAllocations
+                    if let bd = paddock.budburstDate {
+                        budburstDate = bd
+                        hasBudburstDate = true
+                    }
+                    if let py = paddock.plantingYear {
+                        plantingYearText = "\(py)"
+                    }
                     if let firstRow = paddock.rows.first, let lastRow = paddock.rows.last {
                         rowNumberAscending = lastRow.number >= firstRow.number
                         rowStartNumber = min(firstRow.number, lastRow.number)
@@ -369,6 +380,35 @@ struct EditPaddockSheet: View {
         }
     }
 
+    private var phenologySection: some View {
+        Section {
+            Toggle(isOn: $hasBudburstDate) {
+                Label("Budburst Date Set", systemImage: "leaf.arrow.triangle.circlepath")
+            }
+            if hasBudburstDate {
+                DatePicker("Budburst", selection: $budburstDate, displayedComponents: .date)
+            }
+            HStack {
+                Label("Planting Year", systemImage: "calendar")
+                Spacer()
+                TextField("e.g. 2018", text: $plantingYearText)
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 90)
+                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar.circle.fill")
+                    .foregroundStyle(VineyardTheme.leafGreen)
+                    .font(.caption)
+                Text("Phenology")
+            }
+        } footer: {
+            Text("Budburst date is the start of GDD/BEDD accumulation for this block. Set it each season for accurate ripeness tracking.")
+        }
+    }
+
     private var availableVarieties: [GrapeVariety] {
         let usedIds = Set(varietyAllocations.map { $0.varietyId })
         return store.grapeVarieties
@@ -617,6 +657,8 @@ struct EditPaddockSheet: View {
             existing.flowPerEmitter = irrigationFlowPerEmitter
             existing.emitterSpacing = irrigationEmitterSpacing
             existing.varietyAllocations = varietyAllocations
+            existing.budburstDate = hasBudburstDate ? budburstDate : nil
+            existing.plantingYear = Int(plantingYearText)
             store.updatePaddock(existing)
         } else {
             let newPaddock = Paddock(
@@ -631,7 +673,9 @@ struct EditPaddockSheet: View {
                 rowLengthOverride: Double(rowLengthOverride),
                 flowPerEmitter: irrigationFlowPerEmitter,
                 emitterSpacing: irrigationEmitterSpacing,
-                varietyAllocations: varietyAllocations
+                varietyAllocations: varietyAllocations,
+                budburstDate: hasBudburstDate ? budburstDate : nil,
+                plantingYear: Int(plantingYearText)
             )
             store.addPaddock(newPaddock)
         }

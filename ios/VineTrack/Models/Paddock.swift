@@ -16,6 +16,8 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
     var flowPerEmitter: Double?
     var emitterSpacing: Double?
     var varietyAllocations: [PaddockVarietyAllocation]
+    var budburstDate: Date?
+    var plantingYear: Int?
 
     init(
         id: UUID = UUID(),
@@ -31,7 +33,9 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         rowLengthOverride: Double? = nil,
         flowPerEmitter: Double? = nil,
         emitterSpacing: Double? = nil,
-        varietyAllocations: [PaddockVarietyAllocation] = []
+        varietyAllocations: [PaddockVarietyAllocation] = [],
+        budburstDate: Date? = nil,
+        plantingYear: Int? = nil
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -47,10 +51,12 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         self.flowPerEmitter = flowPerEmitter
         self.emitterSpacing = emitterSpacing
         self.varietyAllocations = varietyAllocations
+        self.budburstDate = budburstDate
+        self.plantingYear = plantingYear
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
-        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride, rowLengthOverride, flowPerEmitter, emitterSpacing, varietyAllocations
+        case id, vineyardId, name, polygonPoints, rows, rowDirection, rowWidth, rowOffset, vineSpacing, vineCountOverride, rowLengthOverride, flowPerEmitter, emitterSpacing, varietyAllocations, budburstDate, plantingYear
     }
 
     init(from decoder: Decoder) throws {
@@ -69,6 +75,8 @@ nonisolated struct Paddock: Codable, Identifiable, Sendable, Hashable {
         flowPerEmitter = try container.decodeIfPresent(Double.self, forKey: .flowPerEmitter)
         emitterSpacing = try container.decodeIfPresent(Double.self, forKey: .emitterSpacing)
         varietyAllocations = try container.decodeIfPresent([PaddockVarietyAllocation].self, forKey: .varietyAllocations) ?? []
+        budburstDate = try container.decodeIfPresent(Date.self, forKey: .budburstDate)
+        plantingYear = try container.decodeIfPresent(Int.self, forKey: .plantingYear)
     }
 }
 

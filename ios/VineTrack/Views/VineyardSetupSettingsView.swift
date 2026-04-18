@@ -29,6 +29,7 @@ struct VineyardSetupSettingsView: View {
         Form {
             vineyardMapSection
             paddocksSection
+            vineyardLocationSection
             grapeVarietiesSection
             blockExportImportSection
             buttonsSection
@@ -39,6 +40,9 @@ struct VineyardSetupSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             manualStationId = store.settings.weatherStationId ?? ""
+            if let lat = store.settings.vineyardLatitude { latitudeText = String(format: "%.5f", lat) }
+            if let lon = store.settings.vineyardLongitude { longitudeText = String(format: "%.5f", lon) }
+            if let elev = store.settings.vineyardElevationMetres { elevationText = String(format: "%.0f", elev) }
         }
         .sheet(isPresented: $showStationPicker) {
             NearbyStationPicker(weatherStationService: weatherStationService, onSelect: { stationId in
@@ -383,6 +387,100 @@ struct VineyardSetupSettingsView: View {
         } footer: {
             Text("Customize buttons directly or create templates to quickly switch between different button sets. Templates pair rows left and right.")
         }
+    }
+
+    @State private var latitudeText: String = ""
+    @State private var longitudeText: String = ""
+    @State private var elevationText: String = ""
+
+    private var vineyardLocationSection: some View {
+        Section {
+            HStack {
+                Label("Latitude", systemImage: "location")
+                    .foregroundStyle(.primary)
+                Spacer()
+                TextField(autoLatPlaceholder, text: $latitudeText)
+                    .keyboardType(.numbersAndPunctuation)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 110)
+                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                    .onSubmit { saveCoords() }
+                Text("°").font(.caption).foregroundStyle(.secondary)
+            }
+            HStack {
+                Label("Longitude", systemImage: "location")
+                    .foregroundStyle(.primary)
+                Spacer()
+                TextField(autoLonPlaceholder, text: $longitudeText)
+                    .keyboardType(.numbersAndPunctuation)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 110)
+                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                    .onSubmit { saveCoords() }
+                Text("°").font(.caption).foregroundStyle(.secondary)
+            }
+            HStack {
+                Label("Elevation", systemImage: "mountain.2")
+                    .foregroundStyle(.primary)
+                Spacer()
+                TextField("0", text: $elevationText)
+                    .keyboardType(.numbersAndPunctuation)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 110)
+                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                    .onSubmit { saveCoords() }
+                Text("m").font(.caption).foregroundStyle(.secondary)
+            }
+            if let lat = store.paddockCentroidLatitude, let lon = store.paddockCentroidLongitude, store.settings.vineyardLatitude == nil {
+                Button {
+                    var s = store.settings
+                    s.vineyardLatitude = lat
+                    s.vineyardLongitude = lon
+                    store.updateSettings(s)
+                    latitudeText = String(format: "%.5f", lat)
+                    longitudeText = String(format: "%.5f", lon)
+                } label: {
+                    Label("Use Block Centroid", systemImage: "scope")
+                }
+            }
+            Toggle(isOn: Binding(
+                get: { store.settings.useBEDD },
+                set: { newValue in
+                    var s = store.settings
+                    s.useBEDD = newValue
+                    store.updateSettings(s)
+                }
+            )) {
+                Label("Use BEDD (recommended)", systemImage: "thermometer.sun")
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "location.fill")
+                    .foregroundStyle(.blue)
+                    .font(.caption)
+                Text("Vineyard Location")
+            }
+        } footer: {
+            Text("Coordinates and elevation improve degree-day accuracy. BEDD applies a 19°C cap, day-length factor by latitude, and a diurnal-range bonus.")
+        }
+    }
+
+    private var autoLatPlaceholder: String {
+        if let lat = store.paddockCentroidLatitude { return String(format: "%.5f (auto)", lat) }
+        return "e.g. -33.29"
+    }
+
+    private var autoLonPlaceholder: String {
+        if let lon = store.paddockCentroidLongitude { return String(format: "%.5f (auto)", lon) }
+        return "e.g. 148.95"
+    }
+
+    private func saveCoords() {
+        var s = store.settings
+        s.vineyardLatitude = Double(latitudeText.trimmingCharacters(in: .whitespacesAndNewlines))
+        s.vineyardLongitude = Double(longitudeText.trimmingCharacters(in: .whitespacesAndNewlines))
+        s.vineyardElevationMetres = Double(elevationText.trimmingCharacters(in: .whitespacesAndNewlines))
+        store.updateSettings(s)
     }
 
     private var weatherStationSection: some View {

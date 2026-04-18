@@ -27,7 +27,7 @@ struct VineyardDetailsView: View {
         paddocks.reduce(0) { $0 + $1.rows.count }
     }
 
-    private var seasonStartDate: Date {
+    private var defaultSeasonStartDate: Date {
         let cal = Calendar.current
         let now = Date()
         let month = store.settings.seasonStartMonth
@@ -42,6 +42,37 @@ struct VineyardDetailsView: View {
             startYear = year - 1
         }
         return cal.date(from: DateComponents(year: startYear, month: month, day: day)) ?? now
+    }
+
+    private var seasonStartDate: Date {
+        let cal = Calendar.current
+        let now = Date()
+        let oneYearAgo = cal.date(byAdding: .year, value: -1, to: now) ?? now
+        let recent = paddocks.compactMap { $0.budburstDate }.filter { $0 <= now && $0 >= oneYearAgo }
+        if let earliest = recent.min() {
+            return cal.startOfDay(for: earliest)
+        }
+        return defaultSeasonStartDate
+    }
+
+    private func gddSinceBudburst(for aggregate: VarietyAggregate) -> Double? {
+        guard let stationId = store.settings.weatherStationId, !stationId.isEmpty else { return nil }
+        let cal = Calendar.current
+        let now = Date()
+        let oneYearAgo = cal.date(byAdding: .year, value: -1, to: now) ?? now
+        let blocks = paddocks.filter { paddock in
+            paddock.varietyAllocations.contains(where: { $0.varietyId == aggregate.id })
+        }
+        let dates: [Date] = blocks.compactMap { $0.budburstDate }.filter { $0 <= now && $0 >= oneYearAgo }
+        guard let earliest = dates.min() else { return nil }
+        let result = degreeDayService.computeGDD(
+            stationId: stationId,
+            from: cal.startOfDay(for: earliest),
+            to: cal.startOfDay(for: now),
+            latitude: effectiveLatitude,
+            useBEDD: store.settings.useBEDD
+        )
+        return result.gdd
     }
 
     private var seasonTrips: [Trip] {
@@ -104,9 +135,18 @@ struct VineyardDetailsView: View {
         }
     }
 
+    private var effectiveLatitude: Double? {
+        store.settings.vineyardLatitude ?? store.paddockCentroidLatitude
+    }
+
     private func refreshDegreeDays() async {
         guard let stationId = store.settings.weatherStationId, !stationId.isEmpty else { return }
-        await degreeDayService.fetchSeasonGDD(stationId: stationId, seasonStart: seasonStartDate)
+        await degreeDayService.fetchSeasonGDD(
+            stationId: stationId,
+            seasonStart: seasonStartDate,
+            latitude: effectiveLatitude,
+            useBEDD: store.settings.useBEDD
+        )
     }
 
     private func formatRangeDate(_ date: Date) -> String {
@@ -145,12 +185,63 @@ struct VineyardDetailsView: View {
         .sorted { $0.hectares > $1.hectares }
     }
 
+    @State private var showGDDInfo: Bool = false
+
+    private var gddInfoButton: some View {
+        Button {
+            showGDDInfo = true
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .popover(isPresented: $showGDDInfo, arrowEdge: .top) {
+            gddInfoPopover
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private var gddInfoPopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(store.settings.useBEDD ? "BEDD Formula" : "GDD Formula")
+                .font(.headline)
+            if store.settings.useBEDD {
+                Text("BEDD = max(0, ((min(Tmax,19) + min(Tmin,19))/2) − 10) + diurnal bonus")
+                    .font(.caption)
+                Text("• Daily temps capped at 19°C")
+                Text("• +0.25×(range−13) when (Tmax−Tmin) > 13°C")
+                Text("• Day-length factor from latitude")
+            } else {
+                Text("GDD = max(0, ((Tmax + Tmin) / 2) − 10°C)")
+                    .font(.caption)
+            }
+            Divider()
+            Text("Season Window").font(.subheadline.weight(.semibold))
+            Text("Start: \(seasonStartDate.formatted(date: .abbreviated, time: .omitted))")
+                .font(.caption)
+            Text("End: yesterday (data lags ~1 day)")
+                .font(.caption)
+            if let lat = effectiveLatitude {
+                Text("Latitude: \(String(format: "%.3f°", lat))")
+                    .font(.caption)
+            }
+            Text("Toggle BEDD/GDD and set vineyard coordinates in Settings → Vineyard Setup.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+        }
+        .font(.caption2)
+        .padding(14)
+        .frame(width: 280, alignment: .leading)
+    }
+
     private var degreeDaysSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Growing Degree Days")
+                Text(store.settings.useBEDD ? "Biologically Effective Degree Days" : "Growing Degree Days")
                     .font(.headline)
                 Spacer()
+                gddInfoButton
                 Button {
                     Task { await refreshDegreeDays() }
                 } label: {
@@ -185,9 +276,14 @@ struct VineyardDetailsView: View {
 
                 if degreeDayService.seasonGDD != nil {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Season to date (\(degreeDayService.daysCovered) days, base 10°C)")
+                        Text("Season to date (\(degreeDayService.daysCovered) days, base 10°C\(store.settings.useBEDD ? ", capped 19°C" : ""))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if let lat = effectiveLatitude {
+                            Text("Latitude \(String(format: "%.3f°", lat))\(store.settings.vineyardLatitude == nil ? " (auto from blocks)" : "")")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
                         if let first = degreeDayService.firstDateCovered, let last = degreeDayService.lastDateCovered {
                             Text("Data: \(formatRangeDate(first)) – \(formatRangeDate(last))")
                                 .font(.caption2)
@@ -244,7 +340,8 @@ struct VineyardDetailsView: View {
                     ForEach(varietyAggregates) { agg in
                         VarietyRipenessRow(
                             aggregate: agg,
-                            seasonGDD: degreeDayService.seasonGDD
+                            seasonGDD: gddSinceBudburst(for: agg) ?? degreeDayService.seasonGDD,
+                            usesBlockBudburst: gddSinceBudburst(for: agg) != nil
                         )
                     }
                 }
@@ -728,6 +825,7 @@ private struct BlockDetailSheet: View {
 private struct VarietyRipenessRow: View {
     let aggregate: VineyardDetailsView.VarietyAggregate
     let seasonGDD: Double?
+    var usesBlockBudburst: Bool = false
 
     private var progress: Double {
         guard let gdd = seasonGDD, aggregate.optimalGDD > 0 else { return 0 }
@@ -772,7 +870,7 @@ private struct VarietyRipenessRow: View {
 
             HStack {
                 if seasonGDD != nil {
-                    Text("\(progressPercent)% of optimal")
+                    Text("\(progressPercent)% of optimal\(usesBlockBudburst ? " • from budburst" : "")")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(progressColor)
                 } else {

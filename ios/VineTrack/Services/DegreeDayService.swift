@@ -16,6 +16,18 @@ nonisolated struct WeatherDailyGDDRecord: Codable, Sendable {
     let updated_at: String?
 }
 
+nonisolated struct DailyTemp: Codable, Sendable {
+    let high: Double
+    let low: Double
+}
+
+nonisolated struct GDDComputeResult: Sendable {
+    let gdd: Double
+    let daysCovered: Int
+    let firstDate: Date?
+    let lastDate: Date?
+}
+
 @Observable
 @MainActor
 class DegreeDayService {
@@ -27,10 +39,14 @@ class DegreeDayService {
     var firstDateCovered: Date?
     var lastDateCovered: Date?
 
+    /// Per-station cache of daily temperatures keyed by yyyyMMdd.
+    private var temps: [String: [String: DailyTemp]] = [:]
+
     private let apiKey: String = Config.EXPO_PUBLIC_WUNDERGROUND_API_KEY
     private let baseTemp: Double = 10.0
+    private let beddCap: Double = 19.0
 
-    private var cacheKey: String { "vinetrack_gdd_cache_v1" }
+    private var cacheKey: String { "vinetrack_gdd_temps_cache_v2" }
     private let lastDailySyncKey = "vinetrack_gdd_last_daily_sync"
 
     private static let dateFormatter: DateFormatter = {
@@ -47,12 +63,21 @@ class DegreeDayService {
         return f
     }()
 
-    private func loadCache() -> [String: [String: Double]] {
-        (UserDefaults.standard.dictionary(forKey: cacheKey) as? [String: [String: Double]]) ?? [:]
+    init() {
+        loadCache()
     }
 
-    private func saveCache(_ cache: [String: [String: Double]]) {
-        UserDefaults.standard.set(cache, forKey: cacheKey)
+    private func loadCache() {
+        guard let data = UserDefaults.standard.data(forKey: cacheKey) else { return }
+        if let decoded = try? JSONDecoder().decode([String: [String: DailyTemp]].self, from: data) {
+            temps = decoded
+        }
+    }
+
+    private func saveCache() {
+        if let data = try? JSONEncoder().encode(temps) {
+            UserDefaults.standard.set(data, forKey: cacheKey)
+        }
     }
 
     /// Returns true if today's daily refresh hasn't happened yet for this station.
@@ -68,7 +93,9 @@ class DegreeDayService {
         UserDefaults.standard.set(Date(), forKey: key)
     }
 
-    func fetchSeasonGDD(stationId: String, seasonStart: Date) async {
+    /// Fetch & cache temperatures for the given station from `seasonStart` through yesterday.
+    /// Sets the published `seasonGDD` using the supplied latitude / BEDD flag.
+    func fetchSeasonGDD(stationId: String, seasonStart: Date, latitude: Double? = nil, useBEDD: Bool = true) async {
         guard !stationId.isEmpty else {
             errorMessage = "No weather station set. Configure one in Vineyard Setup."
             return
@@ -90,8 +117,7 @@ class DegreeDayService {
             return
         }
 
-        var cache = loadCache()
-        var stationCache = cache[stationId] ?? [:]
+        var stationTemps = temps[stationId] ?? [:]
 
         var dates: [Date] = []
         var d = start
@@ -115,28 +141,31 @@ class DegreeDayService {
                     .value
                 for record in records {
                     let key = compactKey(fromISODate: record.date)
-                    stationCache[key] = record.gdd
+                    if let high = record.temp_high, let low = record.temp_low {
+                        stationTemps[key] = DailyTemp(high: high, low: low)
+                    }
                 }
             } catch {
                 print("DegreeDayService: Supabase pull failed: \(error)")
             }
         }
 
-        // 2. Determine missing dates and fetch them from Weather Underground
-        let missingDates: [Date] = dates.filter { stationCache[Self.wuDateFormatter.string(from: $0)] == nil }
-        let maxFetch = 120
+        // 2. Determine missing dates and fetch from Weather Underground
+        let missingDates: [Date] = dates.filter { stationTemps[Self.wuDateFormatter.string(from: $0)] == nil }
+        let maxFetch = 200
         let toFetch = Array(missingDates.suffix(maxFetch))
 
         var newRecords: [WeatherDailyGDDRecord] = []
         if !apiKey.isEmpty {
             for date in toFetch {
                 let dateStr = Self.wuDateFormatter.string(from: date)
-                if let result = await fetchDailyGDD(stationId: stationId, dateString: dateStr) {
-                    stationCache[dateStr] = result.gdd
+                if let result = await fetchDailyTemps(stationId: stationId, dateString: dateStr) {
+                    stationTemps[dateStr] = DailyTemp(high: result.high, low: result.low)
+                    let plainGDD = max(0, ((result.high + result.low) / 2.0) - baseTemp)
                     newRecords.append(WeatherDailyGDDRecord(
                         station_id: stationId,
                         date: Self.dateFormatter.string(from: date),
-                        gdd: result.gdd,
+                        gdd: plainGDD,
                         temp_high: result.high,
                         temp_low: result.low,
                         base_temp: baseTemp,
@@ -144,11 +173,11 @@ class DegreeDayService {
                     ))
                 }
             }
-        } else if missingDates.contains(where: { stationCache[Self.wuDateFormatter.string(from: $0)] == nil }) {
+        } else if !missingDates.isEmpty {
             errorMessage = "Weather Underground API key not configured."
         }
 
-        // 3. Persist newly fetched records back to Supabase
+        // 3. Persist to Supabase
         if isSupabaseConfigured && !newRecords.isEmpty {
             do {
                 try await supabase
@@ -160,43 +189,85 @@ class DegreeDayService {
             }
         }
 
-        cache[stationId] = stationCache
-        saveCache(cache)
+        temps[stationId] = stationTemps
+        saveCache()
 
-        var total: Double = 0
-        var count: Int = 0
-        var firstCovered: Date?
-        var lastCovered: Date?
-        for date in dates {
-            if let value = stationCache[Self.wuDateFormatter.string(from: date)] {
-                total += value
-                count += 1
-                if firstCovered == nil { firstCovered = date }
-                lastCovered = date
-            }
-        }
-
-        seasonGDD = total
-        daysCovered = count
-        firstDateCovered = firstCovered
-        lastDateCovered = lastCovered
+        let result = computeGDD(stationId: stationId, from: start, to: today, latitude: latitude, useBEDD: useBEDD)
+        seasonGDD = result.gdd
+        daysCovered = result.daysCovered
+        firstDateCovered = result.firstDate
+        lastDateCovered = result.lastDate
         lastUpdated = Date()
         markDailyRefresh(for: stationId)
         isLoading = false
     }
 
+    /// Compute GDD/BEDD from cached temperatures between two dates (exclusive end).
+    func computeGDD(stationId: String, from start: Date, to end: Date, latitude: Double?, useBEDD: Bool) -> GDDComputeResult {
+        guard let stationTemps = temps[stationId] else {
+            return GDDComputeResult(gdd: 0, daysCovered: 0, firstDate: nil, lastDate: nil)
+        }
+        let cal = Calendar.current
+        var total: Double = 0
+        var count: Int = 0
+        var first: Date?
+        var last: Date?
+        var d = cal.startOfDay(for: start)
+        let endDay = cal.startOfDay(for: end)
+        while d < endDay {
+            let key = Self.wuDateFormatter.string(from: d)
+            if let temp = stationTemps[key] {
+                let value = useBEDD ? beddDay(high: temp.high, low: temp.low, latitude: latitude, date: d)
+                                    : max(0, ((temp.high + temp.low) / 2.0) - baseTemp)
+                total += value
+                count += 1
+                if first == nil { first = d }
+                last = d
+            }
+            d = cal.date(byAdding: .day, value: 1, to: d) ?? endDay
+        }
+        return GDDComputeResult(gdd: total, daysCovered: count, firstDate: first, lastDate: last)
+    }
+
+    private func beddDay(high: Double, low: Double, latitude: Double?, date: Date) -> Double {
+        let cappedHigh = min(high, beddCap)
+        let cappedLow = min(low, beddCap)
+        let mean = (cappedHigh + cappedLow) / 2.0
+        var heat = max(0, mean - baseTemp)
+
+        let range = high - low
+        if range > 13 {
+            heat += (range - 13) * 0.25
+        }
+
+        let k = dayLengthFactor(latitude: latitude, date: date)
+        return heat * k
+    }
+
+    private func dayLengthFactor(latitude: Double?, date: Date) -> Double {
+        guard let lat = latitude, abs(lat) <= 66 else { return 1.0 }
+        let cal = Calendar(identifier: .gregorian)
+        let n = cal.ordinality(of: .day, in: .year, for: date) ?? 1
+        let decl = 23.45 * sin((360.0 * Double(284 + n) / 365.0) * .pi / 180.0)
+        let latRad = lat * .pi / 180.0
+        let declRad = decl * .pi / 180.0
+        let cosOmega = -tan(latRad) * tan(declRad)
+        let clamped = max(-1.0, min(1.0, cosOmega))
+        let omega = acos(clamped) * 180.0 / .pi
+        let dayLength = 2.0 * omega / 15.0
+        return max(0.5, min(1.5, dayLength / 12.0))
+    }
+
     private func compactKey(fromISODate iso: String) -> String {
-        // "2025-04-12" -> "20250412"
         iso.replacingOccurrences(of: "-", with: "")
     }
 
-    private struct DailyResult {
-        let gdd: Double
+    private struct DailyTempResult {
         let high: Double
         let low: Double
     }
 
-    private func fetchDailyGDD(stationId: String, dateString: String) async -> DailyResult? {
+    private func fetchDailyTemps(stationId: String, dateString: String) async -> DailyTempResult? {
         let urlString = "https://api.weather.com/v2/pws/history/daily?stationId=\(stationId)&format=json&units=m&date=\(dateString)&numericPrecision=decimal&apiKey=\(apiKey)"
         guard let url = URL(string: urlString) else { return nil }
 
@@ -213,9 +284,7 @@ class DegreeDayService {
             let tempHigh = parseDouble(metric["tempHigh"])
             let tempLow = parseDouble(metric["tempLow"])
             guard let high = tempHigh, let low = tempLow else { return nil }
-            let avg = (high + low) / 2.0
-            let gdd = max(0, avg - baseTemp)
-            return DailyResult(gdd: gdd, high: high, low: low)
+            return DailyTempResult(high: high, low: low)
         } catch {
             return nil
         }

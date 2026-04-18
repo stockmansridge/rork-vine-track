@@ -1898,6 +1898,18 @@ class DataStore {
         trips.first { $0.isActive }
     }
 
+    var paddockCentroidLatitude: Double? {
+        let pts = paddocks.flatMap { $0.polygonPoints }
+        guard !pts.isEmpty else { return nil }
+        return pts.map(\.latitude).reduce(0, +) / Double(pts.count)
+    }
+
+    var paddockCentroidLongitude: Double? {
+        let pts = paddocks.flatMap { $0.polygonPoints }
+        guard !pts.isEmpty else { return nil }
+        return pts.map(\.longitude).reduce(0, +) / Double(pts.count)
+    }
+
     var orderedPaddocks: [Paddock] {
         let order = settings.paddockOrder
         guard !order.isEmpty else { return paddocks }
