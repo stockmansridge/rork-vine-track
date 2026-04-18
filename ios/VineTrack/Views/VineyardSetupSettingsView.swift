@@ -405,6 +405,7 @@ struct VineyardSetupSettingsView: View {
                     .frame(width: 110)
                     .font(.system(.subheadline, design: .monospaced).weight(.semibold))
                     .onSubmit { saveCoords() }
+                    .onChange(of: latitudeText) { _, _ in saveCoords() }
                 Text("°").font(.caption).foregroundStyle(.secondary)
             }
             HStack {
@@ -417,6 +418,7 @@ struct VineyardSetupSettingsView: View {
                     .frame(width: 110)
                     .font(.system(.subheadline, design: .monospaced).weight(.semibold))
                     .onSubmit { saveCoords() }
+                    .onChange(of: longitudeText) { _, _ in saveCoords() }
                 Text("°").font(.caption).foregroundStyle(.secondary)
             }
             HStack {
@@ -429,6 +431,7 @@ struct VineyardSetupSettingsView: View {
                     .frame(width: 110)
                     .font(.system(.subheadline, design: .monospaced).weight(.semibold))
                     .onSubmit { saveCoords() }
+                    .onChange(of: elevationText) { _, _ in saveCoords() }
                 Text("m").font(.caption).foregroundStyle(.secondary)
             }
             if let lat = store.paddockCentroidLatitude, let lon = store.paddockCentroidLongitude, store.settings.vineyardLatitude == nil {
