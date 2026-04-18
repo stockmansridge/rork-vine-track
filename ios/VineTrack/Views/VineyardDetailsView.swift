@@ -642,16 +642,16 @@ private struct BlockInfoCard: View {
                     irrigationStat(label: "Emitter Spacing", value: String(format: "%.1f m", spacing))
                 }
                 if let totalEmitters = paddock.totalEmitters {
-                    irrigationStat(label: "Emitters", value: "\(totalEmitters)")
+                    irrigationStat(label: "Emitters", value: formatCountK(Double(totalEmitters)))
                 }
                 if let lVineHr = paddock.litresPerVinePerHour {
-                    irrigationStat(label: "L/Vine/Hr", value: String(format: "%.1f", lVineHr))
+                    irrigationStat(label: "L/Vine/Hr", value: formatK(lVineHr, suffix: ""))
                 }
                 if let lph = paddock.litresPerHour {
-                    irrigationStat(label: "Block L/hr", value: formatLitresPerHour(lph))
+                    irrigationStat(label: "Block L/hr", value: formatK(lph, suffix: " L/hr"))
                 }
                 if let lphha = paddock.litresPerHaPerHour {
-                    irrigationStat(label: "L/ha/hr", value: String(format: "%.0f", lphha))
+                    irrigationStat(label: "L/ha/hr", value: formatK(lphha, suffix: ""))
                 }
             }
         }
@@ -687,10 +687,21 @@ private struct BlockInfoCard: View {
     }
 
     private func formatLitresPerHour(_ lph: Double) -> String {
-        if lph >= 1000 {
-            return String(format: "%.1fk L/hr", lph / 1000)
+        formatK(lph, suffix: " L/hr")
+    }
+
+    private func formatK(_ value: Double, suffix: String) -> String {
+        if abs(value) >= 1000 {
+            return String(format: "%.1fk%@", value / 1000, suffix)
         }
-        return String(format: "%.0f L/hr", lph)
+        return String(format: "%.0f%@", value, suffix)
+    }
+
+    private func formatCountK(_ value: Double) -> String {
+        if abs(value) >= 1000 {
+            return String(format: "%.1fk", value / 1000)
+        }
+        return String(format: "%.0f", value)
     }
 }
 
