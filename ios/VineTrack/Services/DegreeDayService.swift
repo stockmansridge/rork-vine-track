@@ -338,14 +338,16 @@ class DegreeDayService {
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 return FetchOutcome(result: nil, statusDescription: "Bad JSON")
             }
-            guard let summaries = json["summaries"] as? [[String: Any]], let obs = summaries.first else {
-                return FetchOutcome(result: nil, statusDescription: "Empty summaries (station not reporting that day?)")
+            let entries = (json["observations"] as? [[String: Any]])
+                ?? (json["summaries"] as? [[String: Any]])
+                ?? []
+            guard let obs = entries.first else {
+                let keys = json.keys.sorted().joined(separator: ",")
+                return FetchOutcome(result: nil, statusDescription: "Empty response (keys: \(keys))")
             }
-            guard let metric = obs["metric"] as? [String: Any] else {
-                return FetchOutcome(result: nil, statusDescription: "Missing metric block")
-            }
-            let tempHigh = parseDouble(metric["tempHigh"])
-            let tempLow = parseDouble(metric["tempLow"])
+            let metric = (obs["metric"] as? [String: Any]) ?? obs
+            let tempHigh = parseDouble(metric["tempHigh"]) ?? parseDouble(metric["tempMax"]) ?? parseDouble(obs["tempHigh"])
+            let tempLow = parseDouble(metric["tempLow"]) ?? parseDouble(metric["tempMin"]) ?? parseDouble(obs["tempLow"])
             guard let high = tempHigh, let low = tempLow else {
                 return FetchOutcome(result: nil, statusDescription: "Missing tempHigh/tempLow")
             }
