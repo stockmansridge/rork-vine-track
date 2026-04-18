@@ -873,10 +873,8 @@ private struct VarietyRipenessRow: View {
 
     private var progressColor: Color {
         switch progress {
-        case 0..<0.33: return .blue
-        case 0.33..<0.66: return .teal
-        case 0.66..<0.9: return VineyardTheme.leafGreen
-        case 0.9..<1.0: return .orange
+        case 0.98...: return VineyardTheme.leafGreen
+        case 0.9..<0.98: return .orange
         default: return .red
         }
     }
