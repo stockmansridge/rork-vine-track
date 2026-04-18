@@ -1103,6 +1103,24 @@ class DataStore {
         save(vineyards, key: vineyardsKey)
         selectedVineyardId = demoVineyard.id
 
+        grapeVarieties = GrapeVariety.defaults(for: demoVineyardId)
+        var allGrapeVarietiesStore: [GrapeVariety] = loadData(key: grapeVarietiesKey) ?? []
+        allGrapeVarietiesStore.removeAll { $0.vineyardId == demoVineyardId }
+        allGrapeVarietiesStore.append(contentsOf: grapeVarieties)
+        save(allGrapeVarietiesStore, key: grapeVarietiesKey)
+
+        func varietyId(_ name: String) -> UUID {
+            grapeVarieties.first { $0.name == name }?.id ?? UUID()
+        }
+        func alloc(_ name: String) -> [PaddockVarietyAllocation] {
+            [PaddockVarietyAllocation(varietyId: varietyId(name), percent: 100)]
+        }
+        let demoBudburst: Date = {
+            var c = DateComponents()
+            c.year = 2025; c.month = 10; c.day = 1
+            return Calendar.current.date(from: c) ?? Date()
+        }()
+
         let pGruner = Paddock(
             id: UUID(uuidString: "715EE7B8-B5FC-4A4B-A9E9-F8A30F9D62D4")!,
             vineyardId: demoVineyardId,
@@ -1119,7 +1137,9 @@ class DataStore {
             rowOffset: -0.5,
             vineSpacing: 1.0,
             flowPerEmitter: 1.6,
-            emitterSpacing: 0.5
+            emitterSpacing: 0.5,
+            varietyAllocations: alloc("Gruner Veltliner"),
+            budburstDate: demoBudburst
         )
 
         let pShiraz = Paddock(
@@ -1138,7 +1158,9 @@ class DataStore {
             rowOffset: 0,
             vineSpacing: 1.0,
             flowPerEmitter: 1.6,
-            emitterSpacing: 0.5
+            emitterSpacing: 0.5,
+            varietyAllocations: alloc("Shiraz"),
+            budburstDate: demoBudburst
         )
 
         let pPinotNoir = Paddock(
@@ -1166,7 +1188,9 @@ class DataStore {
             rowOffset: 0,
             vineSpacing: 1.0,
             flowPerEmitter: 1.6,
-            emitterSpacing: 0.5
+            emitterSpacing: 0.5,
+            varietyAllocations: alloc("Pinot Noir"),
+            budburstDate: demoBudburst
         )
 
         let pPrimitivo = Paddock(
@@ -1185,7 +1209,9 @@ class DataStore {
             rowOffset: 0,
             vineSpacing: 1.0,
             flowPerEmitter: 1.6,
-            emitterSpacing: 0.5
+            emitterSpacing: 0.5,
+            varietyAllocations: alloc("Primitivo"),
+            budburstDate: demoBudburst
         )
 
         let pCabFranc = Paddock(
@@ -1204,7 +1230,9 @@ class DataStore {
             rowOffset: 0,
             vineSpacing: 1.0,
             flowPerEmitter: 1.6,
-            emitterSpacing: 0.5
+            emitterSpacing: 0.5,
+            varietyAllocations: alloc("Cabernet Franc"),
+            budburstDate: demoBudburst
         )
 
         let pSauvBlanc = Paddock(
@@ -1228,7 +1256,9 @@ class DataStore {
             rowOffset: 0.5,
             vineSpacing: 1.0,
             flowPerEmitter: 1.6,
-            emitterSpacing: 0.5
+            emitterSpacing: 0.5,
+            varietyAllocations: alloc("Sauvignon Blanc"),
+            budburstDate: demoBudburst
         )
 
         let pMerlot = Paddock(
@@ -1247,7 +1277,9 @@ class DataStore {
             rowOffset: 0,
             vineSpacing: 1.0,
             flowPerEmitter: 1.6,
-            emitterSpacing: 0.5
+            emitterSpacing: 0.5,
+            varietyAllocations: alloc("Merlot"),
+            budburstDate: demoBudburst
         )
 
         let pPinotGris = Paddock(
@@ -1266,7 +1298,9 @@ class DataStore {
             rowOffset: 0,
             vineSpacing: 1.0,
             flowPerEmitter: 1.6,
-            emitterSpacing: 0.5
+            emitterSpacing: 0.5,
+            varietyAllocations: alloc("Pinot Gris / Grigio"),
+            budburstDate: demoBudburst
         )
 
         paddocks = [pShiraz, pPinotNoir, pGruner, pPrimitivo, pCabFranc, pSauvBlanc, pMerlot, pPinotGris]
