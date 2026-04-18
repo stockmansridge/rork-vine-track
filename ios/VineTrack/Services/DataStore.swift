@@ -769,6 +769,36 @@ class DataStore {
         }
         all.append(contentsOf: grapeVarieties)
         save(all, key: grapeVarietiesKey)
+        syncDataToCloud(dataType: "grape_varieties")
+    }
+
+    func replaceGrapeVarieties(_ remote: [GrapeVariety], for vineyardId: UUID) {
+        var all: [GrapeVariety] = loadData(key: grapeVarietiesKey) ?? []
+        all.removeAll { $0.vineyardId == vineyardId }
+        all.append(contentsOf: remote)
+        save(all, key: grapeVarietiesKey)
+        if selectedVineyardId == vineyardId {
+            grapeVarieties = remote
+        }
+    }
+
+    func mergeGrapeVarieties(_ remote: [GrapeVariety], for vineyardId: UUID) {
+        var all: [GrapeVariety] = loadData(key: grapeVarietiesKey) ?? []
+        for item in remote {
+            if let index = all.firstIndex(where: { $0.id == item.id }) {
+                all[index] = item
+            } else {
+                all.append(item)
+            }
+        }
+        save(all, key: grapeVarietiesKey)
+        if selectedVineyardId == vineyardId {
+            grapeVarieties = all.filter { $0.vineyardId == vineyardId }
+        }
+    }
+
+    var allGrapeVarieties: [GrapeVariety] {
+        loadData(key: grapeVarietiesKey) ?? []
     }
 
     // MARK: - Historical Yield Records
@@ -2753,6 +2783,7 @@ class DataStore {
             case "yield_sessions": return yieldSessions as [YieldEstimationSession]
             case "damage_records": return damageRecords as [DamageRecord]
             case "historical_yield_records": return historicalYieldRecords as [HistoricalYieldRecord]
+            case "grape_varieties": return grapeVarieties as [GrapeVariety]
             case "el_stage_images_manifest": return elStageImageManifest(for: vid)
             default: return [] as [String]
             }

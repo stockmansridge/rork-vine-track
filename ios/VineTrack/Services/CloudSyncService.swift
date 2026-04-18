@@ -450,8 +450,10 @@ class CloudSyncService {
 
             let operatorCategories = store.allOperatorCategories.filter { $0.vineyardId == vid }
             let buttonTemplates = store.allButtonTemplates.filter { $0.vineyardId == vid }
+            let grapeVars = store.allGrapeVarieties.filter { $0.vineyardId == vid }
             result.append(("operator_categories", vid, operatorCategories))
             result.append(("button_templates", vid, buttonTemplates))
+            result.append(("grape_varieties", vid, grapeVars))
 
             let manifest = store.elStageImageManifest(for: vid)
             result.append(("el_stage_images_manifest", vid, manifest))
@@ -588,6 +590,13 @@ class CloudSyncService {
                 store.replaceButtonTemplates(items, for: vineyardId)
             } else {
                 store.mergeButtonTemplates(items, for: vineyardId)
+            }
+        case "grape_varieties":
+            let items = try decoder.decode([GrapeVariety].self, from: jsonData)
+            if replace {
+                store.replaceGrapeVarieties(items, for: vineyardId)
+            } else {
+                store.mergeGrapeVarieties(items, for: vineyardId)
             }
         case "el_stage_images_manifest":
             let manifest = try decoder.decode(ELStageImageManifest.self, from: jsonData)
