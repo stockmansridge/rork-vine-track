@@ -294,6 +294,23 @@ struct VineyardDetailsView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                         }
+                        if let error = degreeDayService.errorMessage {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .padding(.top, 4)
+                        }
+                        if let diag = degreeDayService.lastDiagnostics {
+                            DisclosureGroup("Diagnostics") {
+                                Text(diag)
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
+                            }
+                            .font(.caption2)
+                            .padding(.top, 4)
+                        }
                     }
                 } else if let error = degreeDayService.errorMessage {
                     Text(error)

@@ -38,6 +38,12 @@ class DegreeDayService {
     var daysCovered: Int = 0
     var firstDateCovered: Date?
     var lastDateCovered: Date?
+    var lastDiagnostics: String?
+    var lastStationId: String?
+    var lastSeasonStart: Date?
+    var lastFetchAttempted: Int = 0
+    var lastFetchSucceeded: Int = 0
+    var lastFetchStatusSample: String?
 
     /// Per-station cache of daily temperatures keyed by yyyyMMdd.
     private var temps: [String: [String: DailyTemp]] = [:]
@@ -103,6 +109,17 @@ class DegreeDayService {
 
         isLoading = true
         errorMessage = nil
+        lastStationId = stationId
+        lastSeasonStart = seasonStart
+        lastFetchAttempted = 0
+        lastFetchSucceeded = 0
+        lastFetchStatusSample = nil
+        var diagnostics: [String] = []
+        if apiKey.isEmpty {
+            diagnostics.append("Weather Underground API key missing in build.")
+        } else {
+            diagnostics.append("API key: \(String(apiKey.prefix(4)))… (\(apiKey.count) chars)")
+        }
 
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
@@ -145,21 +162,33 @@ class DegreeDayService {
                         stationTemps[key] = DailyTemp(high: high, low: low)
                     }
                 }
+                diagnostics.append("Supabase cached rows: \(records.count)")
             } catch {
+                diagnostics.append("Supabase pull failed: \(error.localizedDescription)")
                 print("DegreeDayService: Supabase pull failed: \(error)")
             }
+        } else {
+            diagnostics.append("Supabase not configured.")
         }
 
         // 2. Determine missing dates and fetch from Weather Underground
         let missingDates: [Date] = dates.filter { stationTemps[Self.wuDateFormatter.string(from: $0)] == nil }
         let maxFetch = 200
         let toFetch = Array(missingDates.suffix(maxFetch))
+        diagnostics.append("Season dates: \(dates.count) • missing: \(missingDates.count) • will fetch: \(toFetch.count)")
 
         var newRecords: [WeatherDailyGDDRecord] = []
+        var firstStatusSample: String?
         if !apiKey.isEmpty {
             for date in toFetch {
                 let dateStr = Self.wuDateFormatter.string(from: date)
-                if let result = await fetchDailyTemps(stationId: stationId, dateString: dateStr) {
+                lastFetchAttempted += 1
+                let outcome = await fetchDailyTemps(stationId: stationId, dateString: dateStr)
+                if firstStatusSample == nil {
+                    firstStatusSample = outcome.statusDescription
+                }
+                if let result = outcome.result {
+                    lastFetchSucceeded += 1
                     stationTemps[dateStr] = DailyTemp(high: result.high, low: result.low)
                     let plainGDD = max(0, ((result.high + result.low) / 2.0) - baseTemp)
                     newRecords.append(WeatherDailyGDDRecord(
@@ -171,6 +200,14 @@ class DegreeDayService {
                         base_temp: baseTemp,
                         updated_at: nil
                     ))
+                }
+            }
+            lastFetchStatusSample = firstStatusSample
+            if lastFetchAttempted > 0 {
+                diagnostics.append("WU fetches: \(lastFetchSucceeded)/\(lastFetchAttempted) succeeded")
+                if lastFetchSucceeded == 0, let sample = firstStatusSample {
+                    diagnostics.append("WU sample: \(sample)")
+                    errorMessage = "Weather Underground request failed: \(sample). Check station ID."
                 }
             }
         } else if !missingDates.isEmpty {
@@ -198,6 +235,17 @@ class DegreeDayService {
         firstDateCovered = result.firstDate
         lastDateCovered = result.lastDate
         lastUpdated = Date()
+        if result.daysCovered == 0 && errorMessage == nil {
+            if apiKey.isEmpty {
+                errorMessage = "Weather Underground API key not configured."
+            } else if dates.isEmpty {
+                errorMessage = "Budburst date is today — no days to accumulate yet."
+            } else {
+                errorMessage = "No temperature data returned for station \"\(stationId)\". Verify the PWS ID is correct and reporting."
+            }
+        }
+        diagnostics.append("Days with data: \(result.daysCovered) • GDD: \(Int(result.gdd))")
+        lastDiagnostics = diagnostics.joined(separator: "\n")
         markDailyRefresh(for: stationId)
         isLoading = false
     }
@@ -267,26 +315,43 @@ class DegreeDayService {
         let low: Double
     }
 
-    private func fetchDailyTemps(stationId: String, dateString: String) async -> DailyTempResult? {
+    private struct FetchOutcome {
+        let result: DailyTempResult?
+        let statusDescription: String
+    }
+
+    private func fetchDailyTemps(stationId: String, dateString: String) async -> FetchOutcome {
         let urlString = "https://api.weather.com/v2/pws/history/daily?stationId=\(stationId)&format=json&units=m&date=\(dateString)&numericPrecision=decimal&apiKey=\(apiKey)"
-        guard let url = URL(string: urlString) else { return nil }
+        guard let url = URL(string: urlString) else {
+            return FetchOutcome(result: nil, statusDescription: "Invalid URL")
+        }
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let summaries = json["summaries"] as? [[String: Any]],
-                  let obs = summaries.first,
-                  let metric = obs["metric"] as? [String: Any] else {
-                return nil
+            guard let http = response as? HTTPURLResponse else {
+                return FetchOutcome(result: nil, statusDescription: "No HTTP response")
             }
-
+            if http.statusCode != 200 {
+                let body = String(data: data.prefix(120), encoding: .utf8) ?? ""
+                return FetchOutcome(result: nil, statusDescription: "HTTP \(http.statusCode) \(body)")
+            }
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return FetchOutcome(result: nil, statusDescription: "Bad JSON")
+            }
+            guard let summaries = json["summaries"] as? [[String: Any]], let obs = summaries.first else {
+                return FetchOutcome(result: nil, statusDescription: "Empty summaries (station not reporting that day?)")
+            }
+            guard let metric = obs["metric"] as? [String: Any] else {
+                return FetchOutcome(result: nil, statusDescription: "Missing metric block")
+            }
             let tempHigh = parseDouble(metric["tempHigh"])
             let tempLow = parseDouble(metric["tempLow"])
-            guard let high = tempHigh, let low = tempLow else { return nil }
-            return DailyTempResult(high: high, low: low)
+            guard let high = tempHigh, let low = tempLow else {
+                return FetchOutcome(result: nil, statusDescription: "Missing tempHigh/tempLow")
+            }
+            return FetchOutcome(result: DailyTempResult(high: high, low: low), statusDescription: "200 OK")
         } catch {
-            return nil
+            return FetchOutcome(result: nil, statusDescription: "Network error: \(error.localizedDescription)")
         }
     }
 
