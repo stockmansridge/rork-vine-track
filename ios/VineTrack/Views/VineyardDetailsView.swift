@@ -253,6 +253,39 @@ struct VineyardDetailsView: View {
         .frame(width: 280, alignment: .leading)
     }
 
+    private var dataHealthRow: some View {
+        let expected = max(degreeDayService.expectedDays, 1)
+        let reported = max(0, degreeDayService.daysCovered - degreeDayService.interpolatedDays)
+        let pct = Double(reported) / Double(expected)
+        let color: Color = pct >= 0.98 ? .green : (pct >= 0.90 ? .orange : .red)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "waveform.path.ecg")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(color)
+                Text("Data health")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Text("\(reported) / \(degreeDayService.expectedDays) days · \(Int((pct * 100).rounded()))%")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(color)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.secondary.opacity(0.15))
+                    Capsule().fill(color).frame(width: geo.size.width * CGFloat(min(max(pct, 0), 1)))
+                }
+            }
+            .frame(height: 6)
+            if degreeDayService.interpolatedDays > 0 {
+                Text("\(degreeDayService.interpolatedDays) day\(degreeDayService.interpolatedDays == 1 ? "" : "s") estimated from neighbouring entries")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.bottom, 4)
+    }
+
     private var degreeDaysSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -293,6 +326,7 @@ struct VineyardDetailsView: View {
                 }
 
                 if degreeDayService.seasonGDD != nil {
+                    dataHealthRow
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Season to date (\(degreeDayService.daysCovered) days, base 10°C\(store.settings.calculationMode == .bedd ? ", capped 19°C" : "")) • from \(store.settings.resetMode.displayName)")
                             .font(.caption)

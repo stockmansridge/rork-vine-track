@@ -24,6 +24,8 @@ nonisolated struct DailyTemp: Codable, Sendable {
 nonisolated struct GDDComputeResult: Sendable {
     let gdd: Double
     let daysCovered: Int
+    let expectedDays: Int
+    let interpolatedDays: Int
     let firstDate: Date?
     let lastDate: Date?
 }
@@ -36,6 +38,8 @@ class DegreeDayService {
     var seasonGDD: Double?
     var lastUpdated: Date?
     var daysCovered: Int = 0
+    var expectedDays: Int = 0
+    var interpolatedDays: Int = 0
     var firstDateCovered: Date?
     var lastDateCovered: Date?
     var lastDiagnostics: String?
@@ -264,6 +268,8 @@ class DegreeDayService {
         let result = computeGDD(stationId: stationId, from: start, to: today, latitude: latitude, useBEDD: useBEDD)
         seasonGDD = result.gdd
         daysCovered = result.daysCovered
+        expectedDays = result.expectedDays
+        interpolatedDays = result.interpolatedDays
         firstDateCovered = result.firstDate
         lastDateCovered = result.lastDate
         lastUpdated = Date()
@@ -283,30 +289,66 @@ class DegreeDayService {
     }
 
     /// Compute GDD/BEDD from cached temperatures between two dates (exclusive end).
+    /// Missing days are back-filled with the average of up to 3 reported entries on
+    /// each side so the accumulation isn't undercounted by sensor gaps.
     func computeGDD(stationId: String, from start: Date, to end: Date, latitude: Double?, useBEDD: Bool) -> GDDComputeResult {
-        guard let stationTemps = temps[stationId] else {
-            return GDDComputeResult(gdd: 0, daysCovered: 0, firstDate: nil, lastDate: nil)
-        }
         let cal = Calendar.current
+        let startDay = cal.startOfDay(for: start)
+        let endDay = cal.startOfDay(for: end)
+        var allDays: [Date] = []
+        var d = startDay
+        while d < endDay {
+            allDays.append(d)
+            d = cal.date(byAdding: .day, value: 1, to: d) ?? endDay
+        }
+
+        let expected = allDays.count
+        guard let stationTemps = temps[stationId] else {
+            return GDDComputeResult(gdd: 0, daysCovered: 0, expectedDays: expected, interpolatedDays: 0, firstDate: nil, lastDate: nil)
+        }
+
+        // Build aligned temp array — nil where missing.
+        var raw: [DailyTemp?] = allDays.map { stationTemps[Self.wuDateFormatter.string(from: $0)] }
+        let reportedCount = raw.compactMap { $0 }.count
+
+        // Interpolate missing entries from up to 3 reported neighbours on each side.
+        var interpolated = 0
+        var filled = raw
+        for i in 0..<filled.count where filled[i] == nil {
+            var highs: [Double] = []
+            var lows: [Double] = []
+            var j = i - 1
+            while j >= 0 && highs.count < 3 {
+                if let t = raw[j] { highs.append(t.high); lows.append(t.low) }
+                j -= 1
+            }
+            var k = i + 1
+            while k < raw.count && highs.count < 6 {
+                if let t = raw[k] { highs.append(t.high); lows.append(t.low) }
+                k += 1
+            }
+            guard !highs.isEmpty else { continue }
+            let avgHigh = highs.reduce(0, +) / Double(highs.count)
+            let avgLow = lows.reduce(0, +) / Double(lows.count)
+            filled[i] = DailyTemp(high: avgHigh, low: avgLow)
+            interpolated += 1
+        }
+
         var total: Double = 0
         var count: Int = 0
         var first: Date?
         var last: Date?
-        var d = cal.startOfDay(for: start)
-        let endDay = cal.startOfDay(for: end)
-        while d < endDay {
-            let key = Self.wuDateFormatter.string(from: d)
-            if let temp = stationTemps[key] {
-                let value = useBEDD ? beddDay(high: temp.high, low: temp.low, latitude: latitude, date: d)
-                                    : max(0, ((temp.high + temp.low) / 2.0) - baseTemp)
-                total += value
-                count += 1
-                if first == nil { first = d }
-                last = d
-            }
-            d = cal.date(byAdding: .day, value: 1, to: d) ?? endDay
+        for (idx, day) in allDays.enumerated() {
+            guard let temp = filled[idx] else { continue }
+            let value = useBEDD ? beddDay(high: temp.high, low: temp.low, latitude: latitude, date: day)
+                                : max(0, ((temp.high + temp.low) / 2.0) - baseTemp)
+            total += value
+            count += 1
+            if first == nil { first = day }
+            last = day
         }
-        return GDDComputeResult(gdd: total, daysCovered: count, firstDate: first, lastDate: last)
+        _ = reportedCount
+        return GDDComputeResult(gdd: total, daysCovered: count, expectedDays: expected, interpolatedDays: interpolated, firstDate: first, lastDate: last)
     }
 
     private func beddDay(high: Double, low: Double, latitude: Double?, date: Date) -> Double {
