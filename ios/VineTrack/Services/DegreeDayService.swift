@@ -179,13 +179,16 @@ class DegreeDayService {
 
         var newRecords: [WeatherDailyGDDRecord] = []
         var firstStatusSample: String?
+        var failureCounts: [String: Int] = [:]
         if !apiKey.isEmpty {
             for date in toFetch {
                 let dateStr = Self.wuDateFormatter.string(from: date)
                 lastFetchAttempted += 1
-                let outcome = await fetchDailyTemps(stationId: stationId, dateString: dateStr)
-                if firstStatusSample == nil {
-                    firstStatusSample = outcome.statusDescription
+                var outcome = await fetchDailyTemps(stationId: stationId, dateString: dateStr)
+                // Retry once after a brief pause if we hit a rate limit
+                if outcome.result == nil, outcome.statusDescription.contains("429") {
+                    try? await Task.sleep(for: .milliseconds(800))
+                    outcome = await fetchDailyTemps(stationId: stationId, dateString: dateStr)
                 }
                 if let result = outcome.result {
                     lastFetchSucceeded += 1
@@ -200,11 +203,24 @@ class DegreeDayService {
                         base_temp: baseTemp,
                         updated_at: nil
                     ))
+                } else {
+                    if firstStatusSample == nil {
+                        firstStatusSample = outcome.statusDescription
+                    }
+                    let bucket = Self.failureBucket(outcome.statusDescription)
+                    failureCounts[bucket, default: 0] += 1
                 }
             }
             lastFetchStatusSample = firstStatusSample
             if lastFetchAttempted > 0 {
                 diagnostics.append("WU fetches: \(lastFetchSucceeded)/\(lastFetchAttempted) succeeded")
+                if !failureCounts.isEmpty {
+                    let summary = failureCounts
+                        .sorted { $0.value > $1.value }
+                        .map { "\($0.key): \($0.value)" }
+                        .joined(separator: ", ")
+                    diagnostics.append("Failures — \(summary)")
+                }
                 if lastFetchSucceeded == 0, let sample = firstStatusSample {
                     diagnostics.append("WU sample: \(sample)")
                     errorMessage = "Weather Underground request failed: \(sample). Check station ID."
@@ -355,6 +371,18 @@ class DegreeDayService {
         } catch {
             return FetchOutcome(result: nil, statusDescription: "Network error: \(error.localizedDescription)")
         }
+    }
+
+    private static func failureBucket(_ status: String) -> String {
+        if status.contains("429") { return "Rate limited (429)" }
+        if status.contains("401") || status.contains("403") { return "Auth error" }
+        if status.contains("204") { return "No data (204)" }
+        if status.hasPrefix("HTTP 5") { return "WU server error" }
+        if status.contains("Empty") { return "Station didn\u{2019}t report" }
+        if status.contains("Missing tempHigh") { return "Missing temps" }
+        if status.contains("Network") { return "Network error" }
+        if status.contains("Bad JSON") { return "Bad JSON" }
+        return "Other"
     }
 
     private func parseDouble(_ value: Any?) -> Double? {
