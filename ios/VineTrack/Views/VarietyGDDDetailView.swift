@@ -243,17 +243,36 @@ struct VarietyGDDDetailView: View {
             }
 
             if let hit = targetIntersection {
-                HStack(spacing: 6) {
+                let tint: Color = hit.kind == .reached ? VineyardTheme.leafGreen : .orange
+                HStack(spacing: 10) {
                     Image(systemName: hit.kind == .reached ? "flag.checkered" : "calendar.badge.clock")
-                        .font(.caption2)
-                        .foregroundStyle(hit.kind == .reached ? VineyardTheme.leafGreen : .secondary)
-                    Text(hit.kind == .reached ? "Target reached" : "Projected target")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Text(hit.date.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .font(.title3)
+                        .foregroundStyle(tint)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(hit.kind == .reached ? "Target reached on" : "Projected crossover")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(hit.date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.subheadline.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(tint)
+                    }
                     Spacer()
+                    if let target = variety?.optimalGDD {
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text("at target")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text("\(Int(target)) GDD")
+                                .font(.caption.monospacedDigit().weight(.semibold))
+                        }
+                    }
                 }
+                .padding(10)
+                .background(tint.opacity(0.1), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(tint.opacity(0.3), lineWidth: 1)
+                )
             }
         }
         .padding(14)
