@@ -15,6 +15,7 @@ struct DashboardView: View {
     @State private var showVineyardDetails: Bool = false
     @State private var showMaintenanceLog: Bool = false
     @State private var showWorkTaskCalculator: Bool = false
+    @State private var showYieldDeterminationCalculator: Bool = false
     @Environment(\.accessControl) private var accessControl
 
     private var vineyard: Vineyard? { store.selectedVineyard }
@@ -122,6 +123,9 @@ struct DashboardView: View {
             }
             .navigationDestination(isPresented: $showWorkTaskCalculator) {
                 WorkTaskCalculatorView()
+            }
+            .navigationDestination(isPresented: $showYieldDeterminationCalculator) {
+                YieldDeterminationCalculatorView()
             }
         }
     }
@@ -381,6 +385,19 @@ struct DashboardView: View {
                 ) {
                     showWorkTaskCalculator = true
                 }
+            }
+
+            HStack(spacing: 12) {
+                toolCard(
+                    title: "Yield Determination",
+                    subtitle: "Calculate yield per ha",
+                    icon: "scalemass.fill",
+                    color: .purple
+                ) {
+                    showYieldDeterminationCalculator = true
+                }
+
+                Color.clear.frame(maxWidth: .infinity)
             }
         }
     }
