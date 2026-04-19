@@ -240,8 +240,11 @@ struct VineyardBlocksMapView: View {
             FullScreenBlocksMapView(
                 paddocks: paddocks,
                 blockColors: blockColors,
-                pins: visiblePins,
-                infoFields: selectedInfoFields,
+                allPins: store.pins,
+                selectedPinNames: $selectedPinNames,
+                selectedInfoFields: $selectedInfoFields,
+                uniquePinNames: uniquePinNames,
+                pinNameColors: pinNameColors,
                 onSelectPaddock: { selectedPaddock = $0 },
                 onSelectPin: { selectedPin = $0 }
             )
@@ -320,12 +323,27 @@ struct VineyardBlocksMapView: View {
 struct FullScreenBlocksMapView: View {
     let paddocks: [Paddock]
     let blockColors: [UUID: Color]
-    let pins: [VinePin]
-    let infoFields: Set<BlockInfoField>
+    let allPins: [VinePin]
+    @Binding var selectedPinNames: Set<String>
+    @Binding var selectedInfoFields: Set<BlockInfoField>
+    let uniquePinNames: [String]
+    let pinNameColors: [String: String]
     let onSelectPaddock: (Paddock) -> Void
     let onSelectPin: (VinePin) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var position: MapCameraPosition = .automatic
+    @State private var showFilterSheet: Bool = false
+
+    private var pins: [VinePin] {
+        guard !selectedPinNames.isEmpty else { return [] }
+        return allPins.filter { selectedPinNames.contains($0.buttonName) }
+    }
+
+    private var infoFields: Set<BlockInfoField> { selectedInfoFields }
+
+    private var activeFilterCount: Int {
+        (selectedPinNames.isEmpty ? 0 : 1) + (selectedInfoFields.isEmpty ? 0 : 1)
+    }
 
     var body: some View {
         NavigationStack {
@@ -378,6 +396,30 @@ struct FullScreenBlocksMapView: View {
                 }
                 .mapStyle(.hybrid)
                 .ignoresSafeArea()
+
+                Button {
+                    showFilterSheet = true
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(activeFilterCount > 0 ? .white : .primary)
+                            .padding(10)
+                            .background(
+                                activeFilterCount > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.ultraThinMaterial),
+                                in: .circle
+                            )
+                        if activeFilterCount > 0 {
+                            Text("\(activeFilterCount)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 14, height: 14)
+                                .background(Color.white, in: .circle)
+                                .offset(x: 2, y: -2)
+                        }
+                    }
+                }
+                .padding(12)
             }
             .navigationTitle("Blocks Map")
             .navigationBarTitleDisplayMode(.inline)
@@ -386,6 +428,16 @@ struct FullScreenBlocksMapView: View {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
                 }
+            }
+            .sheet(isPresented: $showFilterSheet) {
+                BlocksMapFilterSheet(
+                    selectedPinNames: $selectedPinNames,
+                    selectedInfoFields: $selectedInfoFields,
+                    uniquePinNames: uniquePinNames,
+                    pinNameColors: pinNameColors
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
             .onAppear { fitAllBlocks() }
         }
