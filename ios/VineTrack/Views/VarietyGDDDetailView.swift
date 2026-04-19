@@ -118,6 +118,37 @@ struct VarietyGDDDetailView: View {
         return Int((remaining / perDay).rounded(.up))
     }
 
+    private enum IntersectionKind {
+        case reached
+        case projected
+    }
+
+    private var targetIntersection: (date: Date, kind: IntersectionKind)? {
+        guard let target = variety?.optimalGDD, target > 0 else { return nil }
+        let points = unionPoints
+        guard points.count >= 2 else { return nil }
+        for i in 1..<points.count {
+            let prev = points[i - 1]
+            let curr = points[i]
+            if prev.cumulative < target && curr.cumulative >= target {
+                let span = curr.cumulative - prev.cumulative
+                let frac = span > 0 ? (target - prev.cumulative) / span : 0
+                let interval = curr.date.timeIntervalSince(prev.date)
+                let date = prev.date.addingTimeInterval(interval * frac)
+                return (date, .reached)
+            }
+        }
+        if let last = points.last, last.cumulative >= target {
+            return (last.date, .reached)
+        }
+        if let days = daysToTarget, days > 0,
+           let last = points.last,
+           let projected = Calendar.current.date(byAdding: .day, value: days, to: last.date) {
+            return (projected, .projected)
+        }
+        return nil
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -210,6 +241,20 @@ struct VarietyGDDDetailView: View {
                     }
                 }
             }
+
+            if let hit = targetIntersection {
+                HStack(spacing: 6) {
+                    Image(systemName: hit.kind == .reached ? "flag.checkered" : "calendar.badge.clock")
+                        .font(.caption2)
+                        .foregroundStyle(hit.kind == .reached ? VineyardTheme.leafGreen : .secondary)
+                    Text(hit.kind == .reached ? "Target reached" : "Projected target")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(hit.date.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                    Spacer()
+                }
+            }
         }
         .padding(14)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
@@ -263,6 +308,31 @@ struct VarietyGDDDetailView: View {
                                 .font(.caption2.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
+                    if let hit = targetIntersection {
+                        let tint: Color = hit.kind == .reached ? VineyardTheme.leafGreen : .orange
+                        RuleMark(x: .value("Intersect", hit.date))
+                            .foregroundStyle(tint.opacity(0.6))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: hit.kind == .projected ? [3, 3] : []))
+                        PointMark(
+                            x: .value("Intersect", hit.date),
+                            y: .value("GDD", target)
+                        )
+                        .symbolSize(80)
+                        .foregroundStyle(tint)
+                        .annotation(position: .topLeading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(hit.kind == .reached ? "Reached" : "Projected")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Text(hit.date.formatted(.dateTime.day().month(.abbreviated)))
+                                    .font(.caption2.monospacedDigit().weight(.semibold))
+                                    .foregroundStyle(tint)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(.regularMaterial, in: .rect(cornerRadius: 6))
+                        }
+                    }
                 }
                 if let selectedDate,
                    let point = unionPoints.min(by: { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }) {
