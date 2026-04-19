@@ -201,6 +201,77 @@ struct VineyardDetailsView: View {
     }
 
     @State private var showGDDInfo: Bool = false
+    @State private var showDataHealth: Bool = false
+
+    private var dataHealthColor: Color {
+        let expected = max(degreeDayService.expectedDays, 1)
+        let reported = max(0, degreeDayService.daysCovered - degreeDayService.interpolatedDays)
+        let pct = Double(reported) / Double(expected)
+        return pct >= 0.98 ? .green : (pct >= 0.90 ? .orange : .red)
+    }
+
+    private var dataHealthButton: some View {
+        Button {
+            showDataHealth = true
+        } label: {
+            Image(systemName: "heart.text.square")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(degreeDayService.seasonGDD != nil ? dataHealthColor : Color.secondary)
+        }
+        .popover(isPresented: $showDataHealth, arrowEdge: .top) {
+            dataHealthPopover
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private var dataHealthPopover: some View {
+        let expected = max(degreeDayService.expectedDays, 1)
+        let reported = max(0, degreeDayService.daysCovered - degreeDayService.interpolatedDays)
+        let pct = Double(reported) / Double(expected)
+        let color = dataHealthColor
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "heart.text.square.fill")
+                    .foregroundStyle(color)
+                Text("Data Health")
+                    .font(.headline)
+            }
+            if degreeDayService.seasonGDD != nil {
+                HStack {
+                    Text("\(reported) / \(degreeDayService.expectedDays) days")
+                        .font(.caption.monospacedDigit())
+                    Spacer()
+                    Text("\(Int((pct * 100).rounded()))%")
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(color)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.secondary.opacity(0.15))
+                        Capsule().fill(color).frame(width: geo.size.width * CGFloat(min(max(pct, 0), 1)))
+                    }
+                }
+                .frame(height: 6)
+                if degreeDayService.interpolatedDays > 0 {
+                    Text("\(degreeDayService.interpolatedDays) day\(degreeDayService.interpolatedDays == 1 ? "" : "s") estimated from neighbouring entries")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("No data yet")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let error = degreeDayService.errorMessage {
+                Divider()
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(14)
+        .frame(width: 280, alignment: .leading)
+    }
 
     private var gddInfoButton: some View {
         Button {
@@ -292,6 +363,7 @@ struct VineyardDetailsView: View {
                 Text(store.settings.calculationMode == .bedd ? "Biologically Effective Degree Days" : "Growing Degree Days")
                     .font(.headline)
                 Spacer()
+                dataHealthButton
                 gddInfoButton
                 Button {
                     Task { await refreshDegreeDays() }
@@ -326,7 +398,6 @@ struct VineyardDetailsView: View {
                 }
 
                 if degreeDayService.seasonGDD != nil {
-                    dataHealthRow
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Season to date (\(degreeDayService.daysCovered) days, base 10°C\(store.settings.calculationMode == .bedd ? ", capped 19°C" : "")) • from \(store.settings.resetMode.displayName)")
                             .font(.caption)
@@ -346,17 +417,7 @@ struct VineyardDetailsView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                         }
-                        if let error = degreeDayService.errorMessage {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                                .padding(.top, 4)
-                        }
                     }
-                } else if let error = degreeDayService.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
                 } else if (store.settings.weatherStationId ?? "").isEmpty {
                     Text("Set a weather station in Vineyard Setup to track degree days.")
                         .font(.caption)
