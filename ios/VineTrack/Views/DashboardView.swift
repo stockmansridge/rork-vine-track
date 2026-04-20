@@ -16,6 +16,7 @@ struct DashboardView: View {
     @State private var showMaintenanceLog: Bool = false
     @State private var showWorkTaskCalculator: Bool = false
     @State private var showYieldDeterminationCalculator: Bool = false
+    @State private var showIrrigationRecommendation: Bool = false
     @Environment(\.accessControl) private var accessControl
 
     private var vineyard: Vineyard? { store.selectedVineyard }
@@ -126,6 +127,9 @@ struct DashboardView: View {
             }
             .navigationDestination(isPresented: $showYieldDeterminationCalculator) {
                 YieldDeterminationCalculatorView()
+            }
+            .navigationDestination(isPresented: $showIrrigationRecommendation) {
+                IrrigationRecommendationView()
             }
         }
     }
@@ -397,7 +401,14 @@ struct DashboardView: View {
                     showYieldDeterminationCalculator = true
                 }
 
-                Color.clear.frame(maxWidth: .infinity)
+                toolCard(
+                    title: "Irrigation Advisor",
+                    subtitle: "5-day runtime recommendation",
+                    icon: "drop.fill",
+                    color: .cyan
+                ) {
+                    showIrrigationRecommendation = true
+                }
             }
         }
     }
