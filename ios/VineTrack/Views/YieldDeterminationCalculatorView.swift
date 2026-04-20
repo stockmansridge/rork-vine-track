@@ -16,7 +16,7 @@ struct YieldDeterminationCalculatorView: View {
 
     // Spur inputs
     @State private var budsPerSpurText: String = "2"
-    @State private var spursPerVineText: String = "20"
+    @State private var spursPerVineText: String = "6"
 
     // Cane inputs
     @State private var budsPerCaneText: String = "10"
