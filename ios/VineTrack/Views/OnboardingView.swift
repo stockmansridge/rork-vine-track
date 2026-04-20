@@ -66,28 +66,54 @@ struct OnboardingView: View {
             ]
         ),
         OnboardingPage(
-            icon: "doc.text.fill",
-            iconColor: .purple,
-            title: "Reports & Exports",
-            subtitle: "PDF, XLS, and growth reports",
-            description: "Export pins, trips, and spray records to PDF. Generate growth stage reports from vineyard to vintage, and export pin data as spreadsheets.",
+            icon: "chart.bar.fill",
+            iconColor: .pink,
+            title: "Yield Determination",
+            subtitle: "Estimate crop yields per block",
+            description: "Pick a paddock and the calculator pulls in vines/ha, spurs/vine, buds/spur, and bunches/bud. Add bunch weight to get kg/ha, t/ha, and total block yield — with support for cane or spur pruning.",
             tips: [
-                "Export all vineyard pins to PDF or XLS",
-                "Generate trip summaries with spray details",
-                "Growth stage reports broken down by paddock and vintage",
-                "Share reports with your team or compliance records"
+                "Select a paddock to auto-fill site-specific data",
+                "Switch between Cane and Spur pruning modes",
+                "Tap any field to highlight and override the value",
+                "Final Yield (t/ha) and Block Yield shown in bold green"
+            ]
+        ),
+        OnboardingPage(
+            icon: "cloud.sun.rain.fill",
+            iconColor: .teal,
+            title: "Irrigation Recommendations",
+            subtitle: "5-day forecast-driven runtimes",
+            description: "Uses the next 5 days of ETo and rainfall, your block's application rate, crop coefficient, and efficiency to recommend irrigation hours. Each setting has a plain-English explanation below it.",
+            tips: [
+                "Site-specific fields are pre-filled from your block data",
+                "See daily breakdown of crop use, rainfall, and deficit",
+                "Tune replacement % for deficit irrigation strategies",
+                "Final recommendation shown in hours and minutes"
+            ]
+        ),
+        OnboardingPage(
+            icon: "map.circle.fill",
+            iconColor: .purple,
+            title: "Vineyard Details Map",
+            subtitle: "Filter pins and block info",
+            description: "Toggle pin categories on and off, and choose which block details to display — area, vine totals, irrigation length, L/hr and more. All filters carry through to the full-screen map.",
+            tips: [
+                "Tick-box filters for each pin type",
+                "Display filters for block area, vine totals, irrigation",
+                "Filters available on full-screen map view",
+                "Export pins and block data to PDF or XLS"
             ]
         ),
         OnboardingPage(
             icon: "person.2.fill",
             iconColor: .indigo,
-            title: "Team & Support",
-            subtitle: "Collaborate and get help",
-            description: "Pins and trips from all team members appear across the vineyard. Cloud sync keeps everyone up to date, and support is just a tap away.",
+            title: "Team, Roles & Categories",
+            subtitle: "Manage users, roles and operator types",
+            description: "Invite team members and assign both an access role and an operator category from Manage Vineyard. Pins and trips from the whole team appear across the vineyard, kept in sync via the cloud.",
             tips: [
+                "Assign user roles to control tool access",
+                "Link operator categories to each user",
                 "All team members' pins visible across the vineyard",
-                "Cloud sync keeps data current across devices",
-                "Mark pins as completed by any team member",
                 "Need help? Use the Support form in Settings"
             ]
         )
