@@ -185,15 +185,102 @@ struct IrrigationRecommendationView: View {
         }
     }
 
+    private var appRateIsSiteData: Bool {
+        (selectedPaddock?.mmPerHour ?? 0) > 0
+    }
+
     private var settingsSection: some View {
-        Section("Irrigation Settings") {
-            inputRow(label: "Application Rate (mm/hr)", text: $applicationRateText, field: .appRate)
-            inputRow(label: "Crop Coefficient (Kc)", text: $kcText, field: .kc)
-            inputRow(label: "Irrigation Efficiency (%)", text: $efficiencyText, field: .efficiency)
-            inputRow(label: "Rainfall Effectiveness (%)", text: $rainEffText, field: .rainEff)
-            inputRow(label: "Replacement (%)", text: $replacementText, field: .replacement)
-            inputRow(label: "Soil Buffer (mm)", text: $bufferText, field: .buffer)
+        Section {
+            settingRow(
+                label: "Application Rate (mm/hr)",
+                text: $applicationRateText,
+                field: .appRate,
+                help: "How many millimetres of water your irrigation system applies to this block in one hour of running.",
+                isSiteData: appRateIsSiteData,
+                siteDataNote: "Pre-filled from this paddock's system rate."
+            )
+            settingRow(
+                label: "Crop Coefficient (Kc)",
+                text: $kcText,
+                field: .kc,
+                help: "How thirsty the vines are compared to a reference grass. 0.65 is a typical mid-season value for wine grapes.",
+                isSiteData: false,
+                siteDataNote: nil
+            )
+            settingRow(
+                label: "Irrigation Efficiency (%)",
+                text: $efficiencyText,
+                field: .efficiency,
+                help: "How much of the water you pump actually reaches the vine roots. Drip systems are typically around 90%.",
+                isSiteData: false,
+                siteDataNote: nil
+            )
+            settingRow(
+                label: "Rainfall Effectiveness (%)",
+                text: $rainEffText,
+                field: .rainEff,
+                help: "How much of the forecast rainfall actually soaks in and is available to the vines. Typically around 80%.",
+                isSiteData: false,
+                siteDataNote: nil
+            )
+            settingRow(
+                label: "Replacement (%)",
+                text: $replacementText,
+                field: .replacement,
+                help: "How much of the water the vines use that you want to replace. 100% fully replaces it, lower values apply deficit irrigation.",
+                isSiteData: false,
+                siteDataNote: nil
+            )
+            settingRow(
+                label: "Soil Buffer (mm)",
+                text: $bufferText,
+                field: .buffer,
+                help: "Extra water already stored in the soil from earlier rain or irrigation. Subtracted from the deficit. Leave at 0 if unsure.",
+                isSiteData: false,
+                siteDataNote: nil
+            )
+        } header: {
+            Text("Irrigation Settings")
+        } footer: {
+            Text("Fields marked \u{2728} are pre-filled with site-specific data from the selected paddock. Other values use sensible defaults you can adjust.")
         }
+    }
+
+    private func settingRow(
+        label: String,
+        text: Binding<String>,
+        field: Field,
+        help: String,
+        isSiteData: Bool,
+        siteDataNote: String?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                HStack(spacing: 4) {
+                    Text(label)
+                    if isSiteData {
+                        Image(systemName: "sparkles")
+                            .font(.caption)
+                            .foregroundStyle(VineyardTheme.leafGreen)
+                    }
+                }
+                Spacer()
+                TextField("0", text: text)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .focused($focusedField, equals: field)
+                    .frame(maxWidth: 120)
+            }
+            Text(help)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if isSiteData, let note = siteDataNote {
+                Text(note)
+                    .font(.caption2)
+                    .foregroundStyle(VineyardTheme.leafGreen)
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     private func resultSection(_ result: IrrigationRecommendationResult) -> some View {
