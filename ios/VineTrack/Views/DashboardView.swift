@@ -362,6 +362,26 @@ struct DashboardView: View {
                 }
 
                 toolCard(
+                    title: "Irrigation Advisor",
+                    subtitle: "5-day runtime recommendation",
+                    icon: "drop.fill",
+                    color: .cyan
+                ) {
+                    showIrrigationRecommendation = true
+                }
+            }
+
+            HStack(spacing: 12) {
+                toolCard(
+                    title: "Yield Determination",
+                    subtitle: "Calculate yield per ha",
+                    icon: "scalemass.fill",
+                    color: .purple
+                ) {
+                    showYieldDeterminationCalculator = true
+                }
+
+                toolCard(
                     title: "Growth Stage Report",
                     subtitle: growthReportSubtitle,
                     icon: "chart.line.uptrend.xyaxis",
@@ -388,26 +408,6 @@ struct DashboardView: View {
                     color: .indigo
                 ) {
                     showWorkTaskCalculator = true
-                }
-            }
-
-            HStack(spacing: 12) {
-                toolCard(
-                    title: "Yield Determination",
-                    subtitle: "Calculate yield per ha",
-                    icon: "scalemass.fill",
-                    color: .purple
-                ) {
-                    showYieldDeterminationCalculator = true
-                }
-
-                toolCard(
-                    title: "Irrigation Advisor",
-                    subtitle: "5-day runtime recommendation",
-                    icon: "drop.fill",
-                    color: .cyan
-                ) {
-                    showIrrigationRecommendation = true
                 }
             }
         }
