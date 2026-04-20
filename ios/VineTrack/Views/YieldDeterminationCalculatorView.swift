@@ -155,27 +155,25 @@ struct YieldDeterminationCalculatorView: View {
                         .monospacedDigit()
                 }
 
-                HStack {
-                    Text("Yield")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(String(format: "%.1f kg/ha", yieldKgPerHa))
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(VineyardTheme.leafGreen)
-                            .monospacedDigit()
-                        Text(String(format: "%.1f t/ha", yieldTonnesPerHa))
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
+                LabeledContent("Yield / Ha") {
+                    Text(String(format: "%.1f kg/ha", yieldKgPerHa))
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(VineyardTheme.leafGreen)
+                        .monospacedDigit()
                 }
-                .padding(.vertical, 4)
+
+                LabeledContent("Yield / Ha") {
+                    Text(String(format: "%.1f t/ha", yieldTonnesPerHa))
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(VineyardTheme.leafGreen)
+                        .monospacedDigit()
+                }
 
                 if let total = totalYieldTonnes {
                     LabeledContent("Block Total") {
                         Text(String(format: "%.1f t", total))
-                            .foregroundStyle(.secondary)
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(VineyardTheme.leafGreen)
                             .monospacedDigit()
                     }
                 }
