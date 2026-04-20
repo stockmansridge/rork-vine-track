@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardView: View {
     @Environment(DataStore.self) private var store
     @Environment(AuthService.self) private var authService
+    @Environment(\.accessControl) private var accessControl
 
     @State private var showPinDrop: Bool = false
     @State private var pinDropMode: PinMode = .repairs
@@ -17,9 +18,25 @@ struct DashboardView: View {
     @State private var showWorkTasks: Bool = false
     @State private var showYieldDeterminationCalculator: Bool = false
     @State private var showIrrigationRecommendation: Bool = false
-    @Environment(\.accessControl) private var accessControl
+    @State private var showAuditLog: Bool = false
+    @State private var showManageUsers: Bool = false
+    @State private var showVineyardSetup: Bool = false
 
     private var vineyard: Vineyard? { store.selectedVineyard }
+
+    // MARK: - Role helpers
+
+    private var isManager: Bool { accessControl?.isManager ?? false }
+    private var canDelete: Bool { accessControl?.canDelete ?? false }
+    private var canViewFinancials: Bool { accessControl?.canViewFinancials ?? false }
+    private var isOperator: Bool { accessControl?.isOperator ?? true }
+
+    private var roleTitle: String {
+        guard let role = accessControl?.currentUserRole else { return "" }
+        return role.displayName
+    }
+
+    // MARK: - Derived data
 
     private var totalAreaHa: Double {
         store.paddocks.reduce(0) { $0 + $1.areaHectares }
@@ -41,16 +58,22 @@ struct DashboardView: View {
         store.sprayRecords.filter { !$0.isTemplate }.sorted { $0.date > $1.date }.first
     }
 
+    private var activeTrip: Trip? { store.activeTrip }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    vineyardSummaryCard
+                    todaySection
                     quickActionsSection
-                    vineyardToolsSection
+                    operationalToolsSection
+                    if isManager {
+                        managementToolsSection
+                    }
                     recentActivitySection
                 }
                 .padding(.horizontal)
+                .padding(.top, 8)
                 .padding(.bottom, 24)
             }
             .background(Color(.systemGroupedBackground))
@@ -82,6 +105,24 @@ struct DashboardView: View {
             }
             .navigationDestination(isPresented: $showVineyardDetails) {
                 VineyardDetailsView()
+            }
+            .navigationDestination(isPresented: $showMaintenanceLog) {
+                MaintenanceLogListView()
+            }
+            .navigationDestination(isPresented: $showWorkTasks) {
+                WorkTasksHubView()
+            }
+            .navigationDestination(isPresented: $showYieldDeterminationCalculator) {
+                YieldDeterminationCalculatorView()
+            }
+            .navigationDestination(isPresented: $showIrrigationRecommendation) {
+                IrrigationRecommendationView()
+            }
+            .navigationDestination(isPresented: $showAuditLog) {
+                AuditLogView()
+            }
+            .navigationDestination(isPresented: $showVineyardSetup) {
+                VineyardSetupSettingsView()
             }
             .sheet(isPresented: $showTripTypeChoice) {
                 TripTypeChoiceSheet { tripType in
@@ -119,143 +160,142 @@ struct DashboardView: View {
             }) {
                 SprayCalculatorView()
             }
-            .navigationDestination(isPresented: $showMaintenanceLog) {
-                MaintenanceLogListView()
-            }
-            .navigationDestination(isPresented: $showWorkTasks) {
-                WorkTasksHubView()
-            }
-            .navigationDestination(isPresented: $showYieldDeterminationCalculator) {
-                YieldDeterminationCalculatorView()
-            }
-            .navigationDestination(isPresented: $showIrrigationRecommendation) {
-                IrrigationRecommendationView()
+            .sheet(isPresented: $showManageUsers) {
+                if let vineyard {
+                    VineyardDetailSheet(vineyard: vineyard)
+                }
             }
         }
     }
 
-    // MARK: - Vineyard Summary
+    // MARK: - Today
 
-    private var vineyardSummaryCard: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Vineyard Overview")
-                        .font(.title3.weight(.bold))
-                    if let name = vineyard?.name, !name.isEmpty {
-                        Text(name)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+    private var todaySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Today")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                if !roleTitle.isEmpty {
+                    Text(roleTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color(.tertiarySystemFill), in: Capsule())
+                }
+            }
+
+            VStack(spacing: 10) {
+                if let trip = activeTrip {
+                    activeTripCard(trip: trip)
+                }
+
+                if !unresolvedPins.isEmpty {
+                    attentionCard(
+                        icon: "mappin.circle.fill",
+                        color: .red,
+                        title: "\(unresolvedPins.count) pin\(unresolvedPins.count == 1 ? "" : "s") need attention",
+                        subtitle: "Repairs pending across your blocks"
+                    ) {
+                        store.selectedTab = 1
                     }
                 }
-                Spacer()
-                if store.activeTrip != nil {
-                    activeTripBadge
+
+                if activeTrip == nil && unresolvedPins.isEmpty {
+                    allClearCard
                 }
             }
-            .padding(.bottom, 16)
+        }
+    }
 
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 16) {
-                summaryMetric(
-                    value: "\(store.paddocks.count)",
-                    label: "Blocks",
-                    icon: "square.grid.2x2",
-                    color: VineyardTheme.olive
-                )
-                summaryMetric(
-                    value: String(format: "%.1f", totalAreaHa),
-                    label: "Hectares",
-                    icon: "map",
-                    color: VineyardTheme.leafGreen
-                )
-                summaryMetric(
-                    value: formatVineCount(totalVines),
-                    label: "Vines",
-                    icon: "leaf",
-                    color: VineyardTheme.earthBrown
-                )
+    private func activeTripCard(trip: Trip) -> some View {
+        Button {
+            store.selectedTab = 2
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "steeringwheel")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.green)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Circle().fill(.green).frame(width: 7, height: 7)
+                        Text("Trip Active")
+                            .font(.subheadline.weight(.bold))
+                    }
+                    Text(trip.paddockName.isEmpty ? "In progress" : trip.paddockName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
             }
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
 
-            Divider()
-                .padding(.vertical, 14)
-
-            HStack(spacing: 20) {
-                miniStat(
-                    icon: "mappin",
-                    value: "\(unresolvedPins.count)",
-                    label: "Open Pins",
-                    color: .red
-                )
-                miniStat(
-                    icon: "road.lanes",
-                    value: "\(store.trips.filter { !$0.isActive }.count)",
-                    label: "Trips",
-                    color: .blue
-                )
-                miniStat(
-                    icon: "sprinkler.and.droplets",
-                    value: "\(store.sprayRecords.filter { !$0.isTemplate }.count)",
-                    label: "Sprays",
-                    color: .purple
-                )
+    private func attentionCard(icon: String, color: Color, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: icon)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(color)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
             }
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
         }
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
-        .onTapGesture {
-            showVineyardDetails = true
-        }
-        .overlay(alignment: .bottomTrailing) {
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.tertiary)
-                .padding(16)
-        }
+        .buttonStyle(.plain)
     }
 
-    private var activeTripBadge: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(.green)
-                .frame(width: 7, height: 7)
-            Text("Trip Active")
-                .font(.caption.weight(.semibold))
+    private var allClearCard: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(VineyardTheme.leafGreen.opacity(0.15))
+                    .frame(width: 44, height: 44)
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(VineyardTheme.leafGreen)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("All clear")
+                    .font(.subheadline.weight(.semibold))
+                Text("No pins need attention right now")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(.green.opacity(0.12), in: Capsule())
-    }
-
-    private func summaryMetric(value: String, label: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(color)
-            Text(value)
-                .font(.title2.weight(.bold).monospacedDigit())
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func miniStat(icon: String, value: String, label: String, color: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundStyle(color)
-            Text(value)
-                .font(.subheadline.weight(.semibold).monospacedDigit())
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
     }
 
     // MARK: - Quick Actions
@@ -269,6 +309,18 @@ struct DashboardView: View {
                 GridItem(.flexible(), spacing: 12),
                 GridItem(.flexible(), spacing: 12)
             ], spacing: 12) {
+                quickActionButton(
+                    title: activeTrip != nil ? "Live Trip" : "Start Trip",
+                    icon: "steeringwheel",
+                    gradient: [Color.blue, Color.blue.opacity(0.8)]
+                ) {
+                    if activeTrip != nil {
+                        store.selectedTab = 2
+                    } else {
+                        showTripTypeChoice = true
+                    }
+                }
+
                 quickActionButton(
                     title: "Repairs",
                     icon: "wrench.fill",
@@ -290,24 +342,15 @@ struct DashboardView: View {
                     showPinDrop = true
                 }
 
-                quickActionButton(
-                    title: "Start Trip",
-                    icon: "steeringwheel",
-                    gradient: [Color.blue, Color.blue.opacity(0.8)]
-                ) {
-                    if store.activeTrip != nil {
-                        store.selectedTab = 2
-                    } else {
-                        showTripTypeChoice = true
+                // Spray Program — Supervisor+ (Operators don't plan sprays)
+                if !isOperator {
+                    quickActionButton(
+                        title: "Spray Program",
+                        icon: "sprinkler.and.droplets.fill",
+                        gradient: [Color.purple, Color.purple.opacity(0.8)]
+                    ) {
+                        store.selectedTab = 3
                     }
-                }
-
-                quickActionButton(
-                    title: "Spray Program",
-                    icon: "sprinkler.and.droplets.fill",
-                    gradient: [Color.purple, Color.purple.opacity(0.8)]
-                ) {
-                    store.selectedTab = 3
                 }
             }
         }
@@ -344,63 +387,18 @@ struct DashboardView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Vineyard Tools
+    // MARK: - Operational Tools
 
-    private var vineyardToolsSection: some View {
+    private var operationalToolsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Vineyard Tools")
+            Text(isOperator ? "My Work" : "Operational Tools")
                 .font(.headline)
 
-            HStack(spacing: 12) {
-                toolCard(
-                    title: "Yield Estimation",
-                    subtitle: yieldToolSubtitle,
-                    icon: "chart.bar.fill",
-                    color: .orange
-                ) {
-                    showYieldHub = true
-                }
-
-                toolCard(
-                    title: "Irrigation Advisor",
-                    subtitle: "5-day runtime recommendation",
-                    icon: "drop.fill",
-                    color: .cyan
-                ) {
-                    showIrrigationRecommendation = true
-                }
-            }
+            // Operators: keep it focused — Work Tasks, Maintenance Log, Growth Stage Report
+            // Supervisors: add Yield Estimation + Irrigation + Yield Determination (operational reports)
+            // Managers: also get these; admin/setup moved to Management Tools below
 
             HStack(spacing: 12) {
-                toolCard(
-                    title: "Yield Determination",
-                    subtitle: "Calculate yield per ha",
-                    icon: "scalemass.fill",
-                    color: .purple
-                ) {
-                    showYieldDeterminationCalculator = true
-                }
-
-                toolCard(
-                    title: "Growth Stage Report",
-                    subtitle: growthReportSubtitle,
-                    icon: "chart.line.uptrend.xyaxis",
-                    color: VineyardTheme.leafGreen
-                ) {
-                    showGrowthStageReport = true
-                }
-            }
-
-            HStack(spacing: 12) {
-                toolCard(
-                    title: "Maintenance Log",
-                    subtitle: maintenanceLogSubtitle,
-                    icon: "wrench.and.screwdriver.fill",
-                    color: VineyardTheme.earthBrown
-                ) {
-                    showMaintenanceLog = true
-                }
-
                 toolCard(
                     title: "Work Tasks",
                     subtitle: workTasksSubtitle,
@@ -409,21 +407,204 @@ struct DashboardView: View {
                 ) {
                     showWorkTasks = true
                 }
+
+                toolCard(
+                    title: "Maintenance Log",
+                    subtitle: maintenanceLogSubtitle,
+                    icon: "wrench.and.screwdriver.fill",
+                    color: VineyardTheme.earthBrown
+                ) {
+                    showMaintenanceLog = true
+                }
+            }
+
+            if !isOperator {
+                HStack(spacing: 12) {
+                    toolCard(
+                        title: "Growth Stage Report",
+                        subtitle: growthReportSubtitle,
+                        icon: "chart.line.uptrend.xyaxis",
+                        color: VineyardTheme.leafGreen
+                    ) {
+                        showGrowthStageReport = true
+                    }
+
+                    toolCard(
+                        title: "Yield Estimation",
+                        subtitle: yieldToolSubtitle,
+                        icon: "chart.bar.fill",
+                        color: .orange
+                    ) {
+                        showYieldHub = true
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    toolCard(
+                        title: "Irrigation Advisor",
+                        subtitle: "5-day runtime recommendation",
+                        icon: "drop.fill",
+                        color: .cyan
+                    ) {
+                        showIrrigationRecommendation = true
+                    }
+
+                    toolCard(
+                        title: "Yield Determination",
+                        subtitle: "Calculate yield per ha",
+                        icon: "scalemass.fill",
+                        color: .purple
+                    ) {
+                        showYieldDeterminationCalculator = true
+                    }
+                }
+            } else {
+                // Operators get a single glanceable shortcut to growth report, no yield/irrigation
+                HStack(spacing: 12) {
+                    toolCard(
+                        title: "Growth Stage Report",
+                        subtitle: growthReportSubtitle,
+                        icon: "chart.line.uptrend.xyaxis",
+                        color: VineyardTheme.leafGreen
+                    ) {
+                        showGrowthStageReport = true
+                    }
+                    // Spacer card to keep two-column rhythm
+                    Color.clear.frame(height: 170)
+                }
             }
         }
     }
 
-    private var yieldToolSubtitle: String {
-        let sessions = store.yieldSessions
-        guard !sessions.isEmpty else { return "No estimates yet" }
-        let blocksWithData = Set(sessions.flatMap(\.selectedPaddockIds)).count
-        return "\(blocksWithData) block\(blocksWithData == 1 ? "" : "s") estimated"
+    // MARK: - Management Tools (Manager/Owner only)
+
+    private var managementToolsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Management")
+                .font(.headline)
+
+            vineyardOverviewCard
+
+            HStack(spacing: 12) {
+                toolCard(
+                    title: "Manage Users",
+                    subtitle: usersSubtitle,
+                    icon: "person.2.fill",
+                    color: .blue
+                ) {
+                    showManageUsers = true
+                }
+
+                toolCard(
+                    title: "Vineyard Setup",
+                    subtitle: "Blocks, tracking & defaults",
+                    icon: "gearshape.2.fill",
+                    color: .gray
+                ) {
+                    showVineyardSetup = true
+                }
+            }
+
+            HStack(spacing: 12) {
+                toolCard(
+                    title: "Audit Log",
+                    subtitle: "Sensitive actions history",
+                    icon: "doc.text.magnifyingglass",
+                    color: .pink
+                ) {
+                    showAuditLog = true
+                }
+
+                toolCard(
+                    title: "Full Overview",
+                    subtitle: financialOverviewSubtitle,
+                    icon: "chart.pie.fill",
+                    color: VineyardTheme.olive
+                ) {
+                    showVineyardDetails = true
+                }
+            }
+        }
     }
 
-    private var growthReportSubtitle: String {
-        let growthPins = store.pins.filter { $0.growthStageCode != nil }
-        guard !growthPins.isEmpty else { return "No data recorded" }
-        return "\(growthPins.count) observation\(growthPins.count == 1 ? "" : "s")"
+    private var vineyardOverviewCard: some View {
+        Button {
+            showVineyardDetails = true
+        } label: {
+            VStack(spacing: 0) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Vineyard Overview")
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(.primary)
+                        if let name = vineyard?.name, !name.isEmpty {
+                            Text(name)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.bottom, 16)
+
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 16) {
+                    summaryMetric(
+                        value: "\(store.paddocks.count)",
+                        label: "Blocks",
+                        icon: "square.grid.2x2",
+                        color: VineyardTheme.olive
+                    )
+                    summaryMetric(
+                        value: String(format: "%.1f", totalAreaHa),
+                        label: "Hectares",
+                        icon: "map",
+                        color: VineyardTheme.leafGreen
+                    )
+                    summaryMetric(
+                        value: formatVineCount(totalVines),
+                        label: "Vines",
+                        icon: "leaf",
+                        color: VineyardTheme.earthBrown
+                    )
+                }
+            }
+            .padding(16)
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var usersSubtitle: String {
+        let count = vineyard?.users.count ?? 0
+        return "\(count) user\(count == 1 ? "" : "s")"
+    }
+
+    private var financialOverviewSubtitle: String {
+        canViewFinancials ? "Costs & totals" : "Blocks & summaries"
+    }
+
+    // MARK: - Shared components
+
+    private func summaryMetric(value: String, label: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(color)
+            Text(value)
+                .font(.title2.weight(.bold).monospacedDigit())
+                .foregroundStyle(.primary)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func toolCard(
@@ -468,11 +649,25 @@ struct DashboardView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Subtitles
+
+    private var yieldToolSubtitle: String {
+        let sessions = store.yieldSessions
+        guard !sessions.isEmpty else { return "No estimates yet" }
+        let blocksWithData = Set(sessions.flatMap(\.selectedPaddockIds)).count
+        return "\(blocksWithData) block\(blocksWithData == 1 ? "" : "s") estimated"
+    }
+
+    private var growthReportSubtitle: String {
+        let growthPins = store.pins.filter { $0.growthStageCode != nil }
+        guard !growthPins.isEmpty else { return "No data recorded" }
+        return "\(growthPins.count) observation\(growthPins.count == 1 ? "" : "s")"
+    }
 
     private var workTasksSubtitle: String {
         let tasks = store.workTasks
         guard !tasks.isEmpty else { return "Log & calculate" }
-        if accessControl?.canViewFinancials ?? false {
+        if canViewFinancials {
             let total = tasks.reduce(0) { $0 + $1.totalCost }
             let currencyCode = Locale.current.currency?.identifier ?? "USD"
             return "\(tasks.count) task\(tasks.count == 1 ? "" : "s") \u{2022} \(total.formatted(.currency(code: currencyCode)))"
@@ -483,7 +678,7 @@ struct DashboardView: View {
     private var maintenanceLogSubtitle: String {
         let logs = store.maintenanceLogs
         guard !logs.isEmpty else { return "No records yet" }
-        if accessControl?.canViewFinancials ?? false {
+        if canViewFinancials {
             let total = logs.reduce(0) { $0 + $1.totalCost }
             let currencyCode = Locale.current.currency?.identifier ?? "USD"
             return "\(logs.count) record\(logs.count == 1 ? "" : "s") \u{2022} \(total.formatted(.currency(code: currencyCode)))"
@@ -498,7 +693,7 @@ struct DashboardView: View {
             Text("Recent")
                 .font(.headline)
 
-            VStack(spacing: 1) {
+            VStack(spacing: 10) {
                 if let trip = lastCompletedTrip {
                     recentRow(
                         icon: "steeringwheel",
@@ -510,7 +705,7 @@ struct DashboardView: View {
                     )
                 }
 
-                if let spray = lastSprayRecord {
+                if let spray = lastSprayRecord, !isOperator {
                     recentRow(
                         icon: "sprinkler.and.droplets.fill",
                         iconColor: .purple,
@@ -521,11 +716,7 @@ struct DashboardView: View {
                     )
                 }
 
-                if !unresolvedPins.isEmpty {
-                    unresolvedPinsRow
-                }
-
-                if lastCompletedTrip == nil && lastSprayRecord == nil && unresolvedPins.isEmpty {
+                if lastCompletedTrip == nil && (lastSprayRecord == nil || isOperator) {
                     HStack {
                         Spacer()
                         VStack(spacing: 8) {
@@ -587,38 +778,6 @@ struct DashboardView: View {
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
-    }
-
-    private var unresolvedPinsRow: some View {
-        Button {
-            store.selectedTab = 1
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.body)
-                    .foregroundStyle(.red)
-                    .frame(width: 36, height: 36)
-                    .background(.red.opacity(0.1), in: .rect(cornerRadius: 10))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Unresolved Pins")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text("\(unresolvedPins.count) repair\(unresolvedPins.count == 1 ? "" : "s") pending")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(12)
-            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Helpers
