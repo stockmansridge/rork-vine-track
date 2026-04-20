@@ -199,7 +199,7 @@ struct TractorRow: View {
                 Text(tractor.displayName)
                     .font(.body.weight(.medium))
                     .foregroundStyle(.primary)
-                if !tractor.brand.isEmpty || !tractor.model.isEmpty {
+                if !tractor.brand.isEmpty || !tractor.model.isEmpty || tractor.modelYear != nil {
                     HStack(spacing: 4) {
                         if !tractor.brand.isEmpty {
                             Text(tractor.brand)
@@ -213,6 +213,14 @@ struct TractorRow: View {
                         }
                         if !tractor.model.isEmpty {
                             Text(tractor.model)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let year = tractor.modelYear {
+                            Text("·")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                            Text(String(year))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -346,6 +354,7 @@ struct TractorFormSheet: View {
 
     @State private var brand: String = ""
     @State private var model: String = ""
+    @State private var modelYearText: String = ""
     @State private var fuelUsage: String = ""
     @State private var isLookingUp: Bool = false
     @State private var lookupError: String?
@@ -355,8 +364,15 @@ struct TractorFormSheet: View {
         if let t = tractor {
             _brand = State(initialValue: t.brand)
             _model = State(initialValue: t.model)
+            _modelYearText = State(initialValue: t.modelYear.map { String($0) } ?? "")
             _fuelUsage = State(initialValue: String(format: "%.1f", t.fuelUsageLPerHour))
         }
+    }
+
+    private var parsedYear: Int? {
+        let trimmed = modelYearText.trimmingCharacters(in: .whitespaces)
+        guard let y = Int(trimmed), y >= 1900, y <= 2100 else { return nil }
+        return y
     }
 
     private var isValid: Bool {
@@ -374,10 +390,12 @@ struct TractorFormSheet: View {
                     TextField("e.g. John Deere", text: $brand)
                         .textContentType(.organizationName)
                     TextField("e.g. 5075E", text: $model)
+                    TextField("e.g. 2018", text: $modelYearText)
+                        .keyboardType(.numberPad)
                 } header: {
                     Text("Tractor")
                 } footer: {
-                    Text("Enter the brand and model of your tractor. This is used to identify the tractor and look up fuel usage.")
+                    Text("Enter the brand, model, and model year of your tractor. The model year helps narrow down the specific engine/spec variant when looking up fuel usage.")
                 }
 
                 Section {
@@ -436,7 +454,7 @@ struct TractorFormSheet: View {
         isLookingUp = true
         lookupError = nil
         Task {
-            let result = await TractorFuelLookupService.shared.lookupFuelUsage(brand: brand.trimmingCharacters(in: .whitespaces), model: model.trimmingCharacters(in: .whitespaces))
+            let result = await TractorFuelLookupService.shared.lookupFuelUsage(brand: brand.trimmingCharacters(in: .whitespaces), model: model.trimmingCharacters(in: .whitespaces), year: parsedYear)
             isLookingUp = false
             if let value = result {
                 fuelUsage = String(format: "%.1f", value)
@@ -452,11 +470,12 @@ struct TractorFormSheet: View {
         if var existing = tractor {
             existing.brand = brand
             existing.model = model
+            existing.modelYear = parsedYear
             existing.name = displayName
             existing.fuelUsageLPerHour = usage
             store.updateTractor(existing)
         } else {
-            let newTractor = Tractor(name: displayName, brand: brand, model: model, fuelUsageLPerHour: usage)
+            let newTractor = Tractor(name: displayName, brand: brand, model: model, modelYear: parsedYear, fuelUsageLPerHour: usage)
             store.addTractor(newTractor)
         }
     }

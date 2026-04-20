@@ -37,6 +37,7 @@ nonisolated struct Tractor: Codable, Identifiable, Sendable, Hashable {
     var name: String
     var brand: String
     var model: String
+    var modelYear: Int?
     var fuelUsageLPerHour: Double
 
     var displayName: String {
@@ -50,6 +51,7 @@ nonisolated struct Tractor: Codable, Identifiable, Sendable, Hashable {
         name: String = "",
         brand: String = "",
         model: String = "",
+        modelYear: Int? = nil,
         fuelUsageLPerHour: Double = 0
     ) {
         self.id = id
@@ -57,11 +59,12 @@ nonisolated struct Tractor: Codable, Identifiable, Sendable, Hashable {
         self.name = name
         self.brand = brand
         self.model = model
+        self.modelYear = modelYear
         self.fuelUsageLPerHour = fuelUsageLPerHour
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
-        case id, vineyardId, name, brand, model, fuelUsageLPerHour
+        case id, vineyardId, name, brand, model, modelYear, fuelUsageLPerHour
     }
 
     nonisolated init(from decoder: Decoder) throws {
@@ -71,6 +74,7 @@ nonisolated struct Tractor: Codable, Identifiable, Sendable, Hashable {
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
         brand = try container.decodeIfPresent(String.self, forKey: .brand) ?? ""
         model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
+        modelYear = try container.decodeIfPresent(Int.self, forKey: .modelYear)
         fuelUsageLPerHour = try container.decodeIfPresent(Double.self, forKey: .fuelUsageLPerHour) ?? 0
     }
 }
