@@ -51,6 +51,10 @@ class DataStore {
     let pinRepository: PinRepository = PinRepository()
     let tripRepository: TripRepository = TripRepository()
 
+    // MARK: - Repositories (Phase 3)
+    let sprayRepository: SprayRepository = SprayRepository()
+    let settingsRepository: SettingsRepository = SettingsRepository()
+
     // MARK: - Permission Guards
 
     private func assertCanDelete(_ label: String) -> Bool {
@@ -93,13 +97,13 @@ class DataStore {
     var tripsKey: String { TripRepository.storageKey }
     let repairButtonsKey = "vinetrack_repair_buttons"
     let growthButtonsKey = "vinetrack_growth_buttons"
-    let settingsKey = "vinetrack_settings_v2"
+    var settingsKey: String { SettingsRepository.storageKey }
     let customPatternsKey = "vinetrack_custom_patterns"
-    let sprayRecordsKey = "vinetrack_spray_records"
-    let savedChemicalsKey = "vinetrack_saved_chemicals"
-    let savedSprayPresetsKey = "vinetrack_saved_spray_presets"
-    let savedEquipmentOptionsKey = "vinetrack_saved_equipment_options"
-    let sprayEquipmentKey = "vinetrack_spray_equipment"
+    var sprayRecordsKey: String { SprayRepository.recordsKey }
+    var savedChemicalsKey: String { SprayRepository.savedChemicalsKey }
+    var savedSprayPresetsKey: String { SprayRepository.savedPresetsKey }
+    var savedEquipmentOptionsKey: String { SprayRepository.savedEquipmentOptionsKey }
+    var sprayEquipmentKey: String { SprayRepository.equipmentKey }
     let tractorsKey = "vinetrack_tractors"
     let fuelPurchasesKey = "vinetrack_fuel_purchases"
     let operatorCategoriesKey = "vinetrack_operator_categories"
@@ -146,7 +150,6 @@ class DataStore {
         let allPaddocks: [Paddock] = loadData(key: paddocksKey) ?? []
         let allRepairButtons: [ButtonConfig] = loadData(key: repairButtonsKey) ?? []
         let allGrowthButtons: [ButtonConfig] = loadData(key: growthButtonsKey) ?? []
-        let allSettings: [AppSettings] = loadData(key: settingsKey) ?? []
 
         guard let vid = selectedVineyardId else {
             pins = []
@@ -173,25 +176,16 @@ class DataStore {
             saveAllGrowthButtons()
         }
 
-        settings = allSettings.first { $0.vineyardId == vid } ?? AppSettings(vineyardId: vid)
+        settings = settingsRepository.load(for: vid)
 
         let allCustomPatterns: [SavedCustomPattern] = loadData(key: customPatternsKey) ?? []
         savedCustomPatterns = allCustomPatterns.filter { $0.vineyardId == vid }
 
-        let allSprayRecords: [SprayRecord] = loadData(key: sprayRecordsKey) ?? []
-        sprayRecords = allSprayRecords.filter { $0.vineyardId == vid }
-
-        let allSavedChemicals: [SavedChemical] = loadData(key: savedChemicalsKey) ?? []
-        savedChemicals = allSavedChemicals.filter { $0.vineyardId == vid }
-
-        let allSavedPresets: [SavedSprayPreset] = loadData(key: savedSprayPresetsKey) ?? []
-        savedSprayPresets = allSavedPresets.filter { $0.vineyardId == vid }
-
-        let allEquipmentOptions: [SavedEquipmentOption] = loadData(key: savedEquipmentOptionsKey) ?? []
-        savedEquipmentOptions = allEquipmentOptions.filter { $0.vineyardId == vid }
-
-        let allSprayEquipment: [SprayEquipmentItem] = loadData(key: sprayEquipmentKey) ?? []
-        sprayEquipment = allSprayEquipment.filter { $0.vineyardId == vid }
+        sprayRecords = sprayRepository.loadRecords(for: vid)
+        savedChemicals = sprayRepository.loadChemicals(for: vid)
+        savedSprayPresets = sprayRepository.loadPresets(for: vid)
+        savedEquipmentOptions = sprayRepository.loadEquipmentOptions(for: vid)
+        sprayEquipment = sprayRepository.loadEquipment(for: vid)
 
         let allTractors: [Tractor] = loadData(key: tractorsKey) ?? []
         tractors = allTractors.filter { $0.vineyardId == vid }
@@ -250,13 +244,13 @@ class DataStore {
     var allTrips: [Trip] { tripRepository.loadAll() }
     var allRepairButtons: [ButtonConfig] { loadData(key: repairButtonsKey) ?? [] }
     var allGrowthButtons: [ButtonConfig] { loadData(key: growthButtonsKey) ?? [] }
-    var allSettings: [AppSettings] { loadData(key: settingsKey) ?? [] }
+    var allSettings: [AppSettings] { settingsRepository.loadAll() }
     var allCustomPatterns: [SavedCustomPattern] { loadData(key: customPatternsKey) ?? [] }
-    var allSprayRecords: [SprayRecord] { loadData(key: sprayRecordsKey) ?? [] }
-    var allSavedChemicals: [SavedChemical] { loadData(key: savedChemicalsKey) ?? [] }
-    var allSavedSprayPresets: [SavedSprayPreset] { loadData(key: savedSprayPresetsKey) ?? [] }
-    var allSavedEquipmentOptions: [SavedEquipmentOption] { loadData(key: savedEquipmentOptionsKey) ?? [] }
-    var allSprayEquipment: [SprayEquipmentItem] { loadData(key: sprayEquipmentKey) ?? [] }
+    var allSprayRecords: [SprayRecord] { sprayRepository.loadAllRecords() }
+    var allSavedChemicals: [SavedChemical] { sprayRepository.loadAllChemicals() }
+    var allSavedSprayPresets: [SavedSprayPreset] { sprayRepository.loadAllPresets() }
+    var allSavedEquipmentOptions: [SavedEquipmentOption] { sprayRepository.loadAllEquipmentOptions() }
+    var allSprayEquipment: [SprayEquipmentItem] { sprayRepository.loadAllEquipment() }
     var allTractors: [Tractor] { loadData(key: tractorsKey) ?? [] }
     var allFuelPurchases: [FuelPurchase] { loadData(key: fuelPurchasesKey) ?? [] }
     var allOperatorCategories: [OperatorCategory] { loadData(key: operatorCategoriesKey) ?? [] }
@@ -330,9 +324,7 @@ class DataStore {
         allGrowthButtons.removeAll { $0.vineyardId == vid }
         save(allGrowthButtons, key: growthButtonsKey)
 
-        var allSettings: [AppSettings] = loadData(key: settingsKey) ?? []
-        allSettings.removeAll { $0.vineyardId == vid }
-        save(allSettings, key: settingsKey)
+        settingsRepository.removeSettings(for: vid)
 
         if selectedVineyardId == vid {
             selectedVineyardId = vineyards.first?.id
@@ -1268,13 +1260,7 @@ class DataStore {
     func updateSettings(_ newSettings: AppSettings) {
         guard assertCanChangeSettings("AppSettings") else { return }
         settings = newSettings
-        var allSettings: [AppSettings] = loadData(key: settingsKey) ?? []
-        if let index = allSettings.firstIndex(where: { $0.vineyardId == newSettings.vineyardId }) {
-            allSettings[index] = newSettings
-        } else {
-            allSettings.append(newSettings)
-        }
-        save(allSettings, key: settingsKey)
+        settingsRepository.upsert(newSettings)
         syncDataToCloud(dataType: "settings")
         auditService?.log(
             action: .settingsChanged,

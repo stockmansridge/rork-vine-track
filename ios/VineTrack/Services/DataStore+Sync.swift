@@ -64,15 +64,7 @@ extension DataStore {
     }
 
     func mergeSettings(_ remote: [AppSettings], for vineyardId: UUID) {
-        var all: [AppSettings] = loadData(key: settingsKey) ?? []
-        for item in remote {
-            if let index = all.firstIndex(where: { $0.vineyardId == item.vineyardId }) {
-                all[index] = item
-            } else {
-                all.append(item)
-            }
-        }
-        save(all, key: settingsKey)
+        _ = settingsRepository.merge(remote, for: vineyardId)
         if selectedVineyardId == vineyardId, let s = remote.first {
             settings = s
         }
@@ -178,92 +170,56 @@ extension DataStore {
     }
 
     func mergeSavedChemicals(_ remote: [SavedChemical], for vineyardId: UUID) {
-        var all: [SavedChemical] = loadData(key: savedChemicalsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: savedChemicalsKey)
+        let merged = sprayRepository.mergeChemicals(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            savedChemicals = all.filter { $0.vineyardId == vineyardId }
+            savedChemicals = merged
         }
     }
 
     func replaceSavedChemicals(_ remote: [SavedChemical], for vineyardId: UUID) {
-        var all: [SavedChemical] = loadData(key: savedChemicalsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: savedChemicalsKey)
+        sprayRepository.replaceChemicals(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             savedChemicals = remote
         }
     }
 
     func mergeSavedSprayPresets(_ remote: [SavedSprayPreset], for vineyardId: UUID) {
-        var all: [SavedSprayPreset] = loadData(key: savedSprayPresetsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: savedSprayPresetsKey)
+        let merged = sprayRepository.mergePresets(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            savedSprayPresets = all.filter { $0.vineyardId == vineyardId }
+            savedSprayPresets = merged
         }
     }
 
     func replaceSavedSprayPresets(_ remote: [SavedSprayPreset], for vineyardId: UUID) {
-        var all: [SavedSprayPreset] = loadData(key: savedSprayPresetsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: savedSprayPresetsKey)
+        sprayRepository.replacePresets(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             savedSprayPresets = remote
         }
     }
 
     func mergeSavedEquipmentOptions(_ remote: [SavedEquipmentOption], for vineyardId: UUID) {
-        var all: [SavedEquipmentOption] = loadData(key: savedEquipmentOptionsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: savedEquipmentOptionsKey)
+        let merged = sprayRepository.mergeEquipmentOptions(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            savedEquipmentOptions = all.filter { $0.vineyardId == vineyardId }
+            savedEquipmentOptions = merged
         }
     }
 
     func replaceSavedEquipmentOptions(_ remote: [SavedEquipmentOption], for vineyardId: UUID) {
-        var all: [SavedEquipmentOption] = loadData(key: savedEquipmentOptionsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: savedEquipmentOptionsKey)
+        sprayRepository.replaceEquipmentOptions(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             savedEquipmentOptions = remote
         }
     }
 
     func mergeSprayEquipment(_ remote: [SprayEquipmentItem], for vineyardId: UUID) {
-        var all: [SprayEquipmentItem] = loadData(key: sprayEquipmentKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: sprayEquipmentKey)
+        let merged = sprayRepository.mergeEquipment(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            sprayEquipment = all.filter { $0.vineyardId == vineyardId }
+            sprayEquipment = merged
         }
     }
 
     func replaceSprayEquipment(_ remote: [SprayEquipmentItem], for vineyardId: UUID) {
-        var all: [SprayEquipmentItem] = loadData(key: sprayEquipmentKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: sprayEquipmentKey)
+        sprayRepository.replaceEquipment(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             sprayEquipment = remote
         }
@@ -316,25 +272,16 @@ extension DataStore {
     }
 
     func replaceSprayRecords(_ remote: [SprayRecord], for vineyardId: UUID) {
-        var all: [SprayRecord] = loadData(key: sprayRecordsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: sprayRecordsKey)
+        sprayRepository.replaceRecords(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             sprayRecords = remote
         }
     }
 
     func mergeSprayRecords(_ remote: [SprayRecord], for vineyardId: UUID) {
-        var all: [SprayRecord] = loadData(key: sprayRecordsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: sprayRecordsKey)
+        let merged = sprayRepository.mergeRecords(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            sprayRecords = all.filter { $0.vineyardId == vineyardId }
+            sprayRecords = merged
         }
     }
 
@@ -383,52 +330,32 @@ extension DataStore {
     }
 
     func saveAllSprayRecords() {
-        var allRecords: [SprayRecord] = loadData(key: sprayRecordsKey) ?? []
-        if let vid = selectedVineyardId {
-            allRecords.removeAll { $0.vineyardId == vid }
-        }
-        allRecords.append(contentsOf: sprayRecords)
-        save(allRecords, key: sprayRecordsKey)
+        guard let vid = selectedVineyardId else { return }
+        sprayRepository.saveRecordsSlice(sprayRecords, for: vid)
         syncDataToCloud(dataType: "spray_records")
     }
 
     func saveAllSavedChemicals() {
-        var all: [SavedChemical] = loadData(key: savedChemicalsKey) ?? []
-        if let vid = selectedVineyardId {
-            all.removeAll { $0.vineyardId == vid }
-        }
-        all.append(contentsOf: savedChemicals)
-        save(all, key: savedChemicalsKey)
+        guard let vid = selectedVineyardId else { return }
+        sprayRepository.saveChemicalsSlice(savedChemicals, for: vid)
         syncDataToCloud(dataType: "saved_chemicals")
     }
 
     func saveAllSavedSprayPresets() {
-        var all: [SavedSprayPreset] = loadData(key: savedSprayPresetsKey) ?? []
-        if let vid = selectedVineyardId {
-            all.removeAll { $0.vineyardId == vid }
-        }
-        all.append(contentsOf: savedSprayPresets)
-        save(all, key: savedSprayPresetsKey)
+        guard let vid = selectedVineyardId else { return }
+        sprayRepository.savePresetsSlice(savedSprayPresets, for: vid)
         syncDataToCloud(dataType: "saved_spray_presets")
     }
 
     func saveAllSavedEquipmentOptions() {
-        var all: [SavedEquipmentOption] = loadData(key: savedEquipmentOptionsKey) ?? []
-        if let vid = selectedVineyardId {
-            all.removeAll { $0.vineyardId == vid }
-        }
-        all.append(contentsOf: savedEquipmentOptions)
-        save(all, key: savedEquipmentOptionsKey)
+        guard let vid = selectedVineyardId else { return }
+        sprayRepository.saveEquipmentOptionsSlice(savedEquipmentOptions, for: vid)
         syncDataToCloud(dataType: "saved_equipment_options")
     }
 
     func saveAllSprayEquipment() {
-        var all: [SprayEquipmentItem] = loadData(key: sprayEquipmentKey) ?? []
-        if let vid = selectedVineyardId {
-            all.removeAll { $0.vineyardId == vid }
-        }
-        all.append(contentsOf: sprayEquipment)
-        save(all, key: sprayEquipmentKey)
+        guard let vid = selectedVineyardId else { return }
+        sprayRepository.saveEquipmentSlice(sprayEquipment, for: vid)
         syncDataToCloud(dataType: "spray_equipment")
     }
 
