@@ -3,9 +3,11 @@ import SwiftUI
 struct InviteMemberSheet: View {
     let vineyard: Vineyard
     @Environment(AuthService.self) private var authService
+    @Environment(DataStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var email: String = ""
     @State private var selectedRole: VineyardRole = .operator_
+    @State private var selectedCategoryId: UUID? = nil
     @State private var isSending: Bool = false
     @State private var showSuccess: Bool = false
 
@@ -24,6 +26,20 @@ struct InviteMemberSheet: View {
                             Text(role.rawValue).tag(role)
                         }
                     }
+                }
+
+                Section {
+                    Picker("Category", selection: $selectedCategoryId) {
+                        Text("None").tag(UUID?.none)
+                        ForEach(store.operatorCategories) { cat in
+                            Text("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)")
+                                .tag(UUID?.some(cat.id))
+                        }
+                    }
+                } header: {
+                    Text("Operator Category")
+                } footer: {
+                    Text("Sets the hourly rate used in trip and task cost reports. You can change this later by tapping the user.")
                 }
 
                 Section {
@@ -55,7 +71,7 @@ struct InviteMemberSheet: View {
                     }
                 }
             }
-            .navigationTitle("Invite Operator")
+            .navigationTitle("Add User")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

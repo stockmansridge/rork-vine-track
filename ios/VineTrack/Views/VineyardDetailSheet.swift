@@ -8,7 +8,6 @@ struct VineyardDetailSheet: View {
     @Environment(\.accessControl) private var accessControl
     @State private var showAddUser: Bool = false
     @State private var showEditName: Bool = false
-    @State private var showInviteMember: Bool = false
     @State private var editedName: String = ""
     @State private var selectedCountry: String = ""
     @State private var editingUser: VineyardUser?
@@ -42,10 +41,11 @@ struct VineyardDetailSheet: View {
                 Button("Cancel", role: .cancel) {}
             }
             .sheet(isPresented: $showAddUser) {
-                AddUserSheet(vineyard: vineyard)
-            }
-            .sheet(isPresented: $showInviteMember) {
-                InviteMemberSheet(vineyard: vineyard)
+                if isSupabaseConfigured {
+                    InviteMemberSheet(vineyard: vineyard)
+                } else {
+                    AddUserSheet(vineyard: vineyard)
+                }
             }
             .sheet(item: $editingUser) { user in
                 EditUserSheet(vineyard: vineyard, user: user)
@@ -137,21 +137,14 @@ struct VineyardDetailSheet: View {
             Button {
                 showAddUser = true
             } label: {
-                Label("Add User", systemImage: "person.badge.plus")
-            }
-
-            if isSupabaseConfigured {
-                Button {
-                    showInviteMember = true
-                } label: {
-                    Label("Invite by Email", systemImage: "envelope.badge.person.crop")
-                        .foregroundStyle(.blue)
-                }
+                Label(isSupabaseConfigured ? "Add User" : "Add User (Local)", systemImage: "person.badge.plus")
             }
         } header: {
             Text("Users")
         } footer: {
-            Text("Tap a user to edit their role and operator category. Role controls app access; operator category sets their hourly rate for trip reports.")
+            Text(isSupabaseConfigured
+                ? "Add users by sending an email invitation. Tap a user to edit their role and operator category. Role controls app access; operator category sets their hourly rate for trip and task reports."
+                : "Tap a user to edit their role and operator category. Role controls app access; operator category sets their hourly rate for trip and task reports.")
         }
     }
 
