@@ -3,17 +3,31 @@ import SwiftUI
 struct YieldDeterminationCalculatorView: View {
     @Environment(DataStore.self) private var store
 
+    enum PruneMethod: String, CaseIterable, Identifiable {
+        case spur = "Spur"
+        case cane = "Cane"
+        var id: String { rawValue }
+    }
+
     @State private var selectedPaddockId: UUID?
+    @State private var pruneMethod: PruneMethod = .spur
     @State private var bunchesPerBudText: String = "1.5"
+
+    // Spur inputs
     @State private var budsPerSpurText: String = "2"
     @State private var spursPerVineText: String = "20"
+
+    // Cane inputs
+    @State private var budsPerCaneText: String = "10"
+    @State private var canesPerVineText: String = "4"
+
     @State private var vinesPerHaText: String = ""
     @State private var bunchWeightText: String = "120"
 
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
-        case bunchesPerBud, budsPerSpur, spursPerVine, vinesPerHa, bunchWeight
+        case bunchesPerBud, budsPerSpur, spursPerVine, budsPerCane, canesPerVine, vinesPerHa, bunchWeight
     }
 
     private var vineyardPaddocks: [Paddock] {
@@ -29,11 +43,20 @@ struct YieldDeterminationCalculatorView: View {
     private var bunchesPerBud: Double { parse(bunchesPerBudText) }
     private var budsPerSpur: Double { parse(budsPerSpurText) }
     private var spursPerVine: Double { parse(spursPerVineText) }
+    private var budsPerCane: Double { parse(budsPerCaneText) }
+    private var canesPerVine: Double { parse(canesPerVineText) }
     private var vinesPerHa: Double { parse(vinesPerHaText) }
     private var bunchWeightGrams: Double { parse(bunchWeightText) }
 
+    private var budsPerVine: Double {
+        switch pruneMethod {
+        case .spur: return budsPerSpur * spursPerVine
+        case .cane: return budsPerCane * canesPerVine
+        }
+    }
+
     private var bunchesPerHa: Double {
-        bunchesPerBud * budsPerSpur * spursPerVine * vinesPerHa
+        bunchesPerBud * budsPerVine * vinesPerHa
     }
 
     private var yieldKgPerHa: Double {
@@ -47,6 +70,15 @@ struct YieldDeterminationCalculatorView: View {
     private var totalYieldTonnes: Double? {
         guard let paddock = selectedPaddock, paddock.areaHectares > 0 else { return nil }
         return yieldTonnesPerHa * paddock.areaHectares
+    }
+
+    private var formulaText: String {
+        switch pruneMethod {
+        case .spur:
+            return "Yield / Ha = Bunches/Bud × Buds/Spur × Spurs/Vine × Vines/Ha × Bunch Weight"
+        case .cane:
+            return "Yield / Ha = Bunches/Bud × Buds/Cane × Canes/Vine × Vines/Ha × Bunch Weight"
+        }
     }
 
     var body: some View {
@@ -78,15 +110,44 @@ struct YieldDeterminationCalculatorView: View {
                 }
             }
 
+            Section("Pruning Method") {
+                Picker("Method", selection: $pruneMethod) {
+                    ForEach(PruneMethod.allCases) { method in
+                        Text(method.rawValue).tag(method)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(pruneMethod == .spur
+                     ? "Spur pruning: short canes (spurs) left with a set number of buds each."
+                     : "Cane pruning: longer canes retained on each vine with multiple buds per cane.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Inputs") {
                 inputRow(label: "Bunches / Bud", text: $bunchesPerBudText, field: .bunchesPerBud)
-                inputRow(label: "Buds / Spur", text: $budsPerSpurText, field: .budsPerSpur)
-                inputRow(label: "Spurs / Vine", text: $spursPerVineText, field: .spursPerVine)
+
+                switch pruneMethod {
+                case .spur:
+                    inputRow(label: "Buds / Spur", text: $budsPerSpurText, field: .budsPerSpur)
+                    inputRow(label: "Spurs / Vine", text: $spursPerVineText, field: .spursPerVine)
+                case .cane:
+                    inputRow(label: "Buds / Cane", text: $budsPerCaneText, field: .budsPerCane)
+                    inputRow(label: "Canes / Vine", text: $canesPerVineText, field: .canesPerVine)
+                }
+
                 inputRow(label: "Vines / Ha", text: $vinesPerHaText, field: .vinesPerHa)
                 inputRow(label: "Bunch Weight (g)", text: $bunchWeightText, field: .bunchWeight)
             }
 
             Section("Calculated") {
+                LabeledContent("Buds / Vine") {
+                    Text(budsPerVine, format: .number.precision(.fractionLength(0)))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
                 LabeledContent("Bunches / Ha") {
                     Text(bunchesPerHa, format: .number.precision(.fractionLength(0)))
                         .foregroundStyle(.secondary)
@@ -120,7 +181,7 @@ struct YieldDeterminationCalculatorView: View {
             }
 
             Section {
-                Text("Yield / Ha = Bunches/Bud × Buds/Spur × Spurs/Vine × Vines/Ha × Bunch Weight")
+                Text(formulaText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
