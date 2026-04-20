@@ -111,6 +111,63 @@ struct SprayCalculatorTests {
         #expect(abs(result.chemicalResults[0].totalAmountRequired - 1000) < 1)
     }
 
+    @Test func zeroWaterRateProducesZeroTanks() {
+        let paddock = squarePaddock(name: "A", areaHectares: 5.0)
+        let result = SprayCalculator.calculate(
+            selectedPaddocks: [paddock],
+            waterRateLitresPerHectare: 0,
+            tankCapacity: 500,
+            chemicalLines: [],
+            chemicals: []
+        )
+        #expect(result.totalWaterLitres == 0)
+        #expect(result.fullTankCount == 0)
+        #expect(result.lastTankLitres == 0)
+    }
+
+    @Test func partialTankRoundsCorrectly() {
+        // 3.3 ha × 300 L/ha = 990 L, tank 400 → 2 full + 190 last
+        let paddock = squarePaddock(name: "A", areaHectares: 3.3)
+        let result = SprayCalculator.calculate(
+            selectedPaddocks: [paddock],
+            waterRateLitresPerHectare: 300,
+            tankCapacity: 400,
+            chemicalLines: [],
+            chemicals: []
+        )
+        #expect(abs(result.totalWaterLitres - 990) < 1)
+        #expect(result.fullTankCount == 2)
+        #expect(abs(result.lastTankLitres - 190) < 1)
+    }
+
+    @Test func multiPaddockAreasSumAndBreakdownShares() {
+        let a = squarePaddock(name: "A", areaHectares: 1.0)
+        let b = squarePaddock(name: "B", areaHectares: 3.0)
+        let rateId = UUID()
+        let chemical = SavedChemical(
+            name: "C",
+            rates: [ChemicalRate(id: rateId, value: 10, basis: .perHectare)]
+        )
+        let line = ChemicalLine(chemicalId: chemical.id, selectedRateId: rateId, basis: .perHectare)
+        let result = SprayCalculator.calculate(
+            selectedPaddocks: [a, b],
+            waterRateLitresPerHectare: 500,
+            tankCapacity: 2000,
+            chemicalLines: [line],
+            chemicals: [chemical]
+        )
+        #expect(abs(result.totalAreaHectares - 4.0) < 0.01)
+        // 10 × 4 = 40 total chem
+        #expect(abs(result.chemicalResults[0].totalAmountRequired - 40) < 0.01)
+        let breakdown = result.chemicalResults[0].paddockBreakdown
+        #expect(breakdown.count == 2)
+        // 1/4 share → 10, 3/4 share → 30
+        let aRow = breakdown.first { $0.paddockName == "A" }
+        let bRow = breakdown.first { $0.paddockName == "B" }
+        #expect(abs((aRow?.amountRequired ?? 0) - 10) < 0.01)
+        #expect(abs((bRow?.amountRequired ?? 0) - 30) < 0.01)
+    }
+
     @Test func chemicalCostingAddsUp() {
         let paddock = squarePaddock(name: "A", areaHectares: 1.0)
         let rateId = UUID()

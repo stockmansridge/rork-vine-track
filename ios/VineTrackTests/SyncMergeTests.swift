@@ -124,6 +124,71 @@ struct SyncMergeTests {
         #expect(store.workTasks.contains { $0.taskType == "New2" })
     }
 
+    @Test func mergeMaintenanceLogsAddsAndUpdates() {
+        let (store, vid) = makeStore()
+        let log = MaintenanceLog(vineyardId: vid, itemName: "Tractor", hours: 2)
+        store.addMaintenanceLog(log)
+
+        var updated = log
+        updated.itemName = "Updated"
+        let remoteNew = MaintenanceLog(vineyardId: vid, itemName: "New", hours: 4)
+        store.mergeMaintenanceLogs([updated, remoteNew], for: vid)
+
+        #expect(store.maintenanceLogs.contains { $0.id == log.id && $0.itemName == "Updated" })
+        #expect(store.maintenanceLogs.contains { $0.id == remoteNew.id })
+    }
+
+    @Test func replaceMaintenanceLogsOverwrites() {
+        let (store, vid) = makeStore()
+        store.addMaintenanceLog(MaintenanceLog(vineyardId: vid, itemName: "Old", hours: 1))
+        let r = MaintenanceLog(vineyardId: vid, itemName: "Fresh", hours: 3)
+        store.replaceMaintenanceLogs([r], for: vid)
+        #expect(store.maintenanceLogs.count == 1)
+        #expect(store.maintenanceLogs.first?.itemName == "Fresh")
+    }
+
+    @Test func replacePinsOnlyAffectsSelectedVineyard() {
+        let store = DataStore()
+        let v1 = Vineyard(name: "V1", users: [VineyardUser(name: "O", role: .owner)])
+        let v2 = Vineyard(name: "V2", users: [VineyardUser(name: "O", role: .owner)])
+        store.addVineyard(v1)
+        store.addVineyard(v2)
+        store.selectedVineyardId = v1.id
+
+        let pinV1 = VinePin(
+            vineyardId: v1.id, latitude: 0, longitude: 0, heading: 0,
+            buttonName: "A", buttonColor: "red", side: .left, mode: .repairs
+        )
+        store.addPin(pinV1)
+        // Switch and add another pin on v2.
+        store.selectedVineyardId = v2.id
+        let pinV2 = VinePin(
+            vineyardId: v2.id, latitude: 1, longitude: 1, heading: 0,
+            buttonName: "B", buttonColor: "blue", side: .right, mode: .growth
+        )
+        store.addPin(pinV2)
+
+        // Replace only v1 pins with an empty set — v2 pin must remain.
+        store.replacePins([], for: v1.id)
+        #expect(store.pins.contains(where: { $0.id == pinV2.id }))
+    }
+
+    @Test func mergeTripsIgnoresDuplicateIds() {
+        let (store, vid) = makeStore()
+        let trip = Trip(vineyardId: vid, paddockName: "A")
+        store.startTrip(trip)
+        store.mergeTrips([trip], for: vid)
+        #expect(store.trips.filter { $0.id == trip.id }.count == 1)
+    }
+
+    @Test func mergePaddocksIgnoresDuplicateIds() {
+        let (store, vid) = makeStore()
+        let p = Paddock(vineyardId: vid, name: "Same")
+        store.addPaddock(p)
+        store.mergePaddocks([p], for: vid)
+        #expect(store.paddocks.filter { $0.id == p.id }.count == 1)
+    }
+
     @Test func mergeVineyardsOnlyAddsNew() {
         let store = DataStore()
         let existing = Vineyard(name: "Existing")

@@ -62,6 +62,60 @@ struct IrrigationCalculatorTests {
         #expect(abs((result?.grossIrrigationMm ?? 0) - 20) < 0.01)
     }
 
+    @Test func replacementPercentScalesOutput() {
+        var settings = IrrigationSettings.defaults
+        settings.irrigationApplicationRateMmPerHour = 5.0
+        settings.cropCoefficientKc = 1.0
+        settings.irrigationEfficiencyPercent = 100
+        settings.replacementPercent = 50
+
+        let days = [ForecastDay(date: Date(), forecastEToMm: 10, forecastRainMm: 0)]
+        let result = IrrigationCalculator.calculate(forecastDays: days, settings: settings)
+        // deficit 10 × 50% replacement = 5 mm gross
+        #expect(abs((result?.grossIrrigationMm ?? 0) - 5) < 0.01)
+        #expect(result?.recommendedIrrigationMinutes == 60)
+    }
+
+    @Test func rainfallEffectivenessAppliesWhenAbove2mm() {
+        var settings = IrrigationSettings.defaults
+        settings.irrigationApplicationRateMmPerHour = 4.0
+        settings.cropCoefficientKc = 1.0
+        settings.irrigationEfficiencyPercent = 100
+        settings.rainfallEffectivenessPercent = 50
+        settings.replacementPercent = 100
+
+        let days = [ForecastDay(date: Date(), forecastEToMm: 10, forecastRainMm: 10)]
+        let result = IrrigationCalculator.calculate(forecastDays: days, settings: settings)
+        // crop use 10, effective rain 10*0.5 = 5, deficit 5
+        #expect(abs((result?.netDeficitMm ?? 0) - 5) < 0.01)
+    }
+
+    @Test func bufferLargerThanDeficitClampsToZero() {
+        var settings = IrrigationSettings.defaults
+        settings.irrigationApplicationRateMmPerHour = 5.0
+        settings.cropCoefficientKc = 1.0
+        settings.irrigationEfficiencyPercent = 100
+        settings.replacementPercent = 100
+        settings.soilMoistureBufferMm = 100
+
+        let days = [ForecastDay(date: Date(), forecastEToMm: 10, forecastRainMm: 0)]
+        let result = IrrigationCalculator.calculate(forecastDays: days, settings: settings)
+        #expect((result?.netDeficitMm ?? -1) == 0)
+        #expect(result?.recommendedIrrigationMinutes == 0)
+    }
+
+    @Test func minutesRoundToNearest() {
+        var settings = IrrigationSettings.defaults
+        settings.irrigationApplicationRateMmPerHour = 3.0
+        settings.cropCoefficientKc = 1.0
+        settings.irrigationEfficiencyPercent = 100
+        settings.replacementPercent = 100
+        // 5 mm / 3 mm/h = 1.6666 h = 100 minutes
+        let days = [ForecastDay(date: Date(), forecastEToMm: 5, forecastRainMm: 0)]
+        let result = IrrigationCalculator.calculate(forecastDays: days, settings: settings)
+        #expect(result?.recommendedIrrigationMinutes == 100)
+    }
+
     @Test func soilBufferReducesDeficit() {
         var settings = IrrigationSettings.defaults
         settings.irrigationApplicationRateMmPerHour = 5.0

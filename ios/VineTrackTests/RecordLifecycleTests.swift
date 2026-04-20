@@ -150,6 +150,95 @@ struct RecordLifecycleTests {
 
     // MARK: - Permission-blocked deletes
 
+    private func makeRestrictedStore(role: VineyardRole) -> (DataStore, UUID) {
+        let store = DataStore()
+        let userId = UUID()
+        let vineyard = Vineyard(
+            name: "R \(UUID().uuidString.prefix(6))",
+            users: [VineyardUser(id: userId, name: "U", role: role)]
+        )
+        store.addVineyard(vineyard)
+        store.selectedVineyardId = vineyard.id
+        let auth = AuthService()
+        auth.userId = userId.uuidString
+        auth.userName = "U"
+        let ac = AccessControl(store: store, authService: auth)
+        store.accessControl = ac
+        store.authService = auth
+        return (store, vineyard.id)
+    }
+
+    @Test func operatorCannotFinalizeWorkTask() {
+        let (store, vid) = makeRestrictedStore(role: .operator_)
+        let task = WorkTask(vineyardId: vid, taskType: "Pruning")
+        store.addWorkTask(task)
+        store.finalizeWorkTask(task)
+        #expect(store.workTasks.first(where: { $0.id == task.id })?.isFinalized == false)
+    }
+
+    @Test func supervisorCanFinalizeAndReopenWorkTask() {
+        let (store, vid) = makeRestrictedStore(role: .supervisor)
+        let task = WorkTask(vineyardId: vid, taskType: "Pruning")
+        store.addWorkTask(task)
+        store.finalizeWorkTask(task)
+        #expect(store.workTasks.first(where: { $0.id == task.id })?.isFinalized == true)
+        store.reopenWorkTask(task)
+        #expect(store.workTasks.first(where: { $0.id == task.id })?.isFinalized == false)
+    }
+
+    @Test func operatorCannotDeleteMaintenanceLog() {
+        let (store, vid) = makeRestrictedStore(role: .operator_)
+        let log = MaintenanceLog(vineyardId: vid, itemName: "Tractor", hours: 2)
+        store.addMaintenanceLog(log)
+        store.deleteMaintenanceLog(log)
+        #expect(store.maintenanceLogs.contains(where: { $0.id == log.id }))
+    }
+
+    @Test func operatorCannotArchiveOrFinalizeMaintenanceLog() {
+        let (store, vid) = makeRestrictedStore(role: .operator_)
+        let log = MaintenanceLog(vineyardId: vid, itemName: "Mower", hours: 1)
+        store.addMaintenanceLog(log)
+        store.archiveMaintenanceLog(log)
+        #expect(store.maintenanceLogs.first(where: { $0.id == log.id })?.isArchived == false)
+        store.finalizeMaintenanceLog(log)
+        #expect(store.maintenanceLogs.first(where: { $0.id == log.id })?.isFinalized == false)
+    }
+
+    @Test func operatorCannotDeleteSprayRecord() {
+        let (store, vid) = makeRestrictedStore(role: .operator_)
+        let record = SprayRecord(vineyardId: vid, sprayReference: "SPR-OP")
+        store.addSprayRecord(record)
+        store.deleteSprayRecord(record)
+        #expect(store.sprayRecords.contains(where: { $0.id == record.id }))
+    }
+
+    @Test func operatorCannotDeletePinOrTrip() {
+        let (store, vid) = makeRestrictedStore(role: .operator_)
+        let pin = VinePin(
+            vineyardId: vid, latitude: 0, longitude: 0, heading: 0,
+            buttonName: "P", buttonColor: "red", side: .left, mode: .repairs
+        )
+        store.addPin(pin)
+        store.deletePin(pin)
+        #expect(store.pins.contains(where: { $0.id == pin.id }))
+
+        let trip = Trip(vineyardId: vid, paddockName: "A")
+        store.startTrip(trip)
+        store.deleteTrip(trip)
+        #expect(store.trips.contains(where: { $0.id == trip.id }))
+    }
+
+    @Test func supervisorCanDeleteButNotChangeSettings() {
+        let (store, vid) = makeRestrictedStore(role: .supervisor)
+        let pin = VinePin(
+            vineyardId: vid, latitude: 0, longitude: 0, heading: 0,
+            buttonName: "P", buttonColor: "red", side: .left, mode: .repairs
+        )
+        store.addPin(pin)
+        store.deletePin(pin)
+        #expect(!store.pins.contains(where: { $0.id == pin.id }))
+    }
+
     @Test func operatorCannotDelete() {
         let store = DataStore()
         let userId = UUID()
