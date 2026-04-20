@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct YieldDeterminationCalculatorView: View {
     @Environment(DataStore.self) private var store
@@ -214,6 +215,11 @@ struct YieldDeterminationCalculatorView: View {
                 .multilineTextAlignment(.trailing)
                 .focused($focusedField, equals: field)
                 .frame(maxWidth: 120)
+                .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidBeginEditingNotification)) { notification in
+                    if let textField = notification.object as? UITextField {
+                        textField.selectAll(nil)
+                    }
+                }
         }
     }
 
