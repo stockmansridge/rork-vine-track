@@ -3,19 +3,24 @@ import RevenueCat
 
 @main
 struct VineTrackApp: App {
-    @State private var store = DataStore()
+    @State private var store: DataStore
     @State private var locationService = LocationService()
-    @State private var authService = AuthService()
+    @State private var authService: AuthService
     @State private var cloudSync = CloudSyncService()
     @State private var analytics = AnalyticsService()
     @State private var adminService = AdminService()
     @State private var tripTrackingService = TripTrackingService()
     @State private var storeViewModel = StoreViewModel()
     @State private var degreeDayService = DegreeDayService()
-    @State private var accessControl: AccessControl?
+    @State private var accessControl: AccessControl
     @State private var auditService = AuditService()
 
     init() {
+        let s = DataStore()
+        let a = AuthService()
+        _store = State(initialValue: s)
+        _authService = State(initialValue: a)
+        _accessControl = State(initialValue: AccessControl(store: s, authService: a))
         #if DEBUG
         Purchases.logLevel = .debug
         Purchases.configure(withAPIKey: Config.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY)
@@ -39,14 +44,13 @@ struct VineTrackApp: App {
                 .environment(\.accessControl, accessControl)
                 .environment(auditService)
                 .task {
-                    let ac = AccessControl(store: store, authService: authService)
-                    accessControl = ac
                     locationService.requestPermission()
                     store.cloudSync = cloudSync
                     store.analytics = analytics
                     store.auditService = auditService
                     store.authService = authService
-                    auditService.configure(store: store, authService: authService, accessControl: ac)
+                    store.accessControl = accessControl
+                    auditService.configure(store: store, authService: authService, accessControl: accessControl)
                     tripTrackingService.configure(store: store, locationService: locationService)
                     await refreshDailyGDDIfNeeded()
                 }

@@ -101,7 +101,7 @@ struct VineyardCostsSection: View {
     private var grandTotal: Double { totalChemicals + totalFuel + totalOperator + totalMaintenance + totalWorkTasks }
 
     var body: some View {
-        if accessControl?.canViewFinancials ?? true {
+        if accessControl?.canViewFinancials ?? false {
             contentBody
         } else {
             restrictedCard

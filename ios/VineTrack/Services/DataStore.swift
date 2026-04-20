@@ -41,6 +41,42 @@ class DataStore {
     var analytics: AnalyticsService?
     weak var auditService: AuditService?
     weak var authService: AuthService?
+    weak var accessControl: AccessControl?
+
+    // MARK: - Permission Guards
+
+    private func assertCanDelete(_ label: String) -> Bool {
+        guard let ac = accessControl else { return true }
+        if !ac.canDelete {
+            #if DEBUG
+            print("⛔️ Permission denied: delete '\(label)' — role: \(ac.currentUserRole.rawValue)")
+            #endif
+            return false
+        }
+        return true
+    }
+
+    private func assertCanChangeSettings(_ label: String) -> Bool {
+        guard let ac = accessControl else { return true }
+        if !ac.canChangeSettings {
+            #if DEBUG
+            print("⛔️ Permission denied: change settings '\(label)' — role: \(ac.currentUserRole.rawValue)")
+            #endif
+            return false
+        }
+        return true
+    }
+
+    private func assertCanEdit(isFinalized: Bool, _ label: String) -> Bool {
+        guard let ac = accessControl else { return true }
+        if isFinalized && !ac.canReopenRecords {
+            #if DEBUG
+            print("⛔️ Permission denied: edit finalised '\(label)' — role: \(ac.currentUserRole.rawValue)")
+            #endif
+            return false
+        }
+        return true
+    }
 
     private let vineyardsKey = "vinetrack_vineyards"
     private let selectedVineyardIdKey = "vinetrack_selected_vineyard_id"
@@ -270,6 +306,7 @@ class DataStore {
     }
 
     func deleteVineyard(_ vineyard: Vineyard) {
+        guard assertCanDelete("Vineyard") else { return }
         let vid = vineyard.id
         vineyards.removeAll { $0.id == vid }
         save(vineyards, key: vineyardsKey)
@@ -349,11 +386,13 @@ class DataStore {
     }
 
     func deletePin(_ pin: VinePin) {
+        guard assertCanDelete("Pin") else { return }
         pins.removeAll { $0.id == pin.id }
         saveAllPins()
     }
 
     func deletePins(at offsets: IndexSet, from filteredPins: [VinePin]) {
+        guard assertCanDelete("Pins") else { return }
         let idsToDelete = offsets.map { filteredPins[$0].id }
         pins.removeAll { idsToDelete.contains($0.id) }
         saveAllPins()
@@ -379,6 +418,7 @@ class DataStore {
     }
 
     func deletePaddock(_ paddock: Paddock) {
+        guard assertCanDelete("Paddock") else { return }
         paddocks.removeAll { $0.id == paddock.id }
         saveAllPaddocks()
     }
@@ -423,6 +463,7 @@ class DataStore {
     }
 
     func deleteTrip(_ trip: Trip) {
+        guard assertCanDelete("Trip") else { return }
         trips.removeAll { $0.id == trip.id }
         saveAllTrips()
         auditService?.log(
@@ -485,6 +526,7 @@ class DataStore {
     }
 
     func deleteSprayRecord(_ record: SprayRecord) {
+        guard assertCanDelete("SprayRecord") else { return }
         sprayRecords.removeAll { $0.id == record.id }
         saveAllSprayRecords()
         auditService?.log(
@@ -754,6 +796,7 @@ class DataStore {
     }
 
     func deleteMaintenanceLog(_ log: MaintenanceLog) {
+        guard assertCanDelete("MaintenanceLog") else { return }
         maintenanceLogs.removeAll { $0.id == log.id }
         saveAllMaintenanceLogs()
         auditService?.log(
@@ -838,6 +881,7 @@ class DataStore {
     }
 
     func deleteWorkTask(_ task: WorkTask) {
+        guard assertCanDelete("WorkTask") else { return }
         workTasks.removeAll { $0.id == task.id }
         saveAllWorkTasks()
         auditService?.log(
@@ -1195,6 +1239,7 @@ class DataStore {
     }
 
     func updateSettings(_ newSettings: AppSettings) {
+        guard assertCanChangeSettings("AppSettings") else { return }
         settings = newSettings
         var allSettings: [AppSettings] = loadData(key: settingsKey) ?? []
         if let index = allSettings.firstIndex(where: { $0.vineyardId == newSettings.vineyardId }) {
@@ -1225,6 +1270,7 @@ class DataStore {
     }
 
     func deleteAllData() {
+        guard assertCanDelete("AllData") else { return }
         let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey, yieldSessionsKey, damageRecordsKey, maintenanceLogsKey, workTasksKey]
         for key in keys {
             let fileURL = Self.storageDirectory.appendingPathComponent("\(key).json")

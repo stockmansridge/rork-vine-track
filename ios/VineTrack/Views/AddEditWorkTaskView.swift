@@ -152,7 +152,7 @@ struct AddEditWorkTaskView: View {
                     Text("Set the number of workers of each type used on this task.")
                 }
 
-                if accessControl?.canViewFinancials ?? true {
+                if accessControl?.canViewFinancials ?? false {
                     Section("Estimated Cost") {
                         LabeledContent("Total People") {
                             Text("\(totalPeople)")

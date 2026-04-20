@@ -33,7 +33,7 @@ struct DataPrivacySettingsView: View {
                 Text("Current Data")
             }
 
-            if accessControl?.canDelete ?? true {
+            if accessControl?.canDelete ?? false {
                 Section {
                     Button(role: .destructive) {
                         showDeletePinsAlert = true

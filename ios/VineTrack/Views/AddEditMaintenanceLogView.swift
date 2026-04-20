@@ -23,7 +23,7 @@ struct AddEditMaintenanceLogView: View {
     @State private var showDeleteAlert: Bool = false
 
     private var isEditing: Bool { existingLog != nil }
-    private var canViewFinancials: Bool { accessControl?.canViewFinancials ?? true }
+    private var canViewFinancials: Bool { accessControl?.canViewFinancials ?? false }
     private var canDelete: Bool { accessControl?.canDelete ?? false }
     private var canFinalize: Bool { accessControl?.canFinalizeRecords ?? false }
     private var isReadOnly: Bool {

@@ -228,7 +228,7 @@ struct TripView: View {
                         .buttonStyle(.plain)
                     }
                     .onDelete { offsets in
-                        guard accessControl?.canDelete ?? true else { return }
+                        guard accessControl?.canDelete ?? false else { return }
                         let trips = filteredAndSortedTrips
                         tripToDelete = offsets.first.map { trips[$0] }
                         showDeleteConfirmation = true
@@ -1659,7 +1659,7 @@ struct TripDetailView: View {
                     }
                 }
 
-                if accessControl?.canViewFinancials ?? true {
+                if accessControl?.canViewFinancials ?? false {
                     tripCostSection
                 }
             }
@@ -1670,7 +1670,7 @@ struct TripDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 12) {
-                    if accessControl?.canExport ?? true {
+                    if accessControl?.canExport ?? false {
                         Menu {
                             Button {
                                 generatePDF()
@@ -1679,7 +1679,7 @@ struct TripDetailView: View {
                             }
                             .disabled(isGeneratingPDF)
 
-                            if accessControl?.canExportFinancialPDF ?? true {
+                            if accessControl?.canExportFinancialPDF ?? false {
                                 Divider()
                                 Toggle(isOn: $includeCostingsInExport) {
                                     Label("Include Costings", systemImage: "dollarsign.circle")
@@ -1875,7 +1875,7 @@ struct TripDetailView: View {
         guard !isGeneratingPDF else { return }
         isGeneratingPDF = true
 
-        let includeCostings = includeCostingsInExport && (accessControl?.canExportFinancialPDF ?? true)
+        let includeCostings = includeCostingsInExport && (accessControl?.canExportFinancialPDF ?? false)
         let vineyardName = store.selectedVineyard?.name ?? ""
         let logoData = store.selectedVineyard?.logoData
         let paddockName = trip.paddockName

@@ -219,7 +219,7 @@ struct DamageRecordsListView: View {
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
         .contextMenu {
-            if accessControl?.canDelete ?? true {
+            if accessControl?.canDelete ?? false {
                 Button(role: .destructive) {
                     store.deleteDamageRecord(record)
                 } label: {

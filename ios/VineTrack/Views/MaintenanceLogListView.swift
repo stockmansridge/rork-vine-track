@@ -3,6 +3,7 @@ import SwiftUI
 struct MaintenanceLogListView: View {
     @Environment(DataStore.self) private var store
     @Environment(AuthService.self) private var authService
+    @Environment(\.accessControl) private var accessControl
 
     @State private var showAddLog: Bool = false
     @State private var searchText: String = ""
@@ -38,7 +39,11 @@ struct MaintenanceLogListView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    costSummaryCard
+                    if accessControl?.canViewFinancials ?? false {
+                        costSummaryCard
+                    } else {
+                        simpleSummaryCard
+                    }
                     logsList
                 }
                 .padding(.horizontal)
@@ -46,6 +51,7 @@ struct MaintenanceLogListView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Maintenance Log")
+
             .navigationBarTitleDisplayMode(.large)
             .searchable(text: $searchText, prompt: "Search logs...")
             .toolbar {
@@ -64,6 +70,26 @@ struct MaintenanceLogListView: View {
                 MaintenanceLogDetailView(log: log)
             }
         }
+    }
+
+    private var simpleSummaryCard: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "wrench.and.screwdriver.fill")
+                .font(.title3)
+                .foregroundStyle(VineyardTheme.earthBrown)
+                .frame(width: 40, height: 40)
+                .background(VineyardTheme.earthBrown.opacity(0.12), in: .rect(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(store.maintenanceLogs.count) record\(store.maintenanceLogs.count == 1 ? "" : "s")")
+                    .font(.headline)
+                Text(String(format: "%.1f total hours logged", totalHours))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
     }
 
     private var costSummaryCard: some View {
@@ -190,7 +216,7 @@ struct MaintenanceLogListView: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
 
-                        if log.totalCost > 0 {
+                        if log.totalCost > 0 && (accessControl?.canViewFinancials ?? false) {
                             Text("•")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)

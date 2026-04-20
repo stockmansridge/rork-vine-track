@@ -125,7 +125,7 @@ struct GrowthStageReportView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if !availableVintages.isEmpty && (accessControl?.canExport ?? true) {
+                if !availableVintages.isEmpty && (accessControl?.canExport ?? false) {
                     Button {
                         generatePDF()
                     } label: {

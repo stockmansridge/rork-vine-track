@@ -222,7 +222,7 @@ struct SprayProgramView: View {
             .searchable(text: $searchText, prompt: "Search spray records")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if accessControl?.canExport ?? true {
+                    if accessControl?.canExport ?? false {
                         Menu {
                             if !statusFilteredRecords.isEmpty {
                                 ShareLink(
@@ -236,7 +236,7 @@ struct SprayProgramView: View {
                                         seasonFuelCostPerLitre: store.seasonFuelCostPerLitre,
                                         operatorCategories: store.operatorCategories,
                                         vineyardUsers: store.selectedVineyard?.users ?? [],
-                                        includeCostings: includeCostings
+                                        includeCostings: includeCostings && (accessControl?.canExportFinancialPDF ?? false)
                                     ),
                                     preview: SharePreview("Spray Program PDF", image: Image(systemName: "doc.fill"))
                                 ) {
@@ -259,8 +259,10 @@ struct SprayProgramView: View {
 
                                 Divider()
 
-                                Toggle(isOn: $includeCostings) {
-                                    Label("Include Costings", systemImage: "dollarsign.circle")
+                                if accessControl?.canExportFinancialPDF ?? false {
+                                    Toggle(isOn: $includeCostings) {
+                                        Label("Include Costings", systemImage: "dollarsign.circle")
+                                    }
                                 }
 
                                 Divider()
@@ -476,7 +478,7 @@ struct SprayProgramView: View {
             .contentShape(Rectangle())
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if accessControl?.canDelete ?? true {
+            if accessControl?.canDelete ?? false {
                 Button(role: .destructive) {
                     recordToDelete = record
                 } label: {
@@ -544,11 +546,13 @@ struct SprayProgramDetailSheet: View {
                     conditionsSection
                     tanksSection
                     chemicalTotalsSection
-                    sprayCostSection
+                    if accessControl?.canViewFinancials ?? false {
+                        sprayCostSection
+                    }
                     if !record.notes.isEmpty {
                         notesSection
                     }
-                    if accessControl?.canExport ?? true {
+                    if accessControl?.canExport ?? false {
                         exportSection
                     }
                     if let trip = trip, !trip.rowSequence.isEmpty {
@@ -1173,11 +1177,13 @@ struct SprayProgramDetailSheet: View {
                 Spacer()
             }
 
-            Toggle(isOn: $includeCostingsInExport) {
-                Label("Include Costings", systemImage: "dollarsign.circle")
-                    .font(.subheadline)
+            if accessControl?.canExportFinancialPDF ?? false {
+                Toggle(isOn: $includeCostingsInExport) {
+                    Label("Include Costings", systemImage: "dollarsign.circle")
+                        .font(.subheadline)
+                }
+                .tint(VineyardTheme.olive)
             }
-            .tint(VineyardTheme.olive)
 
             Button {
                 sharePDF()
@@ -1235,7 +1241,7 @@ struct SprayProgramDetailSheet: View {
                 fuelCost: fuelCostForTrip,
                 operatorCost: operatorCostForTrip,
                 operatorCategoryName: operatorCategoryName,
-                includeCostings: includeCostingsInExport
+                includeCostings: includeCostingsInExport && (accessControl?.canExportFinancialPDF ?? false)
             )
             let dateStr = record.date.formatted(.dateTime.year().month().day())
             let fileName = "SprayRecord_\(dateStr)"

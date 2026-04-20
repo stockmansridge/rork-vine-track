@@ -26,7 +26,7 @@ struct ChemicalsManagementView: View {
                     ChemicalDetailRow(chemical: chemical)
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    if accessControl?.canDelete ?? true {
+                    if accessControl?.canDelete ?? false {
                         Button(role: .destructive) {
                             store.deleteSavedChemical(chemical)
                         } label: {

@@ -75,7 +75,7 @@ struct PinsView: View {
             .navigationTitle("Pins")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if accessControl?.canExport ?? true {
+                    if accessControl?.canExport ?? false {
                         Button {
                             showExportOptions = true
                         } label: {
@@ -516,7 +516,7 @@ struct PinsListView: View {
             .ignoresSafeArea()
         }
         .confirmationDialog("Delete Pin?", isPresented: $showDeleteConfirmation, presenting: pinToDelete) { pin in
-            if accessControl?.canDelete ?? true {
+            if accessControl?.canDelete ?? false {
                 Button("Delete", role: .destructive) {
                     store.deletePin(pin)
                     pinToDelete = nil
@@ -675,7 +675,7 @@ struct PinRowView: View {
                     color: pin.isCompleted ? .orange : VineyardTheme.leafGreen,
                     action: onComplete
                 )
-                if accessControl?.canDelete ?? true {
+                if accessControl?.canDelete ?? false {
                     Spacer()
                     ActionButton(icon: "trash", label: "Delete", color: .red, action: onDelete)
                 }
@@ -974,7 +974,7 @@ struct PinDetailSheet: View {
                         )
                     }
 
-                    if accessControl?.canDelete ?? true {
+                    if accessControl?.canDelete ?? false {
                         Button(role: .destructive) {
                             store.deletePin(pin)
                             dismiss()

@@ -78,7 +78,7 @@ struct DisclaimerReportView: View {
                     Button("Done") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    if accessControl?.canExport ?? true {
+                    if accessControl?.canExport ?? false {
                         Button {
                             exportCSV()
                         } label: {

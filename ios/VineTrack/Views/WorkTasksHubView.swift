@@ -60,7 +60,7 @@ struct WorkTasksHubView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if accessControl?.canViewFinancials ?? true {
+                PermissionGate(\.canViewFinancials) {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("Total")
                             .font(.caption)
@@ -240,7 +240,7 @@ struct WorkTaskRow: View {
                         Label("\(task.totalPeople)", systemImage: "person.fill")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                        if task.totalCost > 0 && (accessControl?.canViewFinancials ?? true) {
+                        if task.totalCost > 0 && (accessControl?.canViewFinancials ?? false) {
                             Text("•")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)

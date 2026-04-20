@@ -4,6 +4,7 @@ struct MaintenanceLogDetailView: View {
     let log: MaintenanceLog
 
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
     @Environment(\.dismiss) private var dismiss
     @State private var showEdit: Bool = false
     @State private var showFullPhoto: Bool = false
@@ -18,7 +19,9 @@ struct MaintenanceLogDetailView: View {
                 VStack(spacing: 20) {
                     headerCard
                     detailsCard
-                    costsCard
+                    if accessControl?.canViewFinancials ?? false {
+                        costsCard
+                    }
 
                     if currentLog.invoicePhotoData != nil {
                         invoiceCard

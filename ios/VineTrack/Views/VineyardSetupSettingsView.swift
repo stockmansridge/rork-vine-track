@@ -203,7 +203,7 @@ struct VineyardSetupSettingsView: View {
                     }
                 }
                 .swipeActions(edge: .trailing) {
-                    if accessControl?.canDelete ?? true {
+                    if accessControl?.canDelete ?? false {
                         Button(role: .destructive) {
                             store.deletePaddock(paddock)
                         } label: {
@@ -248,7 +248,7 @@ struct VineyardSetupSettingsView: View {
 
     private var blockExportImportSection: some View {
         Section {
-            if accessControl?.canExport ?? true {
+            if accessControl?.canExport ?? false {
                 Button {
                     exportBlocks()
                 } label: {

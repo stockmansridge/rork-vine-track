@@ -69,7 +69,7 @@ struct VineyardListView: View {
             ForEach(store.vineyards) { vineyard in
                 VineyardCardRow(vineyard: vineyard, isSelected: vineyard.id == store.selectedVineyardId)
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        if accessControl?.canDelete ?? true {
+                        if accessControl?.canDelete ?? false {
                             Button(role: .destructive) {
                                 store.deleteVineyard(vineyard)
                             } label: {

@@ -109,7 +109,7 @@ struct WorkTaskLogView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if accessControl?.canViewFinancials ?? true {
+                if accessControl?.canViewFinancials ?? false {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("Cost")
                             .font(.caption)
@@ -294,7 +294,7 @@ private struct WorkTaskLogRow: View {
                     Label("\(task.totalPeople)", systemImage: "person.fill")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                    if task.costPerPerson > 0 && (accessControl?.canViewFinancials ?? true) {
+                    if task.costPerPerson > 0 && (accessControl?.canViewFinancials ?? false) {
                         Text("•")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
@@ -313,7 +313,7 @@ private struct WorkTaskLogRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                if accessControl?.canViewFinancials ?? true {
+                if accessControl?.canViewFinancials ?? false {
                     Text(task.totalCost, format: .currency(code: currencyCode))
                         .font(.subheadline.weight(.bold).monospacedDigit())
                         .foregroundStyle(VineyardTheme.leafGreen)

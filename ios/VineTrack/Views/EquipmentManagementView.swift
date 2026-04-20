@@ -20,7 +20,7 @@ struct EquipmentManagementView: View {
                         EquipmentRow(equipment: item)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if accessControl?.canDelete ?? true {
+                        if accessControl?.canDelete ?? false {
                             Button(role: .destructive) {
                                 store.deleteSprayEquipment(item)
                             } label: {
@@ -52,7 +52,7 @@ struct EquipmentManagementView: View {
                         TractorRow(tractor: tractor)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if accessControl?.canDelete ?? true {
+                        if accessControl?.canDelete ?? false {
                             Button(role: .destructive) {
                                 store.deleteTractor(tractor)
                             } label: {
@@ -86,7 +86,7 @@ struct EquipmentManagementView: View {
                         FuelPurchaseRow(purchase: purchase)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if accessControl?.canDelete ?? true {
+                        if accessControl?.canDelete ?? false {
                             Button(role: .destructive) {
                                 store.deleteFuelPurchase(purchase)
                             } label: {

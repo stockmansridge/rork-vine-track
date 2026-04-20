@@ -203,7 +203,7 @@ struct SettingsView: View {
                 handleLogoSelection(newItem)
             }
 
-            if store.selectedVineyard?.logoData != nil && (accessControl?.canDelete ?? true) {
+            if store.selectedVineyard?.logoData != nil && (accessControl?.canDelete ?? false) {
                 Button(role: .destructive) {
                     store.updateVineyardLogo(nil)
                 } label: {
@@ -229,8 +229,11 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
     private var setupSection: some View {
+        let canChange = accessControl?.canChangeSettings ?? false
         Section {
+            if canChange {
             NavigationLink {
                 VineyardSetupSettingsView()
             } label: {
@@ -252,6 +255,8 @@ struct SettingsView: View {
                 }
             }
 
+            }
+            if canChange {
             NavigationLink {
                 SprayManagementSettingsView()
             } label: {
@@ -274,6 +279,8 @@ struct SettingsView: View {
                 }
             }
 
+            }
+            if canChange {
             NavigationLink {
                 PreferencesSettingsView()
             } label: {
@@ -296,6 +303,8 @@ struct SettingsView: View {
                 }
             }
 
+            }
+            if canChange {
             NavigationLink {
                 DataPrivacySettingsView()
             } label: {
@@ -318,6 +327,7 @@ struct SettingsView: View {
                 }
             }
 
+            }
             if accessControl?.isManager ?? false {
                 NavigationLink {
                     AuditLogView()
@@ -340,6 +350,11 @@ struct SettingsView: View {
                         }
                     }
                 }
+            }
+            if !canChange && !(accessControl?.isManager ?? false) {
+                Text("Only Managers can change vineyard settings.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         } header: {
             HStack(spacing: 6) {

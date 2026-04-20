@@ -29,7 +29,7 @@ struct ButtonTemplateListView: View {
                             templateRow(template)
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            if accessControl?.canDelete ?? true {
+                            if accessControl?.canDelete ?? false {
                                 Button(role: .destructive) {
                                     store.deleteButtonTemplate(template)
                                 } label: {

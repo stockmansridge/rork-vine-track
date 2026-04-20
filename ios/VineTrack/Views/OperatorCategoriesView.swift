@@ -29,7 +29,7 @@ struct OperatorCategoriesView: View {
                         }
                     }
                     .swipeActions(edge: .trailing) {
-                        if accessControl?.canDelete ?? true {
+                        if accessControl?.canDelete ?? false {
                             Button(role: .destructive) {
                                 store.deleteOperatorCategory(category)
                             } label: {

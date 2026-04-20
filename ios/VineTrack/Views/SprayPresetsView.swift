@@ -58,7 +58,7 @@ struct SprayPresetsView: View {
                     }
                 }
                 .swipeActions(edge: .trailing) {
-                    if accessControl?.canDelete ?? true {
+                    if accessControl?.canDelete ?? false {
                         Button(role: .destructive) {
                             store.deleteSavedChemical(chemical)
                         } label: {
@@ -107,7 +107,7 @@ struct SprayPresetsView: View {
                     }
                 }
                 .swipeActions(edge: .trailing) {
-                    if accessControl?.canDelete ?? true {
+                    if accessControl?.canDelete ?? false {
                         Button(role: .destructive) {
                             store.deleteSavedSprayPreset(preset)
                         } label: {

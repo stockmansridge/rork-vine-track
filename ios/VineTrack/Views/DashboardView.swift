@@ -472,17 +472,23 @@ struct DashboardView: View {
     private var workTasksSubtitle: String {
         let tasks = store.workTasks
         guard !tasks.isEmpty else { return "Log & calculate" }
-        let total = tasks.reduce(0) { $0 + $1.totalCost }
-        let currencyCode = Locale.current.currency?.identifier ?? "USD"
-        return "\(tasks.count) task\(tasks.count == 1 ? "" : "s") \u{2022} \(total.formatted(.currency(code: currencyCode)))"
+        if accessControl?.canViewFinancials ?? false {
+            let total = tasks.reduce(0) { $0 + $1.totalCost }
+            let currencyCode = Locale.current.currency?.identifier ?? "USD"
+            return "\(tasks.count) task\(tasks.count == 1 ? "" : "s") \u{2022} \(total.formatted(.currency(code: currencyCode)))"
+        }
+        return "\(tasks.count) task\(tasks.count == 1 ? "" : "s") logged"
     }
 
     private var maintenanceLogSubtitle: String {
         let logs = store.maintenanceLogs
         guard !logs.isEmpty else { return "No records yet" }
-        let total = logs.reduce(0) { $0 + $1.totalCost }
-        let currencyCode = Locale.current.currency?.identifier ?? "USD"
-        return "\(logs.count) record\(logs.count == 1 ? "" : "s") \u{2022} \(total.formatted(.currency(code: currencyCode)))"
+        if accessControl?.canViewFinancials ?? false {
+            let total = logs.reduce(0) { $0 + $1.totalCost }
+            let currencyCode = Locale.current.currency?.identifier ?? "USD"
+            return "\(logs.count) record\(logs.count == 1 ? "" : "s") \u{2022} \(total.formatted(.currency(code: currencyCode)))"
+        }
+        return "\(logs.count) record\(logs.count == 1 ? "" : "s")"
     }
 
     // MARK: - Recent Activity

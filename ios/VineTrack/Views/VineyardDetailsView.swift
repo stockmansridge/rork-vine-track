@@ -6,6 +6,7 @@ struct VineyardDetailsView: View {
     @Environment(DataStore.self) private var store
     @Environment(LocationService.self) private var locationService
     @Environment(DegreeDayService.self) private var degreeDayService
+    @Environment(\.accessControl) private var accessControl
     @State private var selectedPaddock: Paddock? = nil
 
     private var vineyard: Vineyard? { store.selectedVineyard }
@@ -137,7 +138,9 @@ struct VineyardDetailsView: View {
                 blocksSection
                 pinsOverviewSection
                 seasonSummarySection
-                VineyardCostsSection()
+                if accessControl?.canViewFinancials ?? false {
+                    VineyardCostsSection()
+                }
             }
             .padding(.horizontal)
             .padding(.bottom, 24)
@@ -623,7 +626,9 @@ struct VineyardDetailsView: View {
             VStack(spacing: 1) {
                 seasonRow(icon: "sprinkler.and.droplets.fill", iconColor: .purple, label: "Sprays This Season", value: "\(seasonSprayRecords.count)")
                 seasonRow(icon: "road.lanes", iconColor: .blue, label: "Trips This Season", value: "\(seasonTrips.count)")
-                seasonRow(icon: "dollarsign.circle.fill", iconColor: VineyardTheme.leafGreen, label: "Total Trip Costs", value: totalTripCosts > 0 ? String(format: "$%.2f", totalTripCosts) : "–")
+                if accessControl?.canViewFinancials ?? false {
+                    seasonRow(icon: "dollarsign.circle.fill", iconColor: VineyardTheme.leafGreen, label: "Total Trip Costs", value: totalTripCosts > 0 ? String(format: "$%.2f", totalTripCosts) : "–")
+                }
             }
         }
     }
