@@ -21,12 +21,32 @@ struct InviteMemberSheet: View {
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                }
 
+                Section {
                     Picker("Role", selection: $selectedRole) {
                         ForEach(VineyardRole.allCases.filter { $0 != .owner }, id: \.self) { role in
                             Text(role.rawValue).tag(role)
                         }
                     }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        RoleSummaryRow(title: "Operator", text: "Basic staff — records work, no deletes or financials.")
+                        RoleSummaryRow(title: "Supervisor", text: "Manages day-to-day operations and deletes, no financials.")
+                        RoleSummaryRow(title: "Manager", text: "Full access, including financials, setup and team.")
+                    }
+                    .padding(.vertical, 4)
+
+                    NavigationLink {
+                        RolesPermissionsInfoView()
+                    } label: {
+                        Label("Learn more about roles", systemImage: "info.circle")
+                            .font(.footnote)
+                    }
+                } header: {
+                    Text("Role")
+                } footer: {
+                    Text("Some features and values are hidden based on the assigned role.")
                 }
 
                 Section {

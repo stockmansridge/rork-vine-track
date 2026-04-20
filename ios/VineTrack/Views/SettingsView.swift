@@ -334,6 +334,17 @@ struct SettingsView: View {
                 )
             }
 
+            NavigationLink {
+                RolesPermissionsInfoView()
+            } label: {
+                settingsRow(
+                    title: "Roles & Permissions",
+                    subtitle: "How access works for your team",
+                    symbol: "person.badge.shield.checkmark.fill",
+                    color: .purple
+                )
+            }
+
             Link(destination: AppLinks.termsOfUse) {
                 HStack {
                     Text("Terms of Use (EULA)")

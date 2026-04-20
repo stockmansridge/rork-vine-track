@@ -1,5 +1,21 @@
 import SwiftUI
 
+struct RoleSummaryRow: View {
+    let title: String
+    let text: String
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
 struct VineyardDetailSheet: View {
     let vineyard: Vineyard
     @Environment(DataStore.self) private var store
@@ -294,10 +310,24 @@ struct AddUserSheet: View {
                             Text(role.rawValue).tag(role)
                         }
                     }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        RoleSummaryRow(title: "Operator", text: "Basic staff — records work, no deletes or financials.")
+                        RoleSummaryRow(title: "Supervisor", text: "Manages operations and deletes, no financials.")
+                        RoleSummaryRow(title: "Manager", text: "Full access, including financials, setup and team.")
+                    }
+                    .padding(.vertical, 4)
+
+                    NavigationLink {
+                        RolesPermissionsInfoView()
+                    } label: {
+                        Label("Learn more about roles", systemImage: "info.circle")
+                            .font(.footnote)
+                    }
                 } header: {
                     Text("Role")
                 } footer: {
-                    Text("Manager: full access including financials. Supervisor: can delete records and manage day-to-day operations but cannot view financial data. Operator: basic staff — no deletes, no financials.")
+                    Text("Some features and values are hidden based on the assigned role.")
                 }
 
                 Section {
@@ -382,13 +412,25 @@ struct EditUserSheet: View {
                                 Text(role.rawValue).tag(role)
                             }
                         }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            RoleSummaryRow(title: "Operator", text: "Basic staff — records work, no deletes or financials.")
+                            RoleSummaryRow(title: "Supervisor", text: "Manages operations and deletes, no financials.")
+                            RoleSummaryRow(title: "Manager", text: "Full access, including financials, setup and team.")
+                        }
+                        .padding(.vertical, 4)
+
+                        NavigationLink {
+                            RolesPermissionsInfoView()
+                        } label: {
+                            Label("Learn more about roles", systemImage: "info.circle")
+                                .font(.footnote)
+                        }
                     }
                 } header: {
                     Text("Role")
                 } footer: {
-                    Text(isOwner
-                        ? "The Owner role cannot be changed."
-                        : "Manager: full access + financials. Supervisor: deletes & operations, no financials. Operator: basic staff.")
+                    Text(isOwner ? "The Owner role cannot be changed." : "Some features and values are hidden based on the assigned role.")
                 }
 
                 Section {
