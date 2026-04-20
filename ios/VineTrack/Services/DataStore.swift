@@ -48,6 +48,8 @@ class DataStore {
     // DataStore delegates file I/O here instead of doing it inline.
     let workTaskRepository: WorkTaskRepository = WorkTaskRepository()
     let maintenanceLogRepository: MaintenanceLogRepository = MaintenanceLogRepository()
+    let pinRepository: PinRepository = PinRepository()
+    let tripRepository: TripRepository = TripRepository()
 
     // MARK: - Permission Guards
 
@@ -86,9 +88,9 @@ class DataStore {
 
     let vineyardsKey = "vinetrack_vineyards"
     let selectedVineyardIdKey = "vinetrack_selected_vineyard_id"
-    let pinsKey = "vinetrack_pins"
+    var pinsKey: String { PinRepository.storageKey }
     let paddocksKey = "vinetrack_paddocks"
-    let tripsKey = "vinetrack_trips"
+    var tripsKey: String { TripRepository.storageKey }
     let repairButtonsKey = "vinetrack_repair_buttons"
     let growthButtonsKey = "vinetrack_growth_buttons"
     let settingsKey = "vinetrack_settings_v2"
@@ -141,9 +143,7 @@ class DataStore {
     }
 
     private func loadVineyardData() {
-        let allPins: [VinePin] = loadData(key: pinsKey) ?? []
         let allPaddocks: [Paddock] = loadData(key: paddocksKey) ?? []
-        let allTrips: [Trip] = loadData(key: tripsKey) ?? []
         let allRepairButtons: [ButtonConfig] = loadData(key: repairButtonsKey) ?? []
         let allGrowthButtons: [ButtonConfig] = loadData(key: growthButtonsKey) ?? []
         let allSettings: [AppSettings] = loadData(key: settingsKey) ?? []
@@ -158,9 +158,9 @@ class DataStore {
             return
         }
 
-        pins = allPins.filter { $0.vineyardId == vid }
+        pins = pinRepository.load(for: vid)
         paddocks = allPaddocks.filter { $0.vineyardId == vid }
-        trips = allTrips.filter { $0.vineyardId == vid }
+        trips = tripRepository.load(for: vid)
         repairButtons = allRepairButtons.filter { $0.vineyardId == vid }
         growthButtons = allGrowthButtons.filter { $0.vineyardId == vid }
 
@@ -245,9 +245,9 @@ class DataStore {
 
     // MARK: - Cloud Sync Helpers (read all data)
 
-    var allPins: [VinePin] { loadData(key: pinsKey) ?? [] }
+    var allPins: [VinePin] { pinRepository.loadAll() }
     var allPaddocks: [Paddock] { loadData(key: paddocksKey) ?? [] }
-    var allTrips: [Trip] { loadData(key: tripsKey) ?? [] }
+    var allTrips: [Trip] { tripRepository.loadAll() }
     var allRepairButtons: [ButtonConfig] { loadData(key: repairButtonsKey) ?? [] }
     var allGrowthButtons: [ButtonConfig] { loadData(key: growthButtonsKey) ?? [] }
     var allSettings: [AppSettings] { loadData(key: settingsKey) ?? [] }
@@ -314,17 +314,13 @@ class DataStore {
         vineyards.removeAll { $0.id == vid }
         save(vineyards, key: vineyardsKey)
 
-        var allPins: [VinePin] = loadData(key: pinsKey) ?? []
-        allPins.removeAll { $0.vineyardId == vid }
-        save(allPins, key: pinsKey)
+        pinRepository.replace([], for: vid)
 
         var allPaddocks: [Paddock] = loadData(key: paddocksKey) ?? []
         allPaddocks.removeAll { $0.vineyardId == vid }
         save(allPaddocks, key: paddocksKey)
 
-        var allTrips: [Trip] = loadData(key: tripsKey) ?? []
-        allTrips.removeAll { $0.vineyardId == vid }
-        save(allTrips, key: tripsKey)
+        tripRepository.replace([], for: vid)
 
         var allRepairButtons: [ButtonConfig] = loadData(key: repairButtonsKey) ?? []
         allRepairButtons.removeAll { $0.vineyardId == vid }

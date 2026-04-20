@@ -17,15 +17,9 @@ extension DataStore {
     }
 
     func mergePins(_ remote: [VinePin], for vineyardId: UUID) {
-        var all: [VinePin] = loadData(key: pinsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: pinsKey)
+        let merged = pinRepository.merge(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            pins = all.filter { $0.vineyardId == vineyardId }
+            pins = merged
         }
     }
 
@@ -43,15 +37,9 @@ extension DataStore {
     }
 
     func mergeTrips(_ remote: [Trip], for vineyardId: UUID) {
-        var all: [Trip] = loadData(key: tripsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: tripsKey)
+        let merged = tripRepository.merge(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            trips = all.filter { $0.vineyardId == vineyardId }
+            trips = merged
         }
     }
 
@@ -156,10 +144,7 @@ extension DataStore {
     // MARK: - Replace Helpers (timestamp-based conflict resolution)
 
     func replacePins(_ remote: [VinePin], for vineyardId: UUID) {
-        var all: [VinePin] = loadData(key: pinsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: pinsKey)
+        pinRepository.replace(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             pins = remote
         }
@@ -176,10 +161,7 @@ extension DataStore {
     }
 
     func replaceTrips(_ remote: [Trip], for vineyardId: UUID) {
-        var all: [Trip] = loadData(key: tripsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: tripsKey)
+        tripRepository.replace(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             trips = remote
         }
@@ -359,12 +341,8 @@ extension DataStore {
     // MARK: - Private Save Helpers
 
     func saveAllPins() {
-        var allPins: [VinePin] = loadData(key: pinsKey) ?? []
-        if let vid = selectedVineyardId {
-            allPins.removeAll { $0.vineyardId == vid }
-        }
-        allPins.append(contentsOf: pins)
-        save(allPins, key: pinsKey)
+        guard let vid = selectedVineyardId else { return }
+        pinRepository.saveSlice(pins, for: vid)
         syncDataToCloud(dataType: "pins")
     }
 
@@ -379,12 +357,8 @@ extension DataStore {
     }
 
     func saveAllTrips() {
-        var allTrips: [Trip] = loadData(key: tripsKey) ?? []
-        if let vid = selectedVineyardId {
-            allTrips.removeAll { $0.vineyardId == vid }
-        }
-        allTrips.append(contentsOf: trips)
-        save(allTrips, key: tripsKey)
+        guard let vid = selectedVineyardId else { return }
+        tripRepository.saveSlice(trips, for: vid)
         syncDataToCloud(dataType: "trips")
     }
 
