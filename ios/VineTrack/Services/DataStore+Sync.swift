@@ -5,12 +5,7 @@ extension DataStore {
     // MARK: - Cloud Merge Helpers
 
     func mergeVineyards(_ remote: [Vineyard]) {
-        for rv in remote {
-            if !vineyards.contains(where: { $0.id == rv.id }) {
-                vineyards.append(rv)
-            }
-        }
-        save(vineyards, key: vineyardsKey)
+        vineyards = vineyardRepository.merge(remote)
         if selectedVineyardId == nil, let first = vineyards.first {
             selectedVineyardId = first.id
         }
@@ -400,12 +395,8 @@ extension DataStore {
     }
 
     func saveAllDamageRecords() {
-        var all: [DamageRecord] = loadData(key: damageRecordsKey) ?? []
-        if let vid = selectedVineyardId {
-            all.removeAll { $0.vineyardId == vid }
-        }
-        all.append(contentsOf: damageRecords)
-        save(all, key: damageRecordsKey)
+        guard let vid = selectedVineyardId else { return }
+        yieldRepository.saveDamageSlice(damageRecords, for: vid)
         syncDataToCloud(dataType: "damage_records")
     }
 
@@ -416,93 +407,58 @@ extension DataStore {
     }
 
     func saveAllHistoricalYieldRecords() {
-        var all: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
-        if let vid = selectedVineyardId {
-            all.removeAll { $0.vineyardId == vid }
-        }
-        all.append(contentsOf: historicalYieldRecords)
-        save(all, key: historicalYieldRecordsKey)
+        guard let vid = selectedVineyardId else { return }
+        yieldRepository.saveHistoricalSlice(historicalYieldRecords, for: vid)
         syncDataToCloud(dataType: "historical_yield_records")
     }
 
     func saveAllYieldSessions() {
-        var all: [YieldEstimationSession] = loadData(key: yieldSessionsKey) ?? []
-        if let vid = selectedVineyardId {
-            all.removeAll { $0.vineyardId == vid }
-        }
-        all.append(contentsOf: yieldSessions)
-        save(all, key: yieldSessionsKey)
+        guard let vid = selectedVineyardId else { return }
+        yieldRepository.saveSessionsSlice(yieldSessions, for: vid)
         syncDataToCloud(dataType: "yield_sessions")
     }
 
     // MARK: - Cloud Merge: Yield / Damage / Maintenance
 
     func replaceYieldSessions(_ remote: [YieldEstimationSession], for vineyardId: UUID) {
-        var all: [YieldEstimationSession] = loadData(key: yieldSessionsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: yieldSessionsKey)
+        yieldRepository.replaceSessions(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             yieldSessions = remote
         }
     }
 
     func mergeYieldSessions(_ remote: [YieldEstimationSession], for vineyardId: UUID) {
-        var all: [YieldEstimationSession] = loadData(key: yieldSessionsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: yieldSessionsKey)
+        let merged = yieldRepository.mergeSessions(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            yieldSessions = all.filter { $0.vineyardId == vineyardId }
+            yieldSessions = merged
         }
     }
 
     func replaceDamageRecords(_ remote: [DamageRecord], for vineyardId: UUID) {
-        var all: [DamageRecord] = loadData(key: damageRecordsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: damageRecordsKey)
+        yieldRepository.replaceDamage(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             damageRecords = remote
         }
     }
 
     func mergeDamageRecords(_ remote: [DamageRecord], for vineyardId: UUID) {
-        var all: [DamageRecord] = loadData(key: damageRecordsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: damageRecordsKey)
+        let merged = yieldRepository.mergeDamage(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            damageRecords = all.filter { $0.vineyardId == vineyardId }
+            damageRecords = merged
         }
     }
 
     func replaceHistoricalYieldRecords(_ remote: [HistoricalYieldRecord], for vineyardId: UUID) {
-        var all: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: historicalYieldRecordsKey)
+        yieldRepository.replaceHistorical(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             historicalYieldRecords = remote
         }
     }
 
     func mergeHistoricalYieldRecords(_ remote: [HistoricalYieldRecord], for vineyardId: UUID) {
-        var all: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: historicalYieldRecordsKey)
+        let merged = yieldRepository.mergeHistorical(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            historicalYieldRecords = all.filter { $0.vineyardId == vineyardId }
+            historicalYieldRecords = merged
         }
     }
 

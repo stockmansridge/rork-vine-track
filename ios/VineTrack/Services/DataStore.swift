@@ -55,6 +55,10 @@ class DataStore {
     let sprayRepository: SprayRepository = SprayRepository()
     let settingsRepository: SettingsRepository = SettingsRepository()
 
+    // MARK: - Repositories (Phase 4)
+    let vineyardRepository: VineyardRepository = VineyardRepository()
+    let yieldRepository: YieldRepository = YieldRepository()
+
     // MARK: - Permission Guards
 
     private func assertCanDelete(_ label: String) -> Bool {
@@ -90,7 +94,7 @@ class DataStore {
         return true
     }
 
-    let vineyardsKey = "vinetrack_vineyards"
+    var vineyardsKey: String { VineyardRepository.storageKey }
     let selectedVineyardIdKey = "vinetrack_selected_vineyard_id"
     var pinsKey: String { PinRepository.storageKey }
     let paddocksKey = "vinetrack_paddocks"
@@ -108,9 +112,9 @@ class DataStore {
     let fuelPurchasesKey = "vinetrack_fuel_purchases"
     let operatorCategoriesKey = "vinetrack_operator_categories"
     let buttonTemplatesKey = "vinetrack_button_templates"
-    let yieldSessionsKey = "vinetrack_yield_sessions"
-    let damageRecordsKey = "vinetrack_damage_records"
-    let historicalYieldRecordsKey = "vinetrack_historical_yield_records"
+    var yieldSessionsKey: String { YieldRepository.sessionsKey }
+    var damageRecordsKey: String { YieldRepository.damageKey }
+    var historicalYieldRecordsKey: String { YieldRepository.historicalKey }
     var maintenanceLogsKey: String { MaintenanceLogRepository.storageKey }
     var workTasksKey: String { WorkTaskRepository.storageKey }
     let grapeVarietiesKey = "vinetrack_grape_varieties"
@@ -132,7 +136,7 @@ class DataStore {
     }
 
     func load() {
-        vineyards = loadData(key: vineyardsKey) ?? []
+        vineyards = vineyardRepository.loadAll()
         if let savedId = UserDefaults.standard.string(forKey: selectedVineyardIdKey) {
             selectedVineyardId = UUID(uuidString: savedId)
         }
@@ -199,14 +203,9 @@ class DataStore {
         let allButtonTemplates: [ButtonTemplate] = loadData(key: buttonTemplatesKey) ?? []
         buttonTemplates = allButtonTemplates.filter { $0.vineyardId == vid }
 
-        let allYieldSessions: [YieldEstimationSession] = loadData(key: yieldSessionsKey) ?? []
-        yieldSessions = allYieldSessions.filter { $0.vineyardId == vid }
-
-        let allDamageRecords: [DamageRecord] = loadData(key: damageRecordsKey) ?? []
-        damageRecords = allDamageRecords.filter { $0.vineyardId == vid }
-
-        let allHistoricalYield: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
-        historicalYieldRecords = allHistoricalYield.filter { $0.vineyardId == vid }
+        yieldSessions = yieldRepository.loadSessions(for: vid)
+        damageRecords = yieldRepository.loadDamage(for: vid)
+        historicalYieldRecords = yieldRepository.loadHistorical(for: vid)
 
         maintenanceLogs = maintenanceLogRepository.load(for: vid)
         workTasks = workTaskRepository.load(for: vid)
@@ -240,6 +239,10 @@ class DataStore {
     // MARK: - Cloud Sync Helpers (read all data)
 
     var allPins: [VinePin] { pinRepository.loadAll() }
+    var allVineyards: [Vineyard] { vineyardRepository.loadAll() }
+    var allYieldSessions: [YieldEstimationSession] { yieldRepository.loadAllSessions() }
+    var allDamageRecords: [DamageRecord] { yieldRepository.loadAllDamage() }
+    var allHistoricalYieldRecords: [HistoricalYieldRecord] { yieldRepository.loadAllHistorical() }
     var allPaddocks: [Paddock] { loadData(key: paddocksKey) ?? [] }
     var allTrips: [Trip] { tripRepository.loadAll() }
     var allRepairButtons: [ButtonConfig] { loadData(key: repairButtonsKey) ?? [] }
@@ -281,13 +284,12 @@ class DataStore {
             changed = true
         }
         if changed {
-            save(vineyards, key: vineyardsKey)
+            vineyardRepository.saveAll(vineyards)
         }
     }
 
     func addVineyard(_ vineyard: Vineyard) {
-        vineyards.append(vineyard)
-        save(vineyards, key: vineyardsKey)
+        vineyards = vineyardRepository.upsert(vineyard)
         if selectedVineyardId == nil {
             selectedVineyardId = vineyard.id
         }
@@ -296,17 +298,15 @@ class DataStore {
     }
 
     func updateVineyard(_ vineyard: Vineyard) {
-        guard let index = vineyards.firstIndex(where: { $0.id == vineyard.id }) else { return }
-        vineyards[index] = vineyard
-        save(vineyards, key: vineyardsKey)
+        guard vineyards.contains(where: { $0.id == vineyard.id }) else { return }
+        vineyards = vineyardRepository.upsert(vineyard)
         syncVineyardToCloud(vineyard)
     }
 
     func deleteVineyard(_ vineyard: Vineyard) {
         guard assertCanDelete("Vineyard") else { return }
         let vid = vineyard.id
-        vineyards.removeAll { $0.id == vid }
-        save(vineyards, key: vineyardsKey)
+        vineyards = vineyardRepository.remove(id: vid)
 
         pinRepository.replace([], for: vid)
 
@@ -713,7 +713,7 @@ class DataStore {
                 vineyards[index].users[userIndex].operatorCategoryId = categoryId
             }
         }
-        save(vineyards, key: vineyardsKey)
+        vineyardRepository.saveAll(vineyards)
     }
 
     // MARK: - Button Templates
@@ -1237,7 +1237,7 @@ class DataStore {
                 if let country = placemarks.first?.country, !country.isEmpty {
                     guard let idx = vineyards.firstIndex(where: { $0.id == vid }) else { return }
                     vineyards[idx].country = country
-                    save(vineyards, key: vineyardsKey)
+                    vineyardRepository.saveAll(vineyards)
                     syncVineyardToCloud(vineyards[idx])
                 }
             } catch {
@@ -1253,7 +1253,7 @@ class DataStore {
         guard let vid = selectedVineyardId,
               let index = vineyards.firstIndex(where: { $0.id == vid }) else { return }
         vineyards[index].logoData = logoData
-        save(vineyards, key: vineyardsKey)
+        vineyardRepository.saveAll(vineyards)
         syncVineyardToCloud(vineyards[index])
     }
 
