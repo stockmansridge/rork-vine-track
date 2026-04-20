@@ -425,6 +425,7 @@ struct ActiveTripView: View {
     @State private var showFillStopConfirmation: Bool = false
     @State private var fillElapsed: TimeInterval = 0
     @State private var fillTimer: Timer? = nil
+    @State private var pinDropShortcutMode: PinMode? = nil
 
     private var currentSpeedKmh: Double {
         guard let speed = locationService.location?.speed, speed > 0 else { return 0 }
@@ -579,6 +580,12 @@ struct ActiveTripView: View {
                 existingRecord: store.sprayRecord(for: trip.id)
             )
         }
+        .sheet(isPresented: Binding(
+            get: { pinDropShortcutMode != nil },
+            set: { if !$0 { pinDropShortcutMode = nil } }
+        )) {
+            PinDropView(initialMode: pinDropShortcutMode ?? .repairs)
+        }
         .onAppear {
             locationService.startUpdating()
             if !trackingService.isTracking && !trip.isPaused {
@@ -690,18 +697,42 @@ struct ActiveTripView: View {
 
     private var tripInfoBar: some View {
         VStack(spacing: 0) {
-            if !trip.personName.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "person.fill")
-                        .font(.caption)
-                        .foregroundStyle(Color.accentColor)
-                    Text(trip.personName)
-                        .font(.subheadline.weight(.semibold))
+            HStack(spacing: 10) {
+                Button {
+                    pinDropShortcutMode = .repairs
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "wrench.fill")
+                            .font(.caption)
+                        Text("Repairs")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.15), in: .rect(cornerRadius: 8))
+                    .foregroundStyle(.orange)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(Color(.tertiarySystemGroupedBackground))
+                .buttonStyle(.plain)
+
+                Button {
+                    pinDropShortcutMode = .growth
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "leaf.fill")
+                            .font(.caption)
+                        Text("Growth")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(VineyardTheme.leafGreen.opacity(0.15), in: .rect(cornerRadius: 8))
+                    .foregroundStyle(VineyardTheme.leafGreen)
+                }
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.tertiarySystemGroupedBackground))
 
             HStack(spacing: 0) {
                 VStack(spacing: 4) {
