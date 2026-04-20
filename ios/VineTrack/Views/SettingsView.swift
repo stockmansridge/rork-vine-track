@@ -16,6 +16,10 @@ struct SettingsView: View {
     @State private var showPaywall: Bool = false
 
 
+    private var canChange: Bool { accessControl?.canChangeSettings ?? false }
+    private var isManager: Bool { accessControl?.isManager ?? false }
+    private var canManageUsers: Bool { accessControl?.canManageUsers ?? false }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -23,13 +27,17 @@ struct SettingsView: View {
                     adminSection
                 }
 
-                subscriptionSection
                 PendingInvitationsView()
-                vineyardSection
-                setupSection
-                accountNavSection
-                supportSection
-                appInfoSection
+
+                vineyardGroupSection
+
+                if canChange {
+                    operationsSetupGroupSection
+                }
+
+                preferencesGroupSection
+
+                accountSupportGroupSection
             }
             .navigationTitle("Settings")
             .sheet(isPresented: $showAdminDashboard) {
@@ -162,7 +170,8 @@ struct SettingsView: View {
         }
     }
 
-    private var vineyardSection: some View {
+    @ViewBuilder
+    private var vineyardGroupSection: some View {
         Section {
             if let vineyard = store.selectedVineyard {
                 HStack(spacing: 12) {
@@ -195,37 +204,256 @@ struct SettingsView: View {
                 }
             }
 
-            PhotosPicker(selection: $selectedLogoItem, matching: .images) {
-                Label(store.selectedVineyard?.logoData != nil ? "Change Logo" : "Add Logo", systemImage: "photo.badge.plus")
-                    .foregroundStyle(.primary)
-            }
-            .onChange(of: selectedLogoItem) { _, newItem in
-                handleLogoSelection(newItem)
-            }
-
-            if store.selectedVineyard?.logoData != nil && (accessControl?.canDelete ?? false) {
-                Button(role: .destructive) {
-                    store.updateVineyardLogo(nil)
-                } label: {
-                    Label("Remove Logo", systemImage: "trash")
-                }
-            }
-
-            Button {
-                showVineyardDetail = true
-            } label: {
-                Label("Manage Vineyard", systemImage: "person.2")
-                    .foregroundStyle(.primary)
-            }
-
             Button {
                 showVineyardList = true
             } label: {
                 Label("Switch Vineyard", systemImage: "arrow.triangle.swap")
                     .foregroundStyle(.primary)
             }
+
+            if canChange {
+                PhotosPicker(selection: $selectedLogoItem, matching: .images) {
+                    Label(store.selectedVineyard?.logoData != nil ? "Change Logo" : "Add Logo", systemImage: "photo.badge.plus")
+                        .foregroundStyle(.primary)
+                }
+                .onChange(of: selectedLogoItem) { _, newItem in
+                    handleLogoSelection(newItem)
+                }
+
+                if store.selectedVineyard?.logoData != nil && (accessControl?.canDelete ?? false) {
+                    Button(role: .destructive) {
+                        store.updateVineyardLogo(nil)
+                    } label: {
+                        Label("Remove Logo", systemImage: "trash")
+                    }
+                }
+            }
+
+            if canManageUsers || isManager {
+                Button {
+                    showVineyardDetail = true
+                } label: {
+                    Label("Team & Access", systemImage: "person.2.fill")
+                        .foregroundStyle(.primary)
+                }
+            }
+
+            if isManager {
+                subscriptionRow
+            }
         } header: {
-            Text("Current Vineyard")
+            HStack(spacing: 6) {
+                Image(systemName: "building.2.fill")
+                    .foregroundStyle(VineyardTheme.leafGreen)
+                    .font(.caption)
+                Text("Vineyard")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var subscriptionRow: some View {
+        if storeVM.isPremium {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.green.gradient)
+                        .frame(width: 28, height: 28)
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+                Text("VineTrack Pro")
+                    .font(.subheadline)
+                Spacer()
+                Text("Active")
+                    .font(.caption.bold())
+                    .foregroundStyle(VineyardTheme.leafGreen)
+            }
+        } else {
+            Button {
+                showPaywall = true
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.green.gradient)
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "star.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    Text("Upgrade to Pro")
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var operationsSetupGroupSection: some View {
+        Section {
+            NavigationLink {
+                OperationsSetupHubView()
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(VineyardTheme.leafGreen.gradient)
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "square.grid.2x2.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Operations Setup")
+                            .font(.subheadline.weight(.medium))
+                        Text("Blocks, spray, equipment & operators")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "wrench.adjustable.fill")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+                Text("Operations")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var preferencesGroupSection: some View {
+        Section {
+            NavigationLink {
+                PreferencesSettingsView()
+            } label: {
+                settingsRow(
+                    title: "Preferences",
+                    subtitle: "Appearance, season, tracking & photos",
+                    symbol: "slider.horizontal.3",
+                    color: .indigo
+                )
+            }
+
+            if canChange {
+                NavigationLink {
+                    DataPrivacySettingsView()
+                } label: {
+                    settingsRow(
+                        title: "Data & Backup",
+                        subtitle: "Cloud sync, pins & trips",
+                        symbol: "externaldrive.fill",
+                        color: .blue
+                    )
+                }
+            }
+
+            if isManager {
+                NavigationLink {
+                    AuditLogView()
+                } label: {
+                    settingsRow(
+                        title: "Audit Log",
+                        subtitle: "Deletes, role & settings changes",
+                        symbol: "list.bullet.clipboard.fill",
+                        color: .gray
+                    )
+                }
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "gearshape.fill")
+                    .foregroundStyle(.indigo)
+                    .font(.caption)
+                Text("Preferences & Data")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var accountSupportGroupSection: some View {
+        Section {
+            NavigationLink {
+                AccountSettingsView()
+            } label: {
+                settingsRow(
+                    title: "Account",
+                    subtitle: authService.userName.isEmpty ? "Sign out & manage account" : authService.userName,
+                    symbol: "person.circle.fill",
+                    color: .gray
+                )
+            }
+
+            Button {
+                showSupportForm = true
+            } label: {
+                settingsRow(
+                    title: "Contact Support",
+                    subtitle: "Report an issue or send feedback",
+                    symbol: "envelope.fill",
+                    color: .blue
+                )
+            }
+
+            Link(destination: AppLinks.termsOfUse) {
+                HStack {
+                    Text("Terms of Use (EULA)")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Link(destination: AppLinks.privacyPolicy) {
+                HStack {
+                    Text("Privacy Policy")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            LabeledContent("Version", value: "\(appVersion) (\(appBuild))")
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "person.fill")
+                    .foregroundStyle(.gray)
+                    .font(.caption)
+                Text("Account & Support")
+            }
+        }
+    }
+
+    private func settingsRow(title: String, subtitle: String, symbol: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.gradient)
+                    .frame(width: 32, height: 32)
+                Image(systemName: symbol)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
