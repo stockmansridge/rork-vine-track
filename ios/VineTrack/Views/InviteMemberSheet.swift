@@ -5,6 +5,7 @@ struct InviteMemberSheet: View {
     @Environment(AuthService.self) private var authService
     @Environment(DataStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessControl) private var accessControl
     @State private var email: String = ""
     @State private var selectedRole: VineyardRole = .operator_
     @State private var selectedCategoryId: UUID? = nil
@@ -32,8 +33,13 @@ struct InviteMemberSheet: View {
                     Picker("Category", selection: $selectedCategoryId) {
                         Text("None").tag(UUID?.none)
                         ForEach(store.operatorCategories) { cat in
-                            Text("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)")
-                                .tag(UUID?.some(cat.id))
+                            if accessControl?.canViewFinancials ?? false {
+                                Text("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)")
+                                    .tag(UUID?.some(cat.id))
+                            } else {
+                                Text(cat.name)
+                                    .tag(UUID?.some(cat.id))
+                            }
                         }
                     }
                 } header: {

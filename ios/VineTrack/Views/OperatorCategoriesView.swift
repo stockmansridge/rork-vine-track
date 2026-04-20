@@ -18,9 +18,11 @@ struct OperatorCategoriesView: View {
                                 Text(category.name)
                                     .font(.headline)
                                     .foregroundStyle(.primary)
-                                Text(String(format: "$%.2f /hr", category.costPerHour))
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                                if accessControl?.canViewFinancials ?? false {
+                                    Text(String(format: "$%.2f /hr", category.costPerHour))
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                             Spacer()
                             Image(systemName: "chevron.right")

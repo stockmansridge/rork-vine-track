@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkTaskCalculatorView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
 
     @State private var hoursText: String = ""
     @State private var peopleText: String = "1"
@@ -36,6 +37,20 @@ struct WorkTaskCalculatorView: View {
     }
 
     var body: some View {
+        if !(accessControl?.canViewFinancials ?? false) {
+            ContentUnavailableView(
+                "Financial tools hidden",
+                systemImage: "lock.fill",
+                description: Text("Only Managers can use the Work Task Calculator.")
+            )
+            .navigationTitle("Work Task Calculator")
+            .navigationBarTitleDisplayMode(.inline)
+        } else {
+            calculatorForm
+        }
+    }
+
+    private var calculatorForm: some View {
         Form {
             Section("Worker Type") {
                 if store.operatorCategories.isEmpty {

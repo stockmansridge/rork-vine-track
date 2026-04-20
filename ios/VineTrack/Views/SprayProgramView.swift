@@ -941,7 +941,7 @@ struct SprayProgramDetailSheet: View {
         let grandTotal = totalChemCost + fuelCost + operatorCost
         let hasCosts = !chemCosts.isEmpty || fuelCost > 0 || operatorCost > 0
 
-        if hasCosts {
+        if hasCosts && (accessControl?.canViewFinancials ?? false) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
                     Image(systemName: "dollarsign.circle.fill")

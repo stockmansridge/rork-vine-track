@@ -11,6 +11,7 @@ struct SprayCalculatorView: View {
     @Environment(TripTrackingService.self) private var trackingService
     @Environment(LocationService.self) private var locationService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessControl) private var accessControl
 
     @State private var selectedPaddockIds: Set<UUID> = []
     @State private var selectedEquipmentId: UUID?
@@ -85,7 +86,7 @@ struct SprayCalculatorView: View {
                         if showResults, let result = calculationResult {
                             ResultsCard(result: result)
 
-                            if let costing = result.costingSummary {
+                            if let costing = result.costingSummary, accessControl?.canViewFinancials ?? false {
                                 CostingsCard(summary: costing)
                             }
                         }

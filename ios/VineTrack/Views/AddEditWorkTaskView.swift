@@ -275,9 +275,11 @@ struct AddEditWorkTaskView: View {
                     Text(res.wrappedValue.workerTypeName.isEmpty ? "Select worker type" : res.wrappedValue.workerTypeName)
                         .foregroundStyle(res.wrappedValue.workerTypeName.isEmpty ? .secondary : .primary)
                     Spacer()
-                    Text(res.wrappedValue.hourlyRate, format: .currency(code: currencyCode))
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
+                    if accessControl?.canViewFinancials ?? false {
+                        Text(res.wrappedValue.hourlyRate, format: .currency(code: currencyCode))
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.caption)
                         .foregroundStyle(.secondary)

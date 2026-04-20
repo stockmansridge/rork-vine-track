@@ -421,6 +421,7 @@ class DataStore {
         guard assertCanDelete("Paddock") else { return }
         paddocks.removeAll { $0.id == paddock.id }
         saveAllPaddocks()
+        auditService?.log(action: .delete, entityType: "Paddock", entityId: paddock.id.uuidString, entityLabel: paddock.name)
     }
 
     // MARK: - Trip CRUD
@@ -504,6 +505,7 @@ class DataStore {
     }
 
     func deleteCustomPattern(_ pattern: SavedCustomPattern) {
+        guard assertCanDelete("CustomPattern") else { return }
         savedCustomPatterns.removeAll { $0.id == pattern.id }
         saveAllCustomPatterns()
     }
@@ -559,6 +561,7 @@ class DataStore {
     }
 
     func deleteSavedChemical(_ chemical: SavedChemical) {
+        guard assertCanDelete("SavedChemical") else { return }
         savedChemicals.removeAll { $0.id == chemical.id }
         saveAllSavedChemicals()
     }
@@ -580,6 +583,7 @@ class DataStore {
     }
 
     func deleteSavedSprayPreset(_ preset: SavedSprayPreset) {
+        guard assertCanDelete("SprayPreset") else { return }
         savedSprayPresets.removeAll { $0.id == preset.id }
         saveAllSavedSprayPresets()
     }
@@ -604,6 +608,7 @@ class DataStore {
     }
 
     func deleteEquipmentOption(_ option: SavedEquipmentOption) {
+        guard assertCanDelete("EquipmentOption") else { return }
         savedEquipmentOptions.removeAll { $0.id == option.id }
         saveAllSavedEquipmentOptions()
     }
@@ -625,6 +630,7 @@ class DataStore {
     }
 
     func deleteSprayEquipment(_ item: SprayEquipmentItem) {
+        guard assertCanDelete("SprayEquipment") else { return }
         sprayEquipment.removeAll { $0.id == item.id }
         saveAllSprayEquipment()
     }
@@ -646,6 +652,7 @@ class DataStore {
     }
 
     func deleteTractor(_ tractor: Tractor) {
+        guard assertCanDelete("Tractor") else { return }
         tractors.removeAll { $0.id == tractor.id }
         saveAllTractors()
     }
@@ -667,6 +674,7 @@ class DataStore {
     }
 
     func deleteFuelPurchase(_ purchase: FuelPurchase) {
+        guard assertCanDelete("FuelPurchase") else { return }
         fuelPurchases.removeAll { $0.id == purchase.id }
         saveAllFuelPurchases()
     }
@@ -688,6 +696,7 @@ class DataStore {
     }
 
     func deleteOperatorCategory(_ category: OperatorCategory) {
+        guard assertCanChangeSettings("OperatorCategory") else { return }
         operatorCategories.removeAll { $0.id == category.id }
         saveAllOperatorCategories()
     }
@@ -733,6 +742,7 @@ class DataStore {
     }
 
     func deleteButtonTemplate(_ template: ButtonTemplate) {
+        guard assertCanChangeSettings("ButtonTemplate") else { return }
         buttonTemplates.removeAll { $0.id == template.id }
         saveAllButtonTemplates()
     }
@@ -754,6 +764,7 @@ class DataStore {
     }
 
     func deleteDamageRecord(_ record: DamageRecord) {
+        guard assertCanDelete("DamageRecord") else { return }
         damageRecords.removeAll { $0.id == record.id }
         saveAllDamageRecords()
     }
@@ -808,6 +819,7 @@ class DataStore {
     }
 
     func archiveMaintenanceLog(_ log: MaintenanceLog) {
+        guard assertCanDelete("ArchiveMaintenanceLog") else { return }
         guard let index = maintenanceLogs.firstIndex(where: { $0.id == log.id }) else { return }
         maintenanceLogs[index].isArchived = true
         maintenanceLogs[index].archivedAt = Date()
@@ -822,6 +834,7 @@ class DataStore {
     }
 
     func restoreMaintenanceLog(_ log: MaintenanceLog) {
+        guard assertCanDelete("RestoreMaintenanceLog") else { return }
         guard let index = maintenanceLogs.firstIndex(where: { $0.id == log.id }) else { return }
         maintenanceLogs[index].isArchived = false
         maintenanceLogs[index].archivedAt = nil
@@ -836,6 +849,12 @@ class DataStore {
     }
 
     func finalizeMaintenanceLog(_ log: MaintenanceLog) {
+        guard let ac = accessControl, ac.canFinalizeRecords else {
+            #if DEBUG
+            print("⛔️ Permission denied: finalize MaintenanceLog")
+            #endif
+            return
+        }
         guard let index = maintenanceLogs.firstIndex(where: { $0.id == log.id }) else { return }
         maintenanceLogs[index].isFinalized = true
         maintenanceLogs[index].finalizedAt = Date()
@@ -850,6 +869,12 @@ class DataStore {
     }
 
     func reopenMaintenanceLog(_ log: MaintenanceLog) {
+        guard let ac = accessControl, ac.canReopenRecords else {
+            #if DEBUG
+            print("⛔️ Permission denied: reopen MaintenanceLog")
+            #endif
+            return
+        }
         guard let index = maintenanceLogs.firstIndex(where: { $0.id == log.id }) else { return }
         maintenanceLogs[index].isFinalized = false
         maintenanceLogs[index].finalizedAt = nil
@@ -893,6 +918,7 @@ class DataStore {
     }
 
     func archiveWorkTask(_ task: WorkTask) {
+        guard assertCanDelete("ArchiveWorkTask") else { return }
         guard let index = workTasks.firstIndex(where: { $0.id == task.id }) else { return }
         workTasks[index].isArchived = true
         workTasks[index].archivedAt = Date()
@@ -907,6 +933,7 @@ class DataStore {
     }
 
     func restoreWorkTask(_ task: WorkTask) {
+        guard assertCanDelete("RestoreWorkTask") else { return }
         guard let index = workTasks.firstIndex(where: { $0.id == task.id }) else { return }
         workTasks[index].isArchived = false
         workTasks[index].archivedAt = nil
@@ -921,6 +948,12 @@ class DataStore {
     }
 
     func finalizeWorkTask(_ task: WorkTask) {
+        guard let ac = accessControl, ac.canFinalizeRecords else {
+            #if DEBUG
+            print("⛔️ Permission denied: finalize WorkTask")
+            #endif
+            return
+        }
         guard let index = workTasks.firstIndex(where: { $0.id == task.id }) else { return }
         workTasks[index].isFinalized = true
         workTasks[index].finalizedAt = Date()
@@ -935,6 +968,12 @@ class DataStore {
     }
 
     func reopenWorkTask(_ task: WorkTask) {
+        guard let ac = accessControl, ac.canReopenRecords else {
+            #if DEBUG
+            print("⛔️ Permission denied: reopen WorkTask")
+            #endif
+            return
+        }
         guard let index = workTasks.firstIndex(where: { $0.id == task.id }) else { return }
         workTasks[index].isFinalized = false
         workTasks[index].finalizedAt = nil
@@ -1000,6 +1039,7 @@ class DataStore {
     }
 
     func deleteGrapeVariety(_ variety: GrapeVariety) {
+        guard assertCanChangeSettings("GrapeVariety") else { return }
         grapeVarieties.removeAll { $0.id == variety.id }
         saveAllGrapeVarieties()
     }
@@ -1064,6 +1104,7 @@ class DataStore {
     }
 
     func deleteHistoricalYieldRecord(_ record: HistoricalYieldRecord) {
+        guard assertCanDelete("HistoricalYield") else { return }
         historicalYieldRecords.removeAll { $0.id == record.id }
         saveAllHistoricalYieldRecords()
     }
@@ -1081,6 +1122,7 @@ class DataStore {
     }
 
     func deleteYieldSession(_ session: YieldEstimationSession) {
+        guard assertCanDelete("YieldSession") else { return }
         yieldSessions.removeAll { $0.id == session.id }
         saveAllYieldSessions()
     }
@@ -1231,6 +1273,7 @@ class DataStore {
     // MARK: - Settings
 
     func updateVineyardLogo(_ logoData: Data?) {
+        guard assertCanChangeSettings("VineyardLogo") else { return }
         guard let vid = selectedVineyardId,
               let index = vineyards.firstIndex(where: { $0.id == vid }) else { return }
         vineyards[index].logoData = logoData
@@ -1260,11 +1303,13 @@ class DataStore {
     // MARK: - Delete All Data
 
     func deleteAllPins() {
+        guard assertCanDelete("AllPins") else { return }
         pins = []
         saveAllPins()
     }
 
     func deleteAllTrips() {
+        guard assertCanDelete("AllTrips") else { return }
         trips = []
         saveAllTrips()
     }

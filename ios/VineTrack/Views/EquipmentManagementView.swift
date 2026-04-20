@@ -233,20 +233,29 @@ struct TractorRow: View {
 
 struct FuelPurchaseRow: View {
     let purchase: FuelPurchase
+    @Environment(\.accessControl) private var accessControl
 
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(String(format: "%.0f", purchase.volumeLitres)) L — $\(String(format: "%.2f", purchase.totalCost))")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
+                if accessControl?.canViewFinancials ?? false {
+                    Text("\(String(format: "%.0f", purchase.volumeLitres)) L — $\(String(format: "%.2f", purchase.totalCost))")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+                } else {
+                    Text("\(String(format: "%.0f", purchase.volumeLitres)) L")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+                }
                 HStack(spacing: 8) {
                     Label(purchase.date.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("$\(String(format: "%.2f", purchase.costPerLitre))/L")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(VineyardTheme.olive)
+                    if accessControl?.canViewFinancials ?? false {
+                        Text("$\(String(format: "%.2f", purchase.costPerLitre))/L")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(VineyardTheme.olive)
+                    }
                 }
             }
             Spacer()

@@ -181,9 +181,15 @@ struct VineyardDetailSheet: View {
                                 Text("•")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("\(cat.name) $\(String(format: "%.0f", cat.costPerHour))/hr")
-                                    .font(.caption)
-                                    .foregroundStyle(.teal)
+                                if accessControl?.canViewFinancials ?? false {
+                                    Text("\(cat.name) $\(String(format: "%.0f", cat.costPerHour))/hr")
+                                        .font(.caption)
+                                        .foregroundStyle(.teal)
+                                } else {
+                                    Text(cat.name)
+                                        .font(.caption)
+                                        .foregroundStyle(.teal)
+                                }
                             }
                         }
                     }
@@ -268,6 +274,7 @@ struct AddUserSheet: View {
     @Environment(DataStore.self) private var store
     @Environment(AuditService.self) private var auditService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessControl) private var accessControl
     @State private var userName: String = ""
     @State private var selectedRole: VineyardRole = .operator_
     @State private var selectedCategoryId: UUID? = nil
@@ -297,8 +304,13 @@ struct AddUserSheet: View {
                     Picker("Category", selection: $selectedCategoryId) {
                         Text("None").tag(UUID?.none)
                         ForEach(store.operatorCategories) { cat in
-                            Text("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)")
-                                .tag(UUID?.some(cat.id))
+                            if accessControl?.canViewFinancials ?? false {
+                                Text("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)")
+                                    .tag(UUID?.some(cat.id))
+                            } else {
+                                Text(cat.name)
+                                    .tag(UUID?.some(cat.id))
+                            }
                         }
                     }
                 } header: {
@@ -345,6 +357,7 @@ struct EditUserSheet: View {
     @Environment(DataStore.self) private var store
     @Environment(AuditService.self) private var auditService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessControl) private var accessControl
     @State private var userName: String = ""
     @State private var selectedRole: VineyardRole = .operator_
     @State private var selectedCategoryId: UUID? = nil
@@ -382,8 +395,13 @@ struct EditUserSheet: View {
                     Picker("Category", selection: $selectedCategoryId) {
                         Text("None").tag(UUID?.none)
                         ForEach(store.operatorCategories) { cat in
-                            Text("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)")
-                                .tag(UUID?.some(cat.id))
+                            if accessControl?.canViewFinancials ?? false {
+                                Text("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)")
+                                    .tag(UUID?.some(cat.id))
+                            } else {
+                                Text(cat.name)
+                                    .tag(UUID?.some(cat.id))
+                            }
                         }
                     }
                     if store.operatorCategories.isEmpty {

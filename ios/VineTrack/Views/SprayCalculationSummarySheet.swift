@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SprayCalculationSummarySheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessControl) private var accessControl
     let result: SprayCalculationResult
     let sprayName: String
     let jobStarted: Bool
@@ -26,7 +27,7 @@ struct SprayCalculationSummarySheet: View {
                         cfNotice
                     }
 
-                    if let costing = result.costingSummary {
+                    if let costing = result.costingSummary, accessControl?.canViewFinancials ?? false {
                         costSummaryCard(costing)
                     }
                 }
