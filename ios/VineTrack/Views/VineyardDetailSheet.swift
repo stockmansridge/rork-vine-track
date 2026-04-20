@@ -11,6 +11,7 @@ struct VineyardDetailSheet: View {
     @State private var showInviteMember: Bool = false
     @State private var editedName: String = ""
     @State private var selectedCountry: String = ""
+    @State private var editingUser: VineyardUser?
 
     var body: some View {
         NavigationStack {
@@ -45,6 +46,9 @@ struct VineyardDetailSheet: View {
             }
             .sheet(isPresented: $showInviteMember) {
                 InviteMemberSheet(vineyard: vineyard)
+            }
+            .sheet(item: $editingUser) { user in
+                EditUserSheet(vineyard: vineyard, user: user)
             }
         }
     }
@@ -113,7 +117,47 @@ struct VineyardDetailSheet: View {
     private var usersSection: some View {
         Section {
             ForEach(vineyard.users) { user in
-                HStack(spacing: 12) {
+                Button {
+                    editingUser = user
+                } label: {
+                userRow(user)
+                }
+                .buttonStyle(.plain)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if user.role != .owner && (accessControl?.canDelete ?? true) {
+                        Button(role: .destructive) {
+                            removeUser(user)
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+
+            Button {
+                showAddUser = true
+            } label: {
+                Label("Add User", systemImage: "person.badge.plus")
+            }
+
+            if isSupabaseConfigured {
+                Button {
+                    showInviteMember = true
+                } label: {
+                    Label("Invite by Email", systemImage: "envelope.badge.person.crop")
+                        .foregroundStyle(.blue)
+                }
+            }
+        } header: {
+            Text("Users")
+        } footer: {
+            Text("Tap a user to edit their role and operator category. Role controls app access; operator category sets their hourly rate for trip reports.")
+        }
+    }
+
+    @ViewBuilder
+    private func userRow(_ user: VineyardUser) -> some View {
+        HStack(spacing: 12) {
                     ZStack {
                         Circle()
                             .fill(roleColor(user.role).gradient)
@@ -149,66 +193,11 @@ struct VineyardDetailSheet: View {
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if user.role != .owner && (accessControl?.canDelete ?? true) {
-                        Button(role: .destructive) {
-                            removeUser(user)
-                        } label: {
-                            Label("Remove", systemImage: "trash")
-                        }
-                    }
-                }
-                .contextMenu {
-                    if user.role != .owner {
-                        Menu("Change Role") {
-                            ForEach(VineyardRole.allCases, id: \.self) { role in
-                                if role != .owner {
-                                    Button {
-                                        changeRole(user: user, to: role)
-                                    } label: {
-                                        Label(role.rawValue, systemImage: role == user.role ? "checkmark" : "")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Menu("Operator Category") {
-                        Button {
-                            assignOperatorCategory(user: user, categoryId: nil)
-                        } label: {
-                            Label("None", systemImage: user.operatorCategoryId == nil ? "checkmark" : "")
-                        }
-                        ForEach(store.operatorCategories) { cat in
-                            Button {
-                                assignOperatorCategory(user: user, categoryId: cat.id)
-                            } label: {
-                                Label("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)", systemImage: user.operatorCategoryId == cat.id ? "checkmark" : "")
-                            }
-                        }
-                    }
-                }
-            }
-
-            Button {
-                showAddUser = true
-            } label: {
-                Label("Add User", systemImage: "person.badge.plus")
-            }
-
-            if isSupabaseConfigured {
-                Button {
-                    showInviteMember = true
-                } label: {
-                    Label("Invite by Email", systemImage: "envelope.badge.person.crop")
-                        .foregroundStyle(.blue)
-                }
-            }
-        } header: {
-            Text("Users")
-        } footer: {
-            Text("Users assigned to this vineyard can access its blocks, pins, trips, and settings.")
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
         }
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -262,18 +251,41 @@ struct AddUserSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var userName: String = ""
     @State private var selectedRole: VineyardRole = .operator_
+    @State private var selectedCategoryId: UUID? = nil
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("User Details") {
+                Section {
                     TextField("Name", text: $userName)
+                } header: {
+                    Text("User Details")
+                }
 
+                Section {
                     Picker("Role", selection: $selectedRole) {
                         ForEach(VineyardRole.allCases.filter { $0 != .owner }, id: \.self) { role in
                             Text(role.rawValue).tag(role)
                         }
                     }
+                } header: {
+                    Text("Role")
+                } footer: {
+                    Text("Controls access to features in the app. Managers can edit settings; Operators can log trips and view data.")
+                }
+
+                Section {
+                    Picker("Category", selection: $selectedCategoryId) {
+                        Text("None").tag(UUID?.none)
+                        ForEach(store.operatorCategories) { cat in
+                            Text("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)")
+                                .tag(UUID?.some(cat.id))
+                        }
+                    }
+                } header: {
+                    Text("Operator Category")
+                } footer: {
+                    Text("Sets the hourly rate used in trip and task cost reports. Manage categories in Settings → Spray Management → Operator Categories.")
                 }
             }
             .navigationTitle("Add User")
@@ -284,7 +296,11 @@ struct AddUserSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        let newUser = VineyardUser(name: userName, role: selectedRole)
+                        let newUser = VineyardUser(
+                            name: userName,
+                            role: selectedRole,
+                            operatorCategoryId: selectedCategoryId
+                        )
                         var updated = vineyard
                         updated.users.append(newUser)
                         store.updateVineyard(updated)
@@ -294,5 +310,97 @@ struct AddUserSheet: View {
                 }
             }
         }
+    }
+}
+
+struct EditUserSheet: View {
+    let vineyard: Vineyard
+    let user: VineyardUser
+    @Environment(DataStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var userName: String = ""
+    @State private var selectedRole: VineyardRole = .operator_
+    @State private var selectedCategoryId: UUID? = nil
+
+    private var isOwner: Bool { user.role == .owner }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Name", text: $userName)
+                } header: {
+                    Text("User Details")
+                }
+
+                Section {
+                    if isOwner {
+                        LabeledContent("Role", value: user.role.rawValue)
+                    } else {
+                        Picker("Role", selection: $selectedRole) {
+                            ForEach(VineyardRole.allCases.filter { $0 != .owner }, id: \.self) { role in
+                                Text(role.rawValue).tag(role)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Role")
+                } footer: {
+                    Text(isOwner
+                        ? "The Owner role cannot be changed."
+                        : "Controls access to features in the app. Managers can edit settings; Operators can log trips and view data.")
+                }
+
+                Section {
+                    Picker("Category", selection: $selectedCategoryId) {
+                        Text("None").tag(UUID?.none)
+                        ForEach(store.operatorCategories) { cat in
+                            Text("\(cat.name) ($\(String(format: "%.0f", cat.costPerHour))/hr)")
+                                .tag(UUID?.some(cat.id))
+                        }
+                    }
+                    if store.operatorCategories.isEmpty {
+                        Text("No categories defined yet. Add them in Settings → Spray Management → Operator Categories.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Operator Category")
+                } footer: {
+                    Text("Sets the hourly rate used in trip and task cost reports. This is independent of the user's role.")
+                }
+            }
+            .navigationTitle("Edit User")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                        .disabled(userName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .onAppear {
+                userName = user.name
+                selectedRole = user.role == .owner ? .operator_ : user.role
+                selectedCategoryId = user.operatorCategoryId
+            }
+        }
+    }
+
+    private func save() {
+        var updated = vineyard
+        guard let idx = updated.users.firstIndex(where: { $0.id == user.id }) else {
+            dismiss()
+            return
+        }
+        updated.users[idx].name = userName.trimmingCharacters(in: .whitespaces)
+        if !isOwner {
+            updated.users[idx].role = selectedRole
+        }
+        updated.users[idx].operatorCategoryId = selectedCategoryId
+        store.updateVineyard(updated)
+        dismiss()
     }
 }
