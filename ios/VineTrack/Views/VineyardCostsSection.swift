@@ -2,6 +2,7 @@ import SwiftUI
 
 struct VineyardCostsSection: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
 
     @State private var selectedCategory: CostCategory?
 
@@ -100,6 +101,32 @@ struct VineyardCostsSection: View {
     private var grandTotal: Double { totalChemicals + totalFuel + totalOperator + totalMaintenance + totalWorkTasks }
 
     var body: some View {
+        if accessControl?.canViewFinancials ?? true {
+            contentBody
+        } else {
+            restrictedCard
+        }
+    }
+
+    private var restrictedCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "lock.fill")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Financial data hidden")
+                    .font(.subheadline.weight(.semibold))
+                Text("Only Managers can view season costs.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+    }
+
+    private var contentBody: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Season Costs")

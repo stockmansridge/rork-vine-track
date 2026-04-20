@@ -73,6 +73,7 @@ nonisolated struct VineyardUser: Codable, Identifiable, Sendable, Hashable {
 nonisolated enum VineyardRole: String, Codable, Sendable, Hashable, CaseIterable {
     case owner = "Owner"
     case manager = "Manager"
+    case supervisor = "Supervisor"
     case operator_ = "Operator"
 
     nonisolated init(from decoder: Decoder) throws {
@@ -81,6 +82,7 @@ nonisolated enum VineyardRole: String, Codable, Sendable, Hashable, CaseIterable
         switch rawValue {
         case "Owner": self = .owner
         case "Manager": self = .manager
+        case "Supervisor": self = .supervisor
         case "Operator", "Member": self = .operator_
         default: self = .operator_
         }
@@ -88,11 +90,28 @@ nonisolated enum VineyardRole: String, Codable, Sendable, Hashable, CaseIterable
 
     var displayName: String { rawValue }
 
-    var canDelete: Bool {
-        self == .owner || self == .manager
-    }
+    /// Highest privilege level: full access including financial data, user management, settings.
+    var isManager: Bool { self == .owner || self == .manager }
 
-    var canExport: Bool {
-        self == .owner || self == .manager
-    }
+    /// Supervisors and above can delete operational records and manage day-to-day data.
+    var canDelete: Bool { self == .owner || self == .manager || self == .supervisor }
+
+    /// Only Managers can view financial data (costs, prices, revenue).
+    var canViewFinancials: Bool { isManager }
+
+    /// Only Managers can export PDFs containing financial data.
+    var canExportFinancialPDF: Bool { isManager }
+
+    /// Operational PDF exports (spray records, trip summaries without cost) — Supervisors and above.
+    var canExport: Bool { isManager || self == .supervisor }
+
+    /// Only Managers can change settings & manage users.
+    var canManageUsers: Bool { isManager }
+    var canChangeSettings: Bool { isManager }
+
+    /// Supervisors and above can reopen finalised records.
+    var canReopenRecords: Bool { canDelete }
+
+    /// Supervisors and above can finalise/lock records.
+    var canFinalizeRecords: Bool { canDelete }
 }

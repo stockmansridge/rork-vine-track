@@ -3,6 +3,7 @@ import SwiftUI
 struct AddEditWorkTaskView: View {
     @Environment(DataStore.self) private var store
     @Environment(AuthService.self) private var authService
+    @Environment(\.accessControl) private var accessControl
     @Environment(\.dismiss) private var dismiss
 
     let existingTask: WorkTask?
@@ -23,6 +24,14 @@ struct AddEditWorkTaskView: View {
     }
 
     private var isEditing: Bool { existingTask != nil }
+    private var isFinalized: Bool { existingTask?.isFinalized ?? false }
+    private var isReadOnly: Bool {
+        guard let t = existingTask else { return false }
+        if t.isFinalized && !(accessControl?.canReopenRecords ?? false) { return true }
+        return false
+    }
+    private var canDelete: Bool { accessControl?.canDelete ?? false }
+    private var canFinalize: Bool { accessControl?.canFinalizeRecords ?? false }
 
     private var currencyCode: String {
         Locale.current.currency?.identifier ?? "USD"
@@ -143,24 +152,33 @@ struct AddEditWorkTaskView: View {
                     Text("Set the number of workers of each type used on this task.")
                 }
 
-                Section("Estimated Cost") {
-                    LabeledContent("Total People") {
-                        Text("\(totalPeople)")
-                            .foregroundStyle(.secondary)
+                if accessControl?.canViewFinancials ?? true {
+                    Section("Estimated Cost") {
+                        LabeledContent("Total People") {
+                            Text("\(totalPeople)")
+                                .foregroundStyle(.secondary)
+                        }
+                        LabeledContent("Cost / Person") {
+                            Text(costPerPerson, format: .currency(code: currencyCode))
+                                .foregroundStyle(.secondary)
+                        }
+                        HStack {
+                            Text("Block Total")
+                                .font(.headline)
+                            Spacer()
+                            Text(totalCost, format: .currency(code: currencyCode))
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(VineyardTheme.leafGreen)
+                        }
+                        .padding(.vertical, 4)
                     }
-                    LabeledContent("Cost / Person") {
-                        Text(costPerPerson, format: .currency(code: currencyCode))
-                            .foregroundStyle(.secondary)
+                } else {
+                    Section("Task Summary") {
+                        LabeledContent("Total People") {
+                            Text("\(totalPeople)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    HStack {
-                        Text("Block Total")
-                            .font(.headline)
-                        Spacer()
-                        Text(totalCost, format: .currency(code: currencyCode))
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(VineyardTheme.leafGreen)
-                    }
-                    .padding(.vertical, 4)
                 }
 
                 Section("Notes") {
@@ -168,7 +186,41 @@ struct AddEditWorkTaskView: View {
                         .lineLimit(2...5)
                 }
 
-                if isEditing {
+                if isEditing, let existing = existingTask, canFinalize {
+                    Section("Record Status") {
+                        if existing.isFinalized {
+                            HStack {
+                                Image(systemName: "lock.fill")
+                                    .foregroundStyle(.orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Finalised")
+                                        .font(.subheadline.weight(.semibold))
+                                    if let by = existing.finalizedBy, !by.isEmpty,
+                                       let at = existing.finalizedAt {
+                                        Text("\(by) on \(at.formatted(date: .abbreviated, time: .shortened))")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            Button {
+                                store.reopenWorkTask(existing)
+                                dismiss()
+                            } label: {
+                                Label("Reopen Record", systemImage: "lock.open")
+                            }
+                        } else {
+                            Button {
+                                store.finalizeWorkTask(existing)
+                                dismiss()
+                            } label: {
+                                Label("Finalise Record", systemImage: "lock")
+                            }
+                        }
+                    }
+                }
+
+                if isEditing && canDelete {
                     Section {
                         Button(role: .destructive) {
                             showDelete = true
@@ -191,7 +243,7 @@ struct AddEditWorkTaskView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveTask() }
                         .fontWeight(.semibold)
-                        .disabled(taskType.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(taskType.trimmingCharacters(in: .whitespaces).isEmpty || isReadOnly)
                 }
             }
             .alert("Delete Task", isPresented: $showDelete) {
@@ -204,6 +256,7 @@ struct AddEditWorkTaskView: View {
                 Button("Cancel", role: .cancel) {}
             }
             .onAppear(perform: loadIfEditing)
+            .disabled(isReadOnly)
         }
     }
 

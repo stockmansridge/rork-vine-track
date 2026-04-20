@@ -3,6 +3,7 @@ import SwiftUI
 struct AddEditMaintenanceLogView: View {
     @Environment(DataStore.self) private var store
     @Environment(AuthService.self) private var authService
+    @Environment(\.accessControl) private var accessControl
     @Environment(\.dismiss) private var dismiss
 
     let existingLog: MaintenanceLog?
@@ -22,6 +23,14 @@ struct AddEditMaintenanceLogView: View {
     @State private var showDeleteAlert: Bool = false
 
     private var isEditing: Bool { existingLog != nil }
+    private var canViewFinancials: Bool { accessControl?.canViewFinancials ?? true }
+    private var canDelete: Bool { accessControl?.canDelete ?? false }
+    private var canFinalize: Bool { accessControl?.canFinalizeRecords ?? false }
+    private var isReadOnly: Bool {
+        guard let log = existingLog else { return false }
+        if log.isFinalized && !(accessControl?.canReopenRecords ?? false) { return true }
+        return false
+    }
 
     init(existingLog: MaintenanceLog? = nil) {
         self.existingLog = existingLog
@@ -99,7 +108,7 @@ struct AddEditMaintenanceLogView: View {
                         .lineLimit(2...5)
                 }
 
-                Section("Costs") {
+                if canViewFinancials { Section("Costs") {
                     HStack {
                         Text("Parts Cost")
                         Spacer()
@@ -128,7 +137,7 @@ struct AddEditMaintenanceLogView: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(VineyardTheme.earthBrown)
                     }
-                }
+                } }
 
                 Section("Invoice Photo") {
                     if let photoData = invoicePhotoData, let uiImage = UIImage(data: photoData) {
@@ -185,7 +194,41 @@ struct AddEditMaintenanceLogView: View {
                     }
                 }
 
-                if isEditing {
+                if isEditing, let existing = existingLog, canFinalize {
+                    Section("Record Status") {
+                        if existing.isFinalized {
+                            HStack {
+                                Image(systemName: "lock.fill")
+                                    .foregroundStyle(.orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Finalised")
+                                        .font(.subheadline.weight(.semibold))
+                                    if let by = existing.finalizedBy, !by.isEmpty,
+                                       let at = existing.finalizedAt {
+                                        Text("\(by) on \(at.formatted(date: .abbreviated, time: .shortened))")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            Button {
+                                store.reopenMaintenanceLog(existing)
+                                dismiss()
+                            } label: {
+                                Label("Reopen Record", systemImage: "lock.open")
+                            }
+                        } else {
+                            Button {
+                                store.finalizeMaintenanceLog(existing)
+                                dismiss()
+                            } label: {
+                                Label("Finalise Record", systemImage: "lock")
+                            }
+                        }
+                    }
+                }
+
+                if isEditing && canDelete {
                     Section {
                         Button(role: .destructive) {
                             showDeleteAlert = true
@@ -208,7 +251,7 @@ struct AddEditMaintenanceLogView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveLog() }
                         .fontWeight(.semibold)
-                        .disabled(itemName.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(itemName.trimmingCharacters(in: .whitespaces).isEmpty || isReadOnly)
                 }
             }
             .confirmationDialog("Add Photo", isPresented: $showPhotoSource) {

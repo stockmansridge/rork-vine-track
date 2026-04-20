@@ -6,8 +6,10 @@ struct VineyardDetailSheet: View {
     @Environment(AuthService.self) private var authService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessControl) private var accessControl
+    @Environment(AuditService.self) private var auditService
     @State private var showAddUser: Bool = false
     @State private var showEditName: Bool = false
+    private var canManage: Bool { accessControl?.canManageUsers ?? false }
     @State private var editedName: String = ""
     @State private var selectedCountry: String = ""
     @State private var editingUser: VineyardUser?
@@ -118,13 +120,14 @@ struct VineyardDetailSheet: View {
         Section {
             ForEach(vineyard.users) { user in
                 Button {
-                    editingUser = user
+                    if canManage { editingUser = user }
                 } label: {
                 userRow(user)
                 }
                 .buttonStyle(.plain)
+                .disabled(!canManage)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if user.role != .owner && (accessControl?.canDelete ?? true) {
+                    if user.role != .owner && canManage {
                         Button(role: .destructive) {
                             removeUser(user)
                         } label: {
@@ -134,17 +137,23 @@ struct VineyardDetailSheet: View {
                 }
             }
 
-            Button {
-                showAddUser = true
-            } label: {
-                Label(isSupabaseConfigured ? "Add User" : "Add User (Local)", systemImage: "person.badge.plus")
+            if canManage {
+                Button {
+                    showAddUser = true
+                } label: {
+                    Label(isSupabaseConfigured ? "Add User" : "Add User (Local)", systemImage: "person.badge.plus")
+                }
             }
         } header: {
             Text("Users")
         } footer: {
-            Text(isSupabaseConfigured
-                ? "Add users by sending an email invitation. Tap a user to edit their role and operator category. Role controls app access; operator category sets their hourly rate for trip and task reports."
-                : "Tap a user to edit their role and operator category. Role controls app access; operator category sets their hourly rate for trip and task reports.")
+            if canManage {
+                Text(isSupabaseConfigured
+                    ? "Add users by sending an email invitation. Tap a user to edit their role and operator category. Role controls app access; operator category sets their hourly rate for trip and task reports."
+                    : "Tap a user to edit their role and operator category.")
+            } else {
+                Text("Only Managers can add, edit or remove users.")
+            }
         }
     }
 
@@ -213,13 +222,28 @@ struct VineyardDetailSheet: View {
         var updated = vineyard
         updated.users.removeAll { $0.id == user.id }
         store.updateVineyard(updated)
+        auditService.log(
+            action: .userRemoved,
+            entityType: "VineyardUser",
+            entityId: user.id.uuidString,
+            entityLabel: user.name,
+            details: "Role: \(user.role.rawValue)"
+        )
     }
 
     private func changeRole(user: VineyardUser, to newRole: VineyardRole) {
         var updated = vineyard
         guard let index = updated.users.firstIndex(where: { $0.id == user.id }) else { return }
+        let oldRole = updated.users[index].role
         updated.users[index].role = newRole
         store.updateVineyard(updated)
+        auditService.log(
+            action: .roleChanged,
+            entityType: "VineyardUser",
+            entityId: user.id.uuidString,
+            entityLabel: user.name,
+            details: "\(oldRole.rawValue) → \(newRole.rawValue)"
+        )
     }
 
     private func assignOperatorCategory(user: VineyardUser, categoryId: UUID?) {
@@ -233,6 +257,7 @@ struct VineyardDetailSheet: View {
         switch role {
         case .owner: return .orange
         case .manager: return .blue
+        case .supervisor: return .purple
         case .operator_: return .green
         }
     }
@@ -241,6 +266,7 @@ struct VineyardDetailSheet: View {
 struct AddUserSheet: View {
     let vineyard: Vineyard
     @Environment(DataStore.self) private var store
+    @Environment(AuditService.self) private var auditService
     @Environment(\.dismiss) private var dismiss
     @State private var userName: String = ""
     @State private var selectedRole: VineyardRole = .operator_
@@ -264,7 +290,7 @@ struct AddUserSheet: View {
                 } header: {
                     Text("Role")
                 } footer: {
-                    Text("Controls access to features in the app. Managers can edit settings; Operators can log trips and view data.")
+                    Text("Manager: full access including financials. Supervisor: can delete records and manage day-to-day operations but cannot view financial data. Operator: basic staff — no deletes, no financials.")
                 }
 
                 Section {
@@ -297,6 +323,13 @@ struct AddUserSheet: View {
                         var updated = vineyard
                         updated.users.append(newUser)
                         store.updateVineyard(updated)
+                        auditService.log(
+                            action: .userAdded,
+                            entityType: "VineyardUser",
+                            entityId: newUser.id.uuidString,
+                            entityLabel: newUser.name,
+                            details: "Role: \(selectedRole.rawValue)"
+                        )
                         dismiss()
                     }
                     .disabled(userName.isEmpty)
@@ -310,6 +343,7 @@ struct EditUserSheet: View {
     let vineyard: Vineyard
     let user: VineyardUser
     @Environment(DataStore.self) private var store
+    @Environment(AuditService.self) private var auditService
     @Environment(\.dismiss) private var dismiss
     @State private var userName: String = ""
     @State private var selectedRole: VineyardRole = .operator_
@@ -341,7 +375,7 @@ struct EditUserSheet: View {
                 } footer: {
                     Text(isOwner
                         ? "The Owner role cannot be changed."
-                        : "Controls access to features in the app. Managers can edit settings; Operators can log trips and view data.")
+                        : "Manager: full access + financials. Supervisor: deletes & operations, no financials. Operator: basic staff.")
                 }
 
                 Section {
@@ -388,12 +422,22 @@ struct EditUserSheet: View {
             dismiss()
             return
         }
+        let oldRole = updated.users[idx].role
         updated.users[idx].name = userName.trimmingCharacters(in: .whitespaces)
         if !isOwner {
             updated.users[idx].role = selectedRole
         }
         updated.users[idx].operatorCategoryId = selectedCategoryId
         store.updateVineyard(updated)
+        if !isOwner && oldRole != selectedRole {
+            auditService.log(
+                action: .roleChanged,
+                entityType: "VineyardUser",
+                entityId: user.id.uuidString,
+                entityLabel: user.name,
+                details: "\(oldRole.rawValue) → \(selectedRole.rawValue)"
+            )
+        }
         dismiss()
     }
 }

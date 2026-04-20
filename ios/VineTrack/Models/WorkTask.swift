@@ -46,6 +46,12 @@ nonisolated struct WorkTask: Codable, Identifiable, Sendable {
     var resources: [WorkTaskResource]
     var notes: String
     var createdBy: String?
+    var isArchived: Bool
+    var archivedAt: Date?
+    var archivedBy: String?
+    var isFinalized: Bool
+    var finalizedAt: Date?
+    var finalizedBy: String?
 
     init(
         id: UUID = UUID(),
@@ -57,7 +63,13 @@ nonisolated struct WorkTask: Codable, Identifiable, Sendable {
         durationHours: Double = 0,
         resources: [WorkTaskResource] = [],
         notes: String = "",
-        createdBy: String? = nil
+        createdBy: String? = nil,
+        isArchived: Bool = false,
+        archivedAt: Date? = nil,
+        archivedBy: String? = nil,
+        isFinalized: Bool = false,
+        finalizedAt: Date? = nil,
+        finalizedBy: String? = nil
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -69,6 +81,12 @@ nonisolated struct WorkTask: Codable, Identifiable, Sendable {
         self.resources = resources
         self.notes = notes
         self.createdBy = createdBy
+        self.isArchived = isArchived
+        self.archivedAt = archivedAt
+        self.archivedBy = archivedBy
+        self.isFinalized = isFinalized
+        self.finalizedAt = finalizedAt
+        self.finalizedBy = finalizedBy
     }
 
     var totalPeople: Int { resources.reduce(0) { $0 + $1.count } }
@@ -87,6 +105,7 @@ nonisolated struct WorkTask: Codable, Identifiable, Sendable {
 
     nonisolated enum CodingKeys: String, CodingKey {
         case id, vineyardId, date, taskType, paddockId, paddockName, durationHours, resources, notes, createdBy
+        case isArchived, archivedAt, archivedBy, isFinalized, finalizedAt, finalizedBy
     }
 
     nonisolated init(from decoder: Decoder) throws {
@@ -101,6 +120,12 @@ nonisolated struct WorkTask: Codable, Identifiable, Sendable {
         resources = try c.decodeIfPresent([WorkTaskResource].self, forKey: .resources) ?? []
         notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         createdBy = try c.decodeIfPresent(String.self, forKey: .createdBy)
+        isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
+        archivedBy = try c.decodeIfPresent(String.self, forKey: .archivedBy)
+        isFinalized = try c.decodeIfPresent(Bool.self, forKey: .isFinalized) ?? false
+        finalizedAt = try c.decodeIfPresent(Date.self, forKey: .finalizedAt)
+        finalizedBy = try c.decodeIfPresent(String.self, forKey: .finalizedBy)
     }
 }
 

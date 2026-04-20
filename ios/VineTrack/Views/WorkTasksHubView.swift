@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkTasksHubView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
 
     @State private var showLog: Bool = false
     @State private var showCalculator: Bool = false
@@ -11,8 +12,9 @@ struct WorkTasksHubView: View {
         Locale.current.currency?.identifier ?? "USD"
     }
 
-    private var totalTasks: Int { store.workTasks.count }
-    private var totalCost: Double { store.workTasks.reduce(0) { $0 + $1.totalCost } }
+    private var visibleTasks: [WorkTask] { store.workTasks.filter { !$0.isArchived } }
+    private var totalTasks: Int { visibleTasks.count }
+    private var totalCost: Double { visibleTasks.reduce(0) { $0 + $1.totalCost } }
 
     var body: some View {
         ScrollView {
@@ -58,13 +60,15 @@ struct WorkTasksHubView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("Total")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(totalCost, format: .currency(code: currencyCode))
-                        .font(.title2.weight(.bold).monospacedDigit())
-                        .foregroundStyle(VineyardTheme.leafGreen)
+                if accessControl?.canViewFinancials ?? true {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Total")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(totalCost, format: .currency(code: currencyCode))
+                            .font(.title2.weight(.bold).monospacedDigit())
+                            .foregroundStyle(VineyardTheme.leafGreen)
+                    }
                 }
             }
         }
@@ -131,7 +135,7 @@ struct WorkTasksHubView: View {
             Text("Recent Tasks")
                 .font(.headline)
 
-            let recent = Array(store.workTasks.sorted { $0.date > $1.date }.prefix(5))
+            let recent = Array(visibleTasks.sorted { $0.date > $1.date }.prefix(5))
 
             if recent.isEmpty {
                 VStack(spacing: 10) {
@@ -192,6 +196,7 @@ struct WorkTasksHubView: View {
 
 struct WorkTaskRow: View {
     let task: WorkTask
+    @Environment(\.accessControl) private var accessControl
 
     @State private var showEdit: Bool = false
 
@@ -235,7 +240,7 @@ struct WorkTaskRow: View {
                         Label("\(task.totalPeople)", systemImage: "person.fill")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                        if task.totalCost > 0 {
+                        if task.totalCost > 0 && (accessControl?.canViewFinancials ?? true) {
                             Text("•")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)

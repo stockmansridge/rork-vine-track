@@ -42,7 +42,9 @@ struct SprayRecordDetailView: View {
             }
 
             chemicalTotalsSection
-            sprayCostSection
+            if accessControl?.canViewFinancials ?? true {
+                sprayCostSection
+            }
 
             if !record.notes.isEmpty {
                 Section("Notes") {
@@ -62,7 +64,7 @@ struct SprayRecordDetailView: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    if accessControl?.canExport ?? true {
+                    if accessControl?.canExportFinancialPDF ?? true {
                         Button {
                             sharePDF()
                         } label: {

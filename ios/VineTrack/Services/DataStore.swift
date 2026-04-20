@@ -39,6 +39,8 @@ class DataStore {
     var selectedTab: Int = 0
     var cloudSync: CloudSyncService?
     var analytics: AnalyticsService?
+    weak var auditService: AuditService?
+    weak var authService: AuthService?
 
     private let vineyardsKey = "vinetrack_vineyards"
     private let selectedVineyardIdKey = "vinetrack_selected_vineyard_id"
@@ -423,6 +425,13 @@ class DataStore {
     func deleteTrip(_ trip: Trip) {
         trips.removeAll { $0.id == trip.id }
         saveAllTrips()
+        auditService?.log(
+            action: .delete,
+            entityType: "Trip",
+            entityId: trip.id.uuidString,
+            entityLabel: trip.paddockName,
+            details: "Deleted trip from \(trip.startTime.formatted(date: .abbreviated, time: .shortened))"
+        )
     }
 
     // MARK: - Buttons
@@ -478,6 +487,13 @@ class DataStore {
     func deleteSprayRecord(_ record: SprayRecord) {
         sprayRecords.removeAll { $0.id == record.id }
         saveAllSprayRecords()
+        auditService?.log(
+            action: .delete,
+            entityType: "SprayRecord",
+            entityId: record.id.uuidString,
+            entityLabel: record.sprayReference,
+            details: "Deleted spray record"
+        )
     }
 
     func sprayRecord(for tripId: UUID) -> SprayRecord? {
@@ -740,6 +756,68 @@ class DataStore {
     func deleteMaintenanceLog(_ log: MaintenanceLog) {
         maintenanceLogs.removeAll { $0.id == log.id }
         saveAllMaintenanceLogs()
+        auditService?.log(
+            action: .delete,
+            entityType: "MaintenanceLog",
+            entityId: log.id.uuidString,
+            entityLabel: log.itemName
+        )
+    }
+
+    func archiveMaintenanceLog(_ log: MaintenanceLog) {
+        guard let index = maintenanceLogs.firstIndex(where: { $0.id == log.id }) else { return }
+        maintenanceLogs[index].isArchived = true
+        maintenanceLogs[index].archivedAt = Date()
+        maintenanceLogs[index].archivedBy = authService?.userName
+        saveAllMaintenanceLogs()
+        auditService?.log(
+            action: .softDelete,
+            entityType: "MaintenanceLog",
+            entityId: log.id.uuidString,
+            entityLabel: log.itemName
+        )
+    }
+
+    func restoreMaintenanceLog(_ log: MaintenanceLog) {
+        guard let index = maintenanceLogs.firstIndex(where: { $0.id == log.id }) else { return }
+        maintenanceLogs[index].isArchived = false
+        maintenanceLogs[index].archivedAt = nil
+        maintenanceLogs[index].archivedBy = nil
+        saveAllMaintenanceLogs()
+        auditService?.log(
+            action: .restore,
+            entityType: "MaintenanceLog",
+            entityId: log.id.uuidString,
+            entityLabel: log.itemName
+        )
+    }
+
+    func finalizeMaintenanceLog(_ log: MaintenanceLog) {
+        guard let index = maintenanceLogs.firstIndex(where: { $0.id == log.id }) else { return }
+        maintenanceLogs[index].isFinalized = true
+        maintenanceLogs[index].finalizedAt = Date()
+        maintenanceLogs[index].finalizedBy = authService?.userName
+        saveAllMaintenanceLogs()
+        auditService?.log(
+            action: .recordFinalized,
+            entityType: "MaintenanceLog",
+            entityId: log.id.uuidString,
+            entityLabel: log.itemName
+        )
+    }
+
+    func reopenMaintenanceLog(_ log: MaintenanceLog) {
+        guard let index = maintenanceLogs.firstIndex(where: { $0.id == log.id }) else { return }
+        maintenanceLogs[index].isFinalized = false
+        maintenanceLogs[index].finalizedAt = nil
+        maintenanceLogs[index].finalizedBy = nil
+        saveAllMaintenanceLogs()
+        auditService?.log(
+            action: .recordReopened,
+            entityType: "MaintenanceLog",
+            entityId: log.id.uuidString,
+            entityLabel: log.itemName
+        )
     }
 
     // MARK: - Work Tasks
@@ -762,6 +840,68 @@ class DataStore {
     func deleteWorkTask(_ task: WorkTask) {
         workTasks.removeAll { $0.id == task.id }
         saveAllWorkTasks()
+        auditService?.log(
+            action: .delete,
+            entityType: "WorkTask",
+            entityId: task.id.uuidString,
+            entityLabel: task.taskType
+        )
+    }
+
+    func archiveWorkTask(_ task: WorkTask) {
+        guard let index = workTasks.firstIndex(where: { $0.id == task.id }) else { return }
+        workTasks[index].isArchived = true
+        workTasks[index].archivedAt = Date()
+        workTasks[index].archivedBy = authService?.userName
+        saveAllWorkTasks()
+        auditService?.log(
+            action: .softDelete,
+            entityType: "WorkTask",
+            entityId: task.id.uuidString,
+            entityLabel: task.taskType
+        )
+    }
+
+    func restoreWorkTask(_ task: WorkTask) {
+        guard let index = workTasks.firstIndex(where: { $0.id == task.id }) else { return }
+        workTasks[index].isArchived = false
+        workTasks[index].archivedAt = nil
+        workTasks[index].archivedBy = nil
+        saveAllWorkTasks()
+        auditService?.log(
+            action: .restore,
+            entityType: "WorkTask",
+            entityId: task.id.uuidString,
+            entityLabel: task.taskType
+        )
+    }
+
+    func finalizeWorkTask(_ task: WorkTask) {
+        guard let index = workTasks.firstIndex(where: { $0.id == task.id }) else { return }
+        workTasks[index].isFinalized = true
+        workTasks[index].finalizedAt = Date()
+        workTasks[index].finalizedBy = authService?.userName
+        saveAllWorkTasks()
+        auditService?.log(
+            action: .recordFinalized,
+            entityType: "WorkTask",
+            entityId: task.id.uuidString,
+            entityLabel: task.taskType
+        )
+    }
+
+    func reopenWorkTask(_ task: WorkTask) {
+        guard let index = workTasks.firstIndex(where: { $0.id == task.id }) else { return }
+        workTasks[index].isFinalized = false
+        workTasks[index].finalizedAt = nil
+        workTasks[index].finalizedBy = nil
+        saveAllWorkTasks()
+        auditService?.log(
+            action: .recordReopened,
+            entityType: "WorkTask",
+            entityId: task.id.uuidString,
+            entityLabel: task.taskType
+        )
     }
 
     private func saveAllWorkTasks() {
@@ -1064,6 +1204,12 @@ class DataStore {
         }
         save(allSettings, key: settingsKey)
         syncDataToCloud(dataType: "settings")
+        auditService?.log(
+            action: .settingsChanged,
+            entityType: "AppSettings",
+            entityId: newSettings.vineyardId.uuidString,
+            entityLabel: "Vineyard Settings"
+        )
     }
 
     // MARK: - Delete All Data

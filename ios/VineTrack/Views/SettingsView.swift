@@ -317,6 +317,30 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            if accessControl?.isManager ?? false {
+                NavigationLink {
+                    AuditLogView()
+                } label: {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(.gray.gradient)
+                                .frame(width: 32, height: 32)
+                            Image(systemName: "list.bullet.clipboard.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Audit Log")
+                                .font(.subheadline.weight(.medium))
+                            Text("Deletes, role & settings changes")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
         } header: {
             HStack(spacing: 6) {
                 Image(systemName: "square.grid.2x2.fill")

@@ -1659,7 +1659,9 @@ struct TripDetailView: View {
                     }
                 }
 
-                tripCostSection
+                if accessControl?.canViewFinancials ?? true {
+                    tripCostSection
+                }
             }
             .listStyle(.insetGrouped)
         }
@@ -1677,10 +1679,11 @@ struct TripDetailView: View {
                             }
                             .disabled(isGeneratingPDF)
 
-                            Divider()
-
-                            Toggle(isOn: $includeCostingsInExport) {
-                                Label("Include Costings", systemImage: "dollarsign.circle")
+                            if accessControl?.canExportFinancialPDF ?? true {
+                                Divider()
+                                Toggle(isOn: $includeCostingsInExport) {
+                                    Label("Include Costings", systemImage: "dollarsign.circle")
+                                }
                             }
                         } label: {
                             if isGeneratingPDF {
@@ -1872,6 +1875,7 @@ struct TripDetailView: View {
         guard !isGeneratingPDF else { return }
         isGeneratingPDF = true
 
+        let includeCostings = includeCostingsInExport && (accessControl?.canExportFinancialPDF ?? true)
         let vineyardName = store.selectedVineyard?.name ?? ""
         let logoData = store.selectedVineyard?.logoData
         let paddockName = trip.paddockName
@@ -1909,8 +1913,17 @@ struct TripDetailView: View {
                 chemicalCosts: pdfChemCosts,
                 operatorCost: operatorCostValue,
                 operatorCategoryName: operatorCatNameValue,
-                includeCostings: includeCostingsInExport
+                includeCostings: includeCostings
             )
+            if includeCostings {
+                store.auditService?.log(
+                    action: .financialExport,
+                    entityType: "Trip",
+                    entityId: currentTrip.id.uuidString,
+                    entityLabel: paddockName,
+                    details: "PDF export with costings"
+                )
+            }
             let fileName = "TripReport_\(paddockName.isEmpty ? "Trip" : paddockName)_\(currentTrip.startTime.formatted(date: .numeric, time: .omitted))"
             let url = TripPDFService.savePDFToTemp(data: pdfData, fileName: fileName)
             let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)

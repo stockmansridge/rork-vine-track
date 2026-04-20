@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkTaskLogView: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.accessControl) private var accessControl
 
     enum SortOption: String, CaseIterable, Identifiable {
         case dateDesc = "Date (newest)"
@@ -33,7 +34,7 @@ struct WorkTaskLogView: View {
     }
 
     private var filtered: [WorkTask] {
-        var items = store.workTasks
+        var items = store.workTasks.filter { !$0.isArchived }
         if !taskFilter.isEmpty {
             items = items.filter { $0.taskType == taskFilter }
         }
@@ -108,13 +109,15 @@ struct WorkTaskLogView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("Cost")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(totalCost, format: .currency(code: currencyCode))
-                        .font(.title2.weight(.bold).monospacedDigit())
-                        .foregroundStyle(VineyardTheme.leafGreen)
+                if accessControl?.canViewFinancials ?? true {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Cost")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(totalCost, format: .currency(code: currencyCode))
+                            .font(.title2.weight(.bold).monospacedDigit())
+                            .foregroundStyle(VineyardTheme.leafGreen)
+                    }
                 }
             }
             .padding(.bottom, 16)
@@ -252,6 +255,7 @@ struct WorkTaskLogView: View {
 
 private struct WorkTaskLogRow: View {
     let task: WorkTask
+    @Environment(\.accessControl) private var accessControl
 
     private var currencyCode: String {
         Locale.current.currency?.identifier ?? "USD"
@@ -290,7 +294,7 @@ private struct WorkTaskLogRow: View {
                     Label("\(task.totalPeople)", systemImage: "person.fill")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                    if task.costPerPerson > 0 {
+                    if task.costPerPerson > 0 && (accessControl?.canViewFinancials ?? true) {
                         Text("•")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
@@ -298,15 +302,22 @@ private struct WorkTaskLogRow: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
+                    if task.isFinalized {
+                        Image(systemName: "lock.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
                 }
             }
 
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text(task.totalCost, format: .currency(code: currencyCode))
-                    .font(.subheadline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(VineyardTheme.leafGreen)
+                if accessControl?.canViewFinancials ?? true {
+                    Text(task.totalCost, format: .currency(code: currencyCode))
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .foregroundStyle(VineyardTheme.leafGreen)
+                }
                 Text(task.date, format: .dateTime.day().month(.abbreviated).year())
                     .font(.caption2)
                     .foregroundStyle(.tertiary)

@@ -12,6 +12,12 @@ nonisolated struct MaintenanceLog: Codable, Identifiable, Sendable {
     var date: Date
     var invoicePhotoData: Data?
     var createdBy: String?
+    var isArchived: Bool
+    var archivedAt: Date?
+    var archivedBy: String?
+    var isFinalized: Bool
+    var finalizedAt: Date?
+    var finalizedBy: String?
 
     init(
         id: UUID = UUID(),
@@ -24,7 +30,13 @@ nonisolated struct MaintenanceLog: Codable, Identifiable, Sendable {
         labourCost: Double = 0,
         date: Date = Date(),
         invoicePhotoData: Data? = nil,
-        createdBy: String? = nil
+        createdBy: String? = nil,
+        isArchived: Bool = false,
+        archivedAt: Date? = nil,
+        archivedBy: String? = nil,
+        isFinalized: Bool = false,
+        finalizedAt: Date? = nil,
+        finalizedBy: String? = nil
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -37,12 +49,19 @@ nonisolated struct MaintenanceLog: Codable, Identifiable, Sendable {
         self.date = date
         self.invoicePhotoData = invoicePhotoData
         self.createdBy = createdBy
+        self.isArchived = isArchived
+        self.archivedAt = archivedAt
+        self.archivedBy = archivedBy
+        self.isFinalized = isFinalized
+        self.finalizedAt = finalizedAt
+        self.finalizedBy = finalizedBy
     }
 
     var totalCost: Double { partsCost + labourCost }
 
     nonisolated enum CodingKeys: String, CodingKey {
         case id, vineyardId, itemName, hours, workCompleted, partsUsed, partsCost, labourCost, date, invoicePhotoData, createdBy
+        case isArchived, archivedAt, archivedBy, isFinalized, finalizedAt, finalizedBy
     }
 
     nonisolated init(from decoder: Decoder) throws {
@@ -58,5 +77,11 @@ nonisolated struct MaintenanceLog: Codable, Identifiable, Sendable {
         date = try container.decodeIfPresent(Date.self, forKey: .date) ?? Date()
         invoicePhotoData = try container.decodeIfPresent(Data.self, forKey: .invoicePhotoData)
         createdBy = try container.decodeIfPresent(String.self, forKey: .createdBy)
+        isArchived = try container.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        archivedAt = try container.decodeIfPresent(Date.self, forKey: .archivedAt)
+        archivedBy = try container.decodeIfPresent(String.self, forKey: .archivedBy)
+        isFinalized = try container.decodeIfPresent(Bool.self, forKey: .isFinalized) ?? false
+        finalizedAt = try container.decodeIfPresent(Date.self, forKey: .finalizedAt)
+        finalizedBy = try container.decodeIfPresent(String.self, forKey: .finalizedBy)
     }
 }

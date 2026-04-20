@@ -13,6 +13,7 @@ struct VineTrackApp: App {
     @State private var storeViewModel = StoreViewModel()
     @State private var degreeDayService = DegreeDayService()
     @State private var accessControl: AccessControl?
+    @State private var auditService = AuditService()
 
     init() {
         #if DEBUG
@@ -36,11 +37,16 @@ struct VineTrackApp: App {
                 .environment(storeViewModel)
                 .environment(degreeDayService)
                 .environment(\.accessControl, accessControl)
+                .environment(auditService)
                 .task {
-                    accessControl = AccessControl(store: store, authService: authService)
+                    let ac = AccessControl(store: store, authService: authService)
+                    accessControl = ac
                     locationService.requestPermission()
                     store.cloudSync = cloudSync
                     store.analytics = analytics
+                    store.auditService = auditService
+                    store.authService = authService
+                    auditService.configure(store: store, authService: authService, accessControl: ac)
                     tripTrackingService.configure(store: store, locationService: locationService)
                     await refreshDailyGDDIfNeeded()
                 }
