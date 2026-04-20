@@ -8,7 +8,7 @@
 
 create table if not exists public.audit_logs (
     id            uuid primary key default gen_random_uuid(),
-    vineyard_id   uuid not null references public.vineyards(id) on delete cascade,
+    vineyard_id   text not null references public.vineyards(id) on delete cascade,
     user_id       uuid references auth.users(id) on delete set null,
     user_name     text not null default '',
     user_role     text not null default '',
@@ -30,7 +30,7 @@ alter table public.audit_logs enable row level security;
 
 -- --- Role Helper ----------------------------------------------------
 
-create or replace function public.current_role_for_vineyard(vid uuid)
+create or replace function public.current_role_for_vineyard(vid text)
 returns text
 language sql
 security definer
