@@ -43,6 +43,12 @@ class DataStore {
     weak var authService: AuthService?
     weak var accessControl: AccessControl?
 
+    // MARK: - Repositories (Phase 1)
+    // Owns persistence + merge/replace logic for their domain.
+    // DataStore delegates file I/O here instead of doing it inline.
+    let workTaskRepository: WorkTaskRepository = WorkTaskRepository()
+    let maintenanceLogRepository: MaintenanceLogRepository = MaintenanceLogRepository()
+
     // MARK: - Permission Guards
 
     private func assertCanDelete(_ label: String) -> Bool {
@@ -99,8 +105,8 @@ class DataStore {
     let yieldSessionsKey = "vinetrack_yield_sessions"
     let damageRecordsKey = "vinetrack_damage_records"
     let historicalYieldRecordsKey = "vinetrack_historical_yield_records"
-    let maintenanceLogsKey = "vinetrack_maintenance_logs"
-    let workTasksKey = "vinetrack_work_tasks"
+    var maintenanceLogsKey: String { MaintenanceLogRepository.storageKey }
+    var workTasksKey: String { WorkTaskRepository.storageKey }
     let grapeVarietiesKey = "vinetrack_grape_varieties"
 
     static let storageDirectory: URL = {
@@ -208,11 +214,8 @@ class DataStore {
         let allHistoricalYield: [HistoricalYieldRecord] = loadData(key: historicalYieldRecordsKey) ?? []
         historicalYieldRecords = allHistoricalYield.filter { $0.vineyardId == vid }
 
-        let allMaintenanceLogs: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
-        maintenanceLogs = allMaintenanceLogs.filter { $0.vineyardId == vid }
-
-        let allWorkTasks: [WorkTask] = loadData(key: workTasksKey) ?? []
-        workTasks = allWorkTasks.filter { $0.vineyardId == vid }
+        maintenanceLogs = maintenanceLogRepository.load(for: vid)
+        workTasks = workTaskRepository.load(for: vid)
 
         let allGrapeVarieties: [GrapeVariety] = loadData(key: grapeVarietiesKey) ?? []
         grapeVarieties = allGrapeVarieties.filter { $0.vineyardId == vid }
@@ -988,37 +991,22 @@ class DataStore {
     }
 
     func saveAllWorkTasks() {
-        var all: [WorkTask] = loadData(key: workTasksKey) ?? []
-        if let vid = selectedVineyardId {
-            all.removeAll { $0.vineyardId == vid }
-        }
-        all.append(contentsOf: workTasks)
-        save(all, key: workTasksKey)
+        guard let vid = selectedVineyardId else { return }
+        workTaskRepository.saveSlice(workTasks, for: vid)
         syncDataToCloud(dataType: "work_tasks")
     }
 
     func replaceWorkTasks(_ remote: [WorkTask], for vineyardId: UUID) {
-        var all: [WorkTask] = loadData(key: workTasksKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: workTasksKey)
+        workTaskRepository.replace(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             workTasks = remote
         }
     }
 
     func mergeWorkTasks(_ remote: [WorkTask], for vineyardId: UUID) {
-        var all: [WorkTask] = loadData(key: workTasksKey) ?? []
-        for item in remote {
-            if let idx = all.firstIndex(where: { $0.id == item.id }) {
-                all[idx] = item
-            } else {
-                all.append(item)
-            }
-        }
-        save(all, key: workTasksKey)
+        let merged = workTaskRepository.merge(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            workTasks = all.filter { $0.vineyardId == vineyardId }
+            workTasks = merged
         }
     }
 

@@ -509,12 +509,8 @@ extension DataStore {
     }
 
     func saveAllMaintenanceLogs() {
-        var all: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
-        if let vid = selectedVineyardId {
-            all.removeAll { $0.vineyardId == vid }
-        }
-        all.append(contentsOf: maintenanceLogs)
-        save(all, key: maintenanceLogsKey)
+        guard let vid = selectedVineyardId else { return }
+        maintenanceLogRepository.saveSlice(maintenanceLogs, for: vid)
         syncDataToCloud(dataType: "maintenance_logs")
     }
 
@@ -610,25 +606,16 @@ extension DataStore {
     }
 
     func replaceMaintenanceLogs(_ remote: [MaintenanceLog], for vineyardId: UUID) {
-        var all: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
-        all.removeAll { $0.vineyardId == vineyardId }
-        all.append(contentsOf: remote)
-        save(all, key: maintenanceLogsKey)
+        maintenanceLogRepository.replace(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
             maintenanceLogs = remote
         }
     }
 
     func mergeMaintenanceLogs(_ remote: [MaintenanceLog], for vineyardId: UUID) {
-        var all: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
-        for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
-                all.append(item)
-            }
-        }
-        save(all, key: maintenanceLogsKey)
+        let merged = maintenanceLogRepository.merge(remote, for: vineyardId)
         if selectedVineyardId == vineyardId {
-            maintenanceLogs = all.filter { $0.vineyardId == vineyardId }
+            maintenanceLogs = merged
         }
     }
 
