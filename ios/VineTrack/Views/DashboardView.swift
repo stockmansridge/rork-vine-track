@@ -14,7 +14,7 @@ struct DashboardView: View {
     @State private var showSprayCalculator: Bool = false
     @State private var showVineyardDetails: Bool = false
     @State private var showMaintenanceLog: Bool = false
-    @State private var showWorkTaskCalculator: Bool = false
+    @State private var showWorkTasks: Bool = false
     @State private var showYieldDeterminationCalculator: Bool = false
     @State private var showIrrigationRecommendation: Bool = false
     @Environment(\.accessControl) private var accessControl
@@ -122,8 +122,8 @@ struct DashboardView: View {
             .navigationDestination(isPresented: $showMaintenanceLog) {
                 MaintenanceLogListView()
             }
-            .navigationDestination(isPresented: $showWorkTaskCalculator) {
-                WorkTaskCalculatorView()
+            .navigationDestination(isPresented: $showWorkTasks) {
+                WorkTasksHubView()
             }
             .navigationDestination(isPresented: $showYieldDeterminationCalculator) {
                 YieldDeterminationCalculatorView()
@@ -402,12 +402,12 @@ struct DashboardView: View {
                 }
 
                 toolCard(
-                    title: "Work Task Calculator",
-                    subtitle: "Estimate labour cost",
+                    title: "Work Tasks",
+                    subtitle: workTasksSubtitle,
                     icon: "person.2.badge.gearshape.fill",
                     color: .indigo
                 ) {
-                    showWorkTaskCalculator = true
+                    showWorkTasks = true
                 }
             }
         }
@@ -468,6 +468,14 @@ struct DashboardView: View {
         .buttonStyle(.plain)
     }
 
+
+    private var workTasksSubtitle: String {
+        let tasks = store.workTasks
+        guard !tasks.isEmpty else { return "Log & calculate" }
+        let total = tasks.reduce(0) { $0 + $1.totalCost }
+        let currencyCode = Locale.current.currency?.identifier ?? "USD"
+        return "\(tasks.count) task\(tasks.count == 1 ? "" : "s") \u{2022} \(total.formatted(.currency(code: currencyCode)))"
+    }
 
     private var maintenanceLogSubtitle: String {
         let logs = store.maintenanceLogs

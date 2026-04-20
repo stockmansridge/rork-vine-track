@@ -443,10 +443,12 @@ class CloudSyncService {
             let damageRecords = store.damageRecords.filter { $0.vineyardId == vid }
             let historicalYield = store.historicalYieldRecords.filter { $0.vineyardId == vid }
             let maintenanceLogs = store.maintenanceLogs.filter { $0.vineyardId == vid }
+            let workTasks = store.workTasks.filter { $0.vineyardId == vid }
             result.append(("yield_sessions", vid, yieldSessions))
             result.append(("damage_records", vid, damageRecords))
             result.append(("historical_yield_records", vid, historicalYield))
             result.append(("maintenance_logs", vid, maintenanceLogs))
+            result.append(("work_tasks", vid, workTasks))
 
             let operatorCategories = store.allOperatorCategories.filter { $0.vineyardId == vid }
             let buttonTemplates = store.allButtonTemplates.filter { $0.vineyardId == vid }
@@ -576,6 +578,13 @@ class CloudSyncService {
                 store.replaceMaintenanceLogs(items, for: vineyardId)
             } else {
                 store.mergeMaintenanceLogs(items, for: vineyardId)
+            }
+        case "work_tasks":
+            let items = try decoder.decode([WorkTask].self, from: jsonData)
+            if replace {
+                store.replaceWorkTasks(items, for: vineyardId)
+            } else {
+                store.mergeWorkTasks(items, for: vineyardId)
             }
         case "operator_categories":
             let items = try decoder.decode([OperatorCategory].self, from: jsonData)

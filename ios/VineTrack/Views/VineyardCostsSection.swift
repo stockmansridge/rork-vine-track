@@ -6,7 +6,7 @@ struct VineyardCostsSection: View {
     @State private var selectedCategory: CostCategory?
 
     enum CostCategory: String, Identifiable, CaseIterable {
-        case chemicals, fuel, operatorCost, maintenance
+        case chemicals, fuel, operatorCost, maintenance, workTasks
 
         var id: String { rawValue }
 
@@ -16,6 +16,7 @@ struct VineyardCostsSection: View {
             case .fuel: return "Fuel"
             case .operatorCost: return "Operator"
             case .maintenance: return "Maintenance"
+            case .workTasks: return "Work Tasks"
             }
         }
 
@@ -25,6 +26,7 @@ struct VineyardCostsSection: View {
             case .fuel: return "fuelpump.fill"
             case .operatorCost: return "person.fill"
             case .maintenance: return "wrench.and.screwdriver.fill"
+            case .workTasks: return "person.2.badge.gearshape.fill"
             }
         }
 
@@ -34,6 +36,7 @@ struct VineyardCostsSection: View {
             case .fuel: return .orange
             case .operatorCost: return .blue
             case .maintenance: return VineyardTheme.earthBrown
+            case .workTasks: return .indigo
             }
         }
     }
@@ -85,11 +88,16 @@ struct VineyardCostsSection: View {
         return category.costPerHour * (trip.activeDuration / 3600.0)
     }
 
+    private var seasonWorkTasks: [WorkTask] {
+        store.workTasks.filter { $0.date >= seasonStartDate }
+    }
+
     private var totalChemicals: Double { seasonTrips.reduce(0) { $0 + chemicalCost(for: $1) } }
     private var totalFuel: Double { seasonTrips.reduce(0) { $0 + fuelCost(for: $1) } }
     private var totalOperator: Double { seasonTrips.reduce(0) { $0 + operatorCost(for: $1) } }
     private var totalMaintenance: Double { seasonMaintenance.reduce(0) { $0 + $1.totalCost } }
-    private var grandTotal: Double { totalChemicals + totalFuel + totalOperator + totalMaintenance }
+    private var totalWorkTasks: Double { seasonWorkTasks.reduce(0) { $0 + $1.totalCost } }
+    private var grandTotal: Double { totalChemicals + totalFuel + totalOperator + totalMaintenance + totalWorkTasks }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -107,6 +115,7 @@ struct VineyardCostsSection: View {
                 costRow(.fuel, value: totalFuel)
                 costRow(.operatorCost, value: totalOperator)
                 costRow(.maintenance, value: totalMaintenance)
+                costRow(.workTasks, value: totalWorkTasks)
             }
 
             Text("Tap a category to see a breakdown by paddock.")
@@ -177,6 +186,10 @@ private struct CostBreakdownSheet: View {
         store.maintenanceLogs.filter { $0.date >= seasonStartDate }
     }
 
+    private var seasonWorkTasks: [WorkTask] {
+        store.workTasks.filter { $0.date >= seasonStartDate }
+    }
+
     private func tripTotal(_ trip: Trip) -> Double {
         switch category {
         case .chemicals:
@@ -197,6 +210,8 @@ private struct CostBreakdownSheet: View {
             return cat.costPerHour * (trip.activeDuration / 3600.0)
         case .maintenance:
             return 0
+        case .workTasks:
+            return 0
         }
     }
 
@@ -216,6 +231,31 @@ private struct CostBreakdownSheet: View {
             return paddocks.map { p in
                 let share = p.areaHectares / totalArea
                 return PaddockCost(id: p.id, name: p.name, amount: total * share)
+            }.sorted { $0.amount > $1.amount }
+        }
+
+        if category == .workTasks {
+            var totals: [UUID: Double] = [:]
+            var unassigned: Double = 0
+            for task in seasonWorkTasks {
+                let amount = task.totalCost
+                guard amount > 0 else { continue }
+                if let pid = task.paddockId, paddocks.contains(where: { $0.id == pid }) {
+                    totals[pid, default: 0] += amount
+                } else {
+                    unassigned += amount
+                }
+            }
+            if unassigned > 0 {
+                let totalArea = paddocks.reduce(0) { $0 + $1.areaHectares }
+                if totalArea > 0 {
+                    for p in paddocks {
+                        totals[p.id, default: 0] += unassigned * (p.areaHectares / totalArea)
+                    }
+                }
+            }
+            return paddocks.map { p in
+                PaddockCost(id: p.id, name: p.name, amount: totals[p.id] ?? 0)
             }.sorted { $0.amount > $1.amount }
         }
 
@@ -277,6 +317,13 @@ private struct CostBreakdownSheet: View {
                 if category == .maintenance {
                     Section {
                         Text("Maintenance costs are vineyard-wide and distributed across paddocks by area.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if category == .workTasks {
+                    Section {
+                        Text("Work task costs are assigned to their block. Tasks with no block are distributed across paddocks by area.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

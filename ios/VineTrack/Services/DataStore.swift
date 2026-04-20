@@ -33,6 +33,7 @@ class DataStore {
     var damageRecords: [DamageRecord] = []
     var historicalYieldRecords: [HistoricalYieldRecord] = []
     var maintenanceLogs: [MaintenanceLog] = []
+    var workTasks: [WorkTask] = []
     var grapeVarieties: [GrapeVariety] = []
 
     var selectedTab: Int = 0
@@ -61,6 +62,7 @@ class DataStore {
     private let damageRecordsKey = "vinetrack_damage_records"
     private let historicalYieldRecordsKey = "vinetrack_historical_yield_records"
     private let maintenanceLogsKey = "vinetrack_maintenance_logs"
+    private let workTasksKey = "vinetrack_work_tasks"
     private let grapeVarietiesKey = "vinetrack_grape_varieties"
 
     private static let storageDirectory: URL = {
@@ -170,6 +172,9 @@ class DataStore {
 
         let allMaintenanceLogs: [MaintenanceLog] = loadData(key: maintenanceLogsKey) ?? []
         maintenanceLogs = allMaintenanceLogs.filter { $0.vineyardId == vid }
+
+        let allWorkTasks: [WorkTask] = loadData(key: workTasksKey) ?? []
+        workTasks = allWorkTasks.filter { $0.vineyardId == vid }
 
         let allGrapeVarieties: [GrapeVariety] = loadData(key: grapeVarietiesKey) ?? []
         grapeVarieties = allGrapeVarieties.filter { $0.vineyardId == vid }
@@ -737,6 +742,63 @@ class DataStore {
         saveAllMaintenanceLogs()
     }
 
+    // MARK: - Work Tasks
+
+    func addWorkTask(_ task: WorkTask) {
+        guard let vid = selectedVineyardId else { return }
+        var t = task
+        t.vineyardId = vid
+        workTasks.insert(t, at: 0)
+        saveAllWorkTasks()
+        analytics?.track("work_task_created", data: ["type": task.taskType])
+    }
+
+    func updateWorkTask(_ task: WorkTask) {
+        guard let index = workTasks.firstIndex(where: { $0.id == task.id }) else { return }
+        workTasks[index] = task
+        saveAllWorkTasks()
+    }
+
+    func deleteWorkTask(_ task: WorkTask) {
+        workTasks.removeAll { $0.id == task.id }
+        saveAllWorkTasks()
+    }
+
+    private func saveAllWorkTasks() {
+        var all: [WorkTask] = loadData(key: workTasksKey) ?? []
+        if let vid = selectedVineyardId {
+            all.removeAll { $0.vineyardId == vid }
+        }
+        all.append(contentsOf: workTasks)
+        save(all, key: workTasksKey)
+        syncDataToCloud(dataType: "work_tasks")
+    }
+
+    func replaceWorkTasks(_ remote: [WorkTask], for vineyardId: UUID) {
+        var all: [WorkTask] = loadData(key: workTasksKey) ?? []
+        all.removeAll { $0.vineyardId == vineyardId }
+        all.append(contentsOf: remote)
+        save(all, key: workTasksKey)
+        if selectedVineyardId == vineyardId {
+            workTasks = remote
+        }
+    }
+
+    func mergeWorkTasks(_ remote: [WorkTask], for vineyardId: UUID) {
+        var all: [WorkTask] = loadData(key: workTasksKey) ?? []
+        for item in remote {
+            if let idx = all.firstIndex(where: { $0.id == item.id }) {
+                all[idx] = item
+            } else {
+                all.append(item)
+            }
+        }
+        save(all, key: workTasksKey)
+        if selectedVineyardId == vineyardId {
+            workTasks = all.filter { $0.vineyardId == vineyardId }
+        }
+    }
+
     // MARK: - Grape Varieties
 
     func addGrapeVariety(_ variety: GrapeVariety) {
@@ -1017,7 +1079,7 @@ class DataStore {
     }
 
     func deleteAllData() {
-        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey, yieldSessionsKey, damageRecordsKey, maintenanceLogsKey]
+        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey, yieldSessionsKey, damageRecordsKey, maintenanceLogsKey, workTasksKey]
         for key in keys {
             let fileURL = Self.storageDirectory.appendingPathComponent("\(key).json")
             try? FileManager.default.removeItem(at: fileURL)
@@ -1047,6 +1109,7 @@ class DataStore {
         damageRecords = []
         historicalYieldRecords = []
         maintenanceLogs = []
+        workTasks = []
     }
 
     func clearInMemoryState() {
@@ -1072,6 +1135,7 @@ class DataStore {
         damageRecords = []
         historicalYieldRecords = []
         maintenanceLogs = []
+        workTasks = []
     }
 
     // MARK: - Demo Data
@@ -2818,6 +2882,7 @@ class DataStore {
             case "operator_categories": return operatorCategories as [OperatorCategory]
             case "button_templates": return buttonTemplates as [ButtonTemplate]
             case "maintenance_logs": return maintenanceLogs as [MaintenanceLog]
+            case "work_tasks": return workTasks as [WorkTask]
             case "yield_sessions": return yieldSessions as [YieldEstimationSession]
             case "damage_records": return damageRecords as [DamageRecord]
             case "historical_yield_records": return historicalYieldRecords as [HistoricalYieldRecord]
