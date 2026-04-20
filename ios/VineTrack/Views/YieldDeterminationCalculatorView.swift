@@ -155,14 +155,13 @@ struct YieldDeterminationCalculatorView: View {
                         .monospacedDigit()
                 }
 
-                LabeledContent("Yield / Ha") {
+                LabeledContent("Yield / Ha (kg)") {
                     Text(String(format: "%.1f kg/ha", yieldKgPerHa))
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(VineyardTheme.leafGreen)
+                        .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
 
-                LabeledContent("Yield / Ha") {
+                LabeledContent("Yield / Ha (t)") {
                     Text(String(format: "%.1f t/ha", yieldTonnesPerHa))
                         .font(.headline.weight(.bold))
                         .foregroundStyle(VineyardTheme.leafGreen)
