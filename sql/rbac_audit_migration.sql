@@ -39,7 +39,7 @@ as $$
     select role
     from public.vineyard_members
     where vineyard_id = vid
-      and user_id = auth.uid()
+      and user_id = auth.uid()::text
     limit 1
 $$;
 
@@ -53,7 +53,7 @@ create policy "audit_logs_select_member"
         exists (
             select 1 from public.vineyard_members vm
             where vm.vineyard_id = audit_logs.vineyard_id
-              and vm.user_id = auth.uid()
+              and vm.user_id = auth.uid()::text
               and vm.role in ('Owner', 'Manager')
         )
     );
@@ -66,7 +66,7 @@ create policy "audit_logs_insert_member"
         exists (
             select 1 from public.vineyard_members vm
             where vm.vineyard_id = audit_logs.vineyard_id
-              and vm.user_id = auth.uid()
+              and vm.user_id = auth.uid()::text
         )
     );
 
@@ -96,7 +96,7 @@ create policy "vineyard_data_delete_supervisor_plus"
         exists (
             select 1 from public.vineyard_members vm
             where vm.vineyard_id = vineyard_data.vineyard_id
-              and vm.user_id = auth.uid()
+              and vm.user_id = auth.uid()::text
               and vm.role in ('Owner', 'Manager', 'Supervisor')
         )
     );
@@ -111,11 +111,11 @@ create policy "vineyard_members_insert_manager"
     with check (
         -- First member being added (owner inserting themselves) is allowed,
         -- otherwise require Manager/Owner role on the vineyard.
-        auth.uid() = user_id
+        auth.uid()::text = user_id
         or exists (
             select 1 from public.vineyard_members vm
             where vm.vineyard_id = vineyard_members.vineyard_id
-              and vm.user_id = auth.uid()
+              and vm.user_id = auth.uid()::text
               and vm.role in ('Owner', 'Manager')
         )
     );
@@ -128,7 +128,7 @@ create policy "vineyard_members_update_manager"
         exists (
             select 1 from public.vineyard_members vm
             where vm.vineyard_id = vineyard_members.vineyard_id
-              and vm.user_id = auth.uid()
+              and vm.user_id = auth.uid()::text
               and vm.role in ('Owner', 'Manager')
         )
     );
@@ -141,7 +141,7 @@ create policy "vineyard_members_delete_manager"
         exists (
             select 1 from public.vineyard_members vm
             where vm.vineyard_id = vineyard_members.vineyard_id
-              and vm.user_id = auth.uid()
+              and vm.user_id = auth.uid()::text
               and vm.role in ('Owner', 'Manager')
         )
     );
