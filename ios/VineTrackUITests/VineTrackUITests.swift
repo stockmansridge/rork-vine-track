@@ -1,41 +1,29 @@
-//
-//  VineTrackUITests.swift
-//  VineTrackUITests
-//
-//  Created by Rork on March 25, 2026.
-//
-
 import XCTest
 
 final class VineTrackUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it's important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testAppLaunches() throws {
         let app = XCUIApplication()
         app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     }
 
     @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
+    func testLoginScreenOrMainAppAppears() throws {
+        let app = XCUIApplication()
+        app.launch()
+        // Either we see a sign-in affordance, a vineyards list, or the main tab bar.
+        let signIn = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Sign' OR label CONTAINS[c] 'Continue' OR label CONTAINS[c] 'Demo'")).firstMatch
+        let anyTab = app.tabBars.firstMatch
+        let anyNav = app.navigationBars.firstMatch
+        let appeared = signIn.waitForExistence(timeout: 15)
+            || anyTab.waitForExistence(timeout: 1)
+            || anyNav.waitForExistence(timeout: 1)
+        XCTAssertTrue(appeared, "Expected login, tab bar, or navigation bar to appear after launch")
     }
 }
