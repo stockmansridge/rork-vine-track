@@ -19,10 +19,15 @@ class AuthService {
     var pendingInvitations: [TeamInvitation] = []
     var isDeletingAccount: Bool = false
     var showEmailConfirmation: Bool = false
+    var isOfflineSession: Bool = false
 
     private let signedInKey = "vinetrack_signed_in"
     private let userNameKey = "vinetrack_user_name"
     private let userEmailKey = "vinetrack_user_email"
+    private let userIdKey = "vinetrack_user_id"
+    private let lastAuthAtKey = "vinetrack_last_auth_at"
+
+    static let offlineGracePeriod: TimeInterval = 7 * 24 * 60 * 60
 
     private var currentNonce: String?
 
@@ -37,6 +42,7 @@ class AuthService {
     init() {
         userName = UserDefaults.standard.string(forKey: userNameKey) ?? ""
         userEmail = UserDefaults.standard.string(forKey: userEmailKey) ?? ""
+        userId = UserDefaults.standard.string(forKey: userIdKey)
         configureGoogleSignIn()
     }
 
@@ -67,13 +73,36 @@ class AuthService {
             userEmail = user.email ?? ""
             userName = user.userMetadata["full_name"]?.value as? String ?? UserDefaults.standard.string(forKey: userNameKey) ?? ""
             isSignedIn = true
+            isOfflineSession = false
             persistUserLocally()
             isLoading = false
         } catch {
+            if tryRestoreOfflineSession() {
+                isLoading = false
+                return
+            }
             isSignedIn = false
+            isOfflineSession = false
             UserDefaults.standard.set(false, forKey: signedInKey)
             isLoading = false
         }
+    }
+
+    private func tryRestoreOfflineSession() -> Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: signedInKey) else { return false }
+        let lastAuthAt = defaults.double(forKey: lastAuthAtKey)
+        guard lastAuthAt > 0 else { return false }
+        let elapsed = Date().timeIntervalSince1970 - lastAuthAt
+        guard elapsed >= 0, elapsed <= Self.offlineGracePeriod else { return false }
+        guard let cachedId = defaults.string(forKey: userIdKey), !cachedId.isEmpty else { return false }
+
+        userId = cachedId
+        userName = defaults.string(forKey: userNameKey) ?? ""
+        userEmail = defaults.string(forKey: userEmailKey) ?? ""
+        isSignedIn = true
+        isOfflineSession = true
+        return true
     }
 
     func signInWithGoogle() {
@@ -254,13 +283,17 @@ class AuthService {
             GIDSignIn.sharedInstance.signOut()
         }
         isSignedIn = false
+        isOfflineSession = false
         userName = ""
         userEmail = ""
         userProfileURL = nil
         userId = nil
-        UserDefaults.standard.set(false, forKey: signedInKey)
-        UserDefaults.standard.removeObject(forKey: userNameKey)
-        UserDefaults.standard.removeObject(forKey: userEmailKey)
+        let defaults = UserDefaults.standard
+        defaults.set(false, forKey: signedInKey)
+        defaults.removeObject(forKey: userNameKey)
+        defaults.removeObject(forKey: userEmailKey)
+        defaults.removeObject(forKey: userIdKey)
+        defaults.removeObject(forKey: lastAuthAtKey)
     }
 
     func deleteAccount(dataStore: DataStore) async {
@@ -551,9 +584,14 @@ class AuthService {
     }
 
     private func persistUserLocally() {
-        UserDefaults.standard.set(true, forKey: signedInKey)
-        UserDefaults.standard.set(userName, forKey: userNameKey)
-        UserDefaults.standard.set(userEmail, forKey: userEmailKey)
+        let defaults = UserDefaults.standard
+        defaults.set(true, forKey: signedInKey)
+        defaults.set(userName, forKey: userNameKey)
+        defaults.set(userEmail, forKey: userEmailKey)
+        if let userId {
+            defaults.set(userId, forKey: userIdKey)
+        }
+        defaults.set(Date().timeIntervalSince1970, forKey: lastAuthAtKey)
     }
 
     private func updateGoogleUser(_ user: GIDGoogleUser) {
