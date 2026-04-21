@@ -310,18 +310,6 @@ struct DashboardView: View {
                 GridItem(.flexible(), spacing: 12)
             ], spacing: 12) {
                 quickActionButton(
-                    title: activeTrip != nil ? "Live Trip" : "Start Trip",
-                    icon: "steeringwheel",
-                    gradient: [Color.blue, Color.blue.opacity(0.8)]
-                ) {
-                    if activeTrip != nil {
-                        store.selectedTab = 2
-                    } else {
-                        showTripTypeChoice = true
-                    }
-                }
-
-                quickActionButton(
                     title: "Repairs",
                     icon: "wrench.fill",
                     gradient: [Color.orange, Color.orange.opacity(0.8)]
@@ -340,6 +328,18 @@ struct DashboardView: View {
                 ) {
                     pinDropMode = .growth
                     showPinDrop = true
+                }
+
+                quickActionButton(
+                    title: activeTrip != nil ? "Live Trip" : "Start Trip",
+                    icon: "steeringwheel",
+                    gradient: [Color.blue, Color.blue.opacity(0.8)]
+                ) {
+                    if activeTrip != nil {
+                        store.selectedTab = 2
+                    } else {
+                        showTripTypeChoice = true
+                    }
                 }
 
                 // Spray Program — Supervisor+ (Operators don't plan sprays)
