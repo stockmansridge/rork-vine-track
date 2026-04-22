@@ -164,7 +164,34 @@ struct DamageRecordsListView: View {
         let paddockName = paddock?.name ?? "Unknown Block"
         let color = paddock.map { colorFor($0) } ?? .gray
 
-        return VStack(alignment: .leading, spacing: 10) {
+        return NavigationLink {
+            if let paddock {
+                RecordDamageView(paddock: paddock, editingRecord: record)
+            }
+        } label: {
+            damageRecordCardContent(record, paddockName: paddockName, color: color)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if let paddock {
+                NavigationLink {
+                    RecordDamageView(paddock: paddock, editingRecord: record)
+                } label: {
+                    Label("Edit Record", systemImage: "pencil")
+                }
+            }
+            if accessControl?.canDelete ?? false {
+                Button(role: .destructive) {
+                    store.deleteDamageRecord(record)
+                } label: {
+                    Label("Delete Record", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private func damageRecordCardContent(_ record: DamageRecord, paddockName: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: record.damageType.icon)
@@ -218,14 +245,11 @@ struct DamageRecordsListView: View {
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
-        .contextMenu {
-            if accessControl?.canDelete ?? false {
-                Button(role: .destructive) {
-                    store.deleteDamageRecord(record)
-                } label: {
-                    Label("Delete Record", systemImage: "trash")
-                }
-            }
+        .overlay(alignment: .topTrailing) {
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(10)
         }
     }
 

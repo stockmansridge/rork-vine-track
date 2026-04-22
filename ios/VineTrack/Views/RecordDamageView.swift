@@ -5,12 +5,23 @@ struct RecordDamageView: View {
     @Environment(DataStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     let paddock: Paddock
+    let editingRecord: DamageRecord?
 
-    @State private var polygonPoints: [CoordinatePoint] = []
-    @State private var damageDate: Date = Date()
-    @State private var damageType: DamageType = .frost
-    @State private var damagePercentText: String = "20"
-    @State private var notes: String = ""
+    init(paddock: Paddock, editingRecord: DamageRecord? = nil) {
+        self.paddock = paddock
+        self.editingRecord = editingRecord
+        _polygonPoints = State(initialValue: editingRecord?.polygonPoints ?? [])
+        _damageDate = State(initialValue: editingRecord?.date ?? Date())
+        _damageType = State(initialValue: editingRecord?.damageType ?? .frost)
+        _damagePercentText = State(initialValue: editingRecord.map { String(format: "%.0f", $0.damagePercent) } ?? "20")
+        _notes = State(initialValue: editingRecord?.notes ?? "")
+    }
+
+    @State private var polygonPoints: [CoordinatePoint]
+    @State private var damageDate: Date
+    @State private var damageType: DamageType
+    @State private var damagePercentText: String
+    @State private var notes: String
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var draggingIndex: Int?
     @State private var visibleRegion: MKCoordinateRegion?
@@ -70,14 +81,14 @@ struct RecordDamageView: View {
             .padding(.horizontal)
             .padding(.bottom, 32)
         }
-        .navigationTitle("Record Damage")
+        .navigationTitle(editingRecord == nil ? "Record Damage" : "Edit Damage")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { fitMapToPaddock() }
         .sensoryFeedback(.success, trigger: showConfirmation)
-        .alert("Damage Recorded", isPresented: $showConfirmation) {
+        .alert(editingRecord == nil ? "Damage Recorded" : "Damage Updated", isPresented: $showConfirmation) {
             Button("OK") { dismiss() }
         } message: {
-            Text("Damage of \(Int(damagePercent))% \(damageType.rawValue) has been recorded for \(paddock.name).")
+            Text("Damage of \(Int(damagePercent))% \(damageType.rawValue) has been \(editingRecord == nil ? "recorded" : "updated") for \(paddock.name).")
         }
     }
 
@@ -105,7 +116,7 @@ struct RecordDamageView: View {
                         .stroke(.blue.opacity(0.15), lineWidth: 0.5)
                 }
 
-                let existingDamage = store.damageRecords(for: paddock.id)
+                let existingDamage = store.damageRecords(for: paddock.id).filter { $0.id != editingRecord?.id }
                 ForEach(existingDamage) { record in
                     if record.polygonPoints.count >= 3 {
                         MapPolygon(coordinates: record.polygonPoints.map(\.coordinate))
@@ -375,19 +386,29 @@ struct RecordDamageView: View {
 
     private var saveButton: some View {
         Button {
-            let record = DamageRecord(
-                vineyardId: paddock.vineyardId,
-                paddockId: paddock.id,
-                polygonPoints: polygonPoints,
-                date: damageDate,
-                damageType: damageType,
-                damagePercent: damagePercent,
-                notes: notes
-            )
-            store.addDamageRecord(record)
+            if let existing = editingRecord {
+                var updated = existing
+                updated.polygonPoints = polygonPoints
+                updated.date = damageDate
+                updated.damageType = damageType
+                updated.damagePercent = damagePercent
+                updated.notes = notes
+                store.updateDamageRecord(updated)
+            } else {
+                let record = DamageRecord(
+                    vineyardId: paddock.vineyardId,
+                    paddockId: paddock.id,
+                    polygonPoints: polygonPoints,
+                    date: damageDate,
+                    damageType: damageType,
+                    damagePercent: damagePercent,
+                    notes: notes
+                )
+                store.addDamageRecord(record)
+            }
             showConfirmation = true
         } label: {
-            Label("Save Damage Record", systemImage: "checkmark.circle.fill")
+            Label(editingRecord == nil ? "Save Damage Record" : "Update Damage Record", systemImage: "checkmark.circle.fill")
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
