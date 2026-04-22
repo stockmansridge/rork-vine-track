@@ -95,7 +95,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         calculationMode: GDDCalculationMode = .bedd,
         resetMode: GDDResetMode = .budburst,
         rainAlertEnabled: Bool = false,
-        rainAlertThresholdMm: Double = 10,
+        rainAlertThresholdMm: Double = 5,
         rainAlertWindowDays: Int = 28
     ) {
         self.id = id
@@ -166,7 +166,7 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         }
         resetMode = try container.decodeIfPresent(GDDResetMode.self, forKey: .resetMode) ?? .budburst
         rainAlertEnabled = try container.decodeIfPresent(Bool.self, forKey: .rainAlertEnabled) ?? false
-        rainAlertThresholdMm = try container.decodeIfPresent(Double.self, forKey: .rainAlertThresholdMm) ?? 10
+        rainAlertThresholdMm = try container.decodeIfPresent(Double.self, forKey: .rainAlertThresholdMm) ?? 5
         rainAlertWindowDays = try container.decodeIfPresent(Int.self, forKey: .rainAlertWindowDays) ?? 28
     }
 

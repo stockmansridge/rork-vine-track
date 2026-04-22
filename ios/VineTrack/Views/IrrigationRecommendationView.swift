@@ -216,9 +216,11 @@ struct IrrigationRecommendationView: View {
                                 showAlertPermissionInfo = true
                             }
                             await runAlertCheck()
+                            rainAlertService.scheduleDailyBackgroundCheck()
                         }
                     } else {
                         rainAlertService.cancelPending()
+                        rainAlertService.cancelScheduledBackgroundCheck()
                     }
                 }
             )) {
@@ -246,7 +248,7 @@ struct IrrigationRecommendationView: View {
                 HStack {
                     Text("Threshold")
                     Spacer()
-                    TextField("10", value: Binding(
+                    TextField("5", value: Binding(
                         get: { store.settings.rainAlertThresholdMm },
                         set: { newValue in
                             var s = store.settings
@@ -301,7 +303,7 @@ struct IrrigationRecommendationView: View {
         } header: {
             Text("Rain Forecast Alert")
         } footer: {
-            Text("Get notified when the forecast rainfall over the next 28 days (up to 16 supported by Open-Meteo) exceeds your threshold. Helps you hold off on irrigation when rain is coming.")
+            Text("VineTrack checks the forecast automatically each day in the background and notifies you when rainfall over the next \(store.settings.rainAlertWindowDays) days (up to 16 supported by Open-Meteo) exceeds your threshold. You don't need to open the app to receive alerts.")
         }
     }
 

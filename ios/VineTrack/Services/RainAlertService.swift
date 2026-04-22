@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import BackgroundTasks
 
 @Observable
 class RainAlertService {
@@ -11,6 +12,20 @@ class RainAlertService {
     var isChecking: Bool = false
 
     private let notificationId = "vinetrack.rain.forecast.alert"
+    static let backgroundTaskIdentifier = "app.rork.nt0v48tayl7v8noxcfe74.rainAlertCheck"
+
+    private let lastCheckDateKey = "vinetrack.rain.alert.lastCheckDate"
+    private let lastForecastTotalKey = "vinetrack.rain.alert.lastForecastTotal"
+    private let lastForecastDaysKey = "vinetrack.rain.alert.lastForecastDays"
+
+    init() {
+        if let saved = UserDefaults.standard.object(forKey: lastCheckDateKey) as? Date {
+            lastCheckDate = saved
+        }
+        let total = UserDefaults.standard.double(forKey: lastForecastTotalKey)
+        if total > 0 { lastForecastTotalMm = total }
+        lastForecastDayCount = UserDefaults.standard.integer(forKey: lastForecastDaysKey)
+    }
 
     func refreshAuthorizationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
@@ -72,6 +87,10 @@ class RainAlertService {
             lastForecastTotalMm = total
             lastForecastDayCount = mmValues.count
 
+            UserDefaults.standard.set(lastCheckDate, forKey: lastCheckDateKey)
+            UserDefaults.standard.set(total, forKey: lastForecastTotalKey)
+            UserDefaults.standard.set(mmValues.count, forKey: lastForecastDaysKey)
+
             if total >= thresholdMm {
                 await scheduleNotification(totalMm: total, days: mmValues.count, thresholdMm: thresholdMm, windowDays: windowDays)
             } else {
@@ -102,5 +121,37 @@ class RainAlertService {
 
     func cancelPending() {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [notificationId])
+    }
+
+    // MARK: - Background Task Scheduling
+
+    /// Register the background task handler. Call this in App init before the app finishes launching.
+    nonisolated static func registerBackgroundTask(handler: @escaping @Sendable (BGAppRefreshTask) -> Void) {
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: backgroundTaskIdentifier,
+            using: nil
+        ) { task in
+            guard let refreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            handler(refreshTask)
+        }
+    }
+
+    /// Schedule the next daily background refresh (iOS decides the exact time).
+    func scheduleDailyBackgroundCheck() {
+        let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskIdentifier)
+        // Earliest 6 hours from now — iOS will typically run once per day.
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 6 * 60 * 60)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            lastError = "Could not schedule background check: \(error.localizedDescription)"
+        }
+    }
+
+    func cancelScheduledBackgroundCheck() {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.backgroundTaskIdentifier)
     }
 }

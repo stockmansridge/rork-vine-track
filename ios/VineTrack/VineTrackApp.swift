@@ -1,5 +1,6 @@
 import SwiftUI
 import RevenueCat
+import BackgroundTasks
 
 @main
 struct VineTrackApp: App {
@@ -14,8 +15,15 @@ struct VineTrackApp: App {
     @State private var degreeDayService = DegreeDayService()
     @State private var accessControl: AccessControl
     @State private var auditService = AuditService()
+    @State private var rainAlertService = RainAlertService()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        RainAlertService.registerBackgroundTask { task in
+            Task { @MainActor in
+                await Self.handleBackgroundRainCheck(task: task)
+            }
+        }
         let s = DataStore()
         let a = AuthService()
         _store = State(initialValue: s)
@@ -43,6 +51,7 @@ struct VineTrackApp: App {
                 .environment(degreeDayService)
                 .environment(\.accessControl, accessControl)
                 .environment(auditService)
+                .environment(rainAlertService)
                 .task {
                     locationService.requestPermission()
                     store.cloudSync = cloudSync
@@ -53,6 +62,16 @@ struct VineTrackApp: App {
                     auditService.configure(store: store, authService: authService, accessControl: accessControl)
                     tripTrackingService.configure(store: store, locationService: locationService)
                     await refreshDailyGDDIfNeeded()
+                    await rainAlertService.refreshAuthorizationStatus()
+                    await runRainAlertCheckIfNeeded()
+                    if store.settings.rainAlertEnabled {
+                        rainAlertService.scheduleDailyBackgroundCheck()
+                    }
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .background, store.settings.rainAlertEnabled {
+                        rainAlertService.scheduleDailyBackgroundCheck()
+                    }
                 }
                 .onChange(of: store.selectedVineyardId) { _, _ in
                     Task { await refreshDailyGDDIfNeeded() }
@@ -92,6 +111,60 @@ struct VineTrackApp: App {
                     }
                 }
         }
+    }
+
+    private func runRainAlertCheckIfNeeded() async {
+        guard store.settings.rainAlertEnabled else { return }
+        let lat = store.settings.vineyardLatitude ?? store.paddockCentroidLatitude
+        let lon = store.settings.vineyardLongitude ?? store.paddockCentroidLongitude
+        guard let lat, let lon else { return }
+        if let last = rainAlertService.lastCheckDate,
+           Calendar.current.isDateInToday(last) {
+            return
+        }
+        await rainAlertService.checkForecastAndNotify(
+            latitude: lat,
+            longitude: lon,
+            windowDays: store.settings.rainAlertWindowDays,
+            thresholdMm: store.settings.rainAlertThresholdMm
+        )
+    }
+
+    @MainActor
+    static func handleBackgroundRainCheck(task: BGAppRefreshTask) async {
+        let service = RainAlertService()
+        let store = DataStore()
+        store.load()
+
+        let settings = store.settings
+        guard settings.rainAlertEnabled else {
+            task.setTaskCompleted(success: true)
+            return
+        }
+        let lat = settings.vineyardLatitude ?? store.paddockCentroidLatitude
+        let lon = settings.vineyardLongitude ?? store.paddockCentroidLongitude
+        guard let lat, let lon else {
+            task.setTaskCompleted(success: true)
+            return
+        }
+
+        service.scheduleDailyBackgroundCheck()
+
+        let checkTask = Task {
+            await service.checkForecastAndNotify(
+                latitude: lat,
+                longitude: lon,
+                windowDays: settings.rainAlertWindowDays,
+                thresholdMm: settings.rainAlertThresholdMm
+            )
+        }
+
+        task.expirationHandler = {
+            checkTask.cancel()
+        }
+
+        await checkTask.value
+        task.setTaskCompleted(success: true)
     }
 
     private func refreshDailyGDDIfNeeded() async {

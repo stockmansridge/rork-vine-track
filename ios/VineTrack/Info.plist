@@ -18,6 +18,12 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>app.rork.nt0v48tayl7v8noxcfe74.rainAlertCheck</string>
 	</array>
 </dict>
 </plist>
