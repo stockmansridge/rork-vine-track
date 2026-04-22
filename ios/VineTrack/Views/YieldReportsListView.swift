@@ -668,10 +668,23 @@ private struct ArchiveYieldSheet: View {
     @State private var season: String = ""
     @State private var year: Int = Calendar.current.component(.year, from: Date())
     @State private var notes: String = ""
+    @State private var actualYields: [UUID: String] = [:]
+    @FocusState private var focusedBlock: UUID?
 
     let blockSummaries: [BlockSummary]
     let totalYieldTonnes: Double
     let totalArea: Double
+
+    private func parsedActual(for id: UUID) -> Double? {
+        guard let raw = actualYields[id]?.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."),
+              !raw.isEmpty,
+              let v = Double(raw), v >= 0 else { return nil }
+        return v
+    }
+
+    private var totalActualEntered: Double {
+        blockSummaries.reduce(0.0) { $0 + (parsedActual(for: $1.paddockId) ?? 0) }
+    }
 
     var body: some View {
         NavigationStack {
@@ -718,17 +731,39 @@ private struct ArchiveYieldSheet: View {
 
                 Section {
                     ForEach(blockSummaries, id: \.paddockId) { summary in
-                        HStack {
-                            Text(summary.paddockName)
-                                .font(.subheadline)
-                            Spacer()
-                            Text(String(format: "%.2f t", summary.yieldTonnes))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(VineyardTheme.leafGreen)
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(summary.paddockName)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Text(String(format: "Est. %.2f t", summary.yieldTonnes))
+                                    .font(.caption)
+                                    .foregroundStyle(VineyardTheme.leafGreen)
+                            }
+                            HStack {
+                                Text("Actual")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                TextField("0.00", text: Binding(
+                                    get: { actualYields[summary.paddockId] ?? "" },
+                                    set: { actualYields[summary.paddockId] = $0 }
+                                ))
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .focused($focusedBlock, equals: summary.paddockId)
+                                .frame(width: 100)
+                                Text("t")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
+                        .padding(.vertical, 2)
                     }
                 } header: {
-                    Text("Block Results")
+                    Text("Block Results & Actual Yield")
+                } footer: {
+                    Text("Actual yields are optional — you can leave them blank and fill them in later from the archived record.")
                 }
 
                 Section {
@@ -758,8 +793,10 @@ private struct ArchiveYieldSheet: View {
     private func archiveSeason() {
         guard let vid = store.selectedVineyardId else { return }
 
-        let blockResults = blockSummaries.map { summary in
-            HistoricalBlockResult(
+        let now = Date()
+        let blockResults = blockSummaries.map { summary -> HistoricalBlockResult in
+            let actual = parsedActual(for: summary.paddockId)
+            return HistoricalBlockResult(
                 paddockId: summary.paddockId,
                 paddockName: summary.paddockName,
                 areaHectares: summary.areaHa,
@@ -769,7 +806,9 @@ private struct ArchiveYieldSheet: View {
                 averageBunchWeightGrams: 0,
                 totalVines: 0,
                 samplesRecorded: summary.samplesRecorded,
-                damageFactor: 1.0
+                damageFactor: 1.0,
+                actualYieldTonnes: actual,
+                actualRecordedAt: actual != nil ? now : nil
             )
         }
 
