@@ -6,6 +6,7 @@ struct YieldReportsListView: View {
     @State private var showHistoricalDetail: HistoricalYieldRecord?
     @State private var historicalSortBy: HistoricalSort = .newest
     @State private var historicalFilterPaddock: UUID?
+    @State private var recordPendingDeletion: HistoricalYieldRecord?
 
     private var paddocks: [Paddock] {
         store.orderedPaddocks.filter { $0.polygonPoints.count >= 3 }
@@ -139,6 +140,21 @@ struct YieldReportsListView: View {
         }
         .sheet(item: $showHistoricalDetail) { record in
             HistoricalYieldDetailSheet(record: record)
+        }
+        .alert("Delete Historical Record?", isPresented: Binding(
+            get: { recordPendingDeletion != nil },
+            set: { if !$0 { recordPendingDeletion = nil } }
+        ), presenting: recordPendingDeletion) { record in
+            Button("Delete", role: .destructive) {
+                store.deleteHistoricalYieldRecord(record)
+                recordPendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                recordPendingDeletion = nil
+            }
+        } message: { record in
+            let title = record.season.isEmpty ? "\(record.year)" : record.season
+            Text("This will permanently delete the \(title) historical yield record. This cannot be undone.")
         }
     }
 
@@ -476,7 +492,7 @@ struct YieldReportsListView: View {
                     .buttonStyle(.plain)
                     .contextMenu {
                         Button(role: .destructive) {
-                            store.deleteHistoricalYieldRecord(record)
+                            recordPendingDeletion = record
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -833,6 +849,7 @@ private struct HistoricalYieldDetailSheet: View {
     @Environment(DataStore.self) private var store
     let record: HistoricalYieldRecord
     @State private var editingBlock: HistoricalBlockResult?
+    @State private var showDeleteConfirm: Bool = false
 
     private var currentRecord: HistoricalYieldRecord {
         store.historicalYieldRecords.first(where: { $0.id == record.id }) ?? record
@@ -945,9 +962,26 @@ private struct HistoricalYieldDetailSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
+                    }
+                }
             }
             .sheet(item: $editingBlock) { block in
                 EditActualYieldSheet(recordId: currentRecord.id, block: block)
+            }
+            .alert("Delete Historical Record?", isPresented: $showDeleteConfirm) {
+                Button("Delete", role: .destructive) {
+                    store.deleteHistoricalYieldRecord(currentRecord)
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will permanently delete this historical yield record. This cannot be undone.")
             }
         }
     }
