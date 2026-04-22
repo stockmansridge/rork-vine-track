@@ -844,9 +844,34 @@ private struct HistoricalYieldDetailSheet: View {
                         }
                     }
 
+                    let missingActuals = currentRecord.blockResults.filter { $0.actualYieldTonnes == nil }.count
+                    if missingActuals > 0 {
+                        HStack(spacing: 10) {
+                            Image(systemName: "info.circle.fill")
+                                .font(.body)
+                                .foregroundStyle(.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Enter Actual Yield")
+                                    .font(.subheadline.weight(.semibold))
+                                Text("Tap any block below to record the actual harvested tonnage and see estimate accuracy.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(12)
+                        .background(Color.blue.opacity(0.1), in: .rect(cornerRadius: 12))
+                    }
+
                     VStack(alignment: .leading, spacing: 10) {
-                        Label("Block Results", systemImage: "chart.bar.doc.horizontal")
-                            .font(.headline)
+                        HStack {
+                            Label("Block Results", systemImage: "chart.bar.doc.horizontal")
+                                .font(.headline)
+                            Spacer()
+                            Text("Tap to edit actuals")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
 
                         ForEach(currentRecord.blockResults) { block in
                             Button {
@@ -932,9 +957,13 @@ private struct HistoricalYieldDetailSheet: View {
                                 .foregroundStyle(.blue.opacity(0.8))
                         }
                     } else {
-                        Text("Tap to add")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.tertiary)
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.caption)
+                            Text("Tap to add")
+                                .font(.subheadline.weight(.medium))
+                        }
+                        .foregroundStyle(.blue)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -13,6 +13,8 @@ struct YieldEstimationView: View {
     @State private var showFullScreenMap: Bool = false
     @State private var fullScreenSelectedSite: SampleSite?
     @State private var showCompleteConfirmation: Bool = false
+    @State private var showSamplesPerHaEditor: Bool = false
+    @State private var samplesPerHaText: String = ""
 
     private var paddocks: [Paddock] {
         store.orderedPaddocks.filter { $0.polygonPoints.count >= 3 }
@@ -99,6 +101,10 @@ struct YieldEstimationView: View {
         }
         .sheet(isPresented: $showBunchWeightEditor) {
             bunchWeightSheet
+        }
+        .sheet(isPresented: $showSamplesPerHaEditor) {
+            samplesPerHaSheet
+                .presentationDetents([.medium])
         }
         .navigationDestination(isPresented: $showReport) {
             YieldReportView(viewModel: viewModel)
@@ -508,12 +514,20 @@ struct YieldEstimationView: View {
                         icon: "square.dashed",
                         color: VineyardTheme.leafGreen
                     )
-                    summaryCard(
-                        title: "Samples/Ha",
-                        value: "\(samplesPerHa)",
-                        icon: "number",
-                        color: .orange
-                    )
+                    Button {
+                        samplesPerHaText = "\(samplesPerHa)"
+                        showSamplesPerHaEditor = true
+                    } label: {
+                        summaryCard(
+                            title: "Samples/Ha",
+                            value: "\(samplesPerHa)",
+                            icon: "number",
+                            color: .orange,
+                            editable: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.isCompleted)
                     summaryCard(
                         title: "Total Sites",
                         value: "\(expectedSamples)",
@@ -526,14 +540,21 @@ struct YieldEstimationView: View {
         }
     }
 
-    private func summaryCard(title: String, value: String, icon: String, color: Color) -> some View {
+    private func summaryCard(title: String, value: String, icon: String, color: Color, editable: Bool = false) -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.body)
                 .foregroundStyle(color)
-            Text(value)
-                .font(.headline)
-                .foregroundStyle(.primary)
+            HStack(spacing: 4) {
+                Text(value)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                if editable {
+                    Image(systemName: "pencil")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -908,6 +929,68 @@ struct YieldEstimationView: View {
                     }
                     .fontWeight(.semibold)
                     .disabled(Double(bunchWeightText) == nil || (Double(bunchWeightText) ?? 0) <= 0)
+                }
+            }
+        }
+    }
+
+    // MARK: - Samples per Ha Sheet
+
+    private var samplesPerHaSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack {
+                        TextField("Samples per Ha", text: $samplesPerHaText)
+                            .keyboardType(.numberPad)
+                        Text("per Ha")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Samples per Hectare")
+                } footer: {
+                    Text("Number of vine sample sites to generate per hectare. This value is saved in Settings and used for all future yield estimations.")
+                }
+
+                if let n = Int(samplesPerHaText), n > 0, !viewModel.selectedPaddockIds.isEmpty {
+                    Section {
+                        let area = viewModel.totalSelectedArea(paddocks: paddocks)
+                        let expected = viewModel.expectedSampleCount(paddocks: paddocks, samplesPerHectare: n)
+                        HStack {
+                            Text("Selected Area")
+                            Spacer()
+                            Text(String(format: "%.2f Ha", area)).foregroundStyle(.secondary)
+                        }
+                        HStack {
+                            Text("Total Sites")
+                            Spacer()
+                            Text("\(expected)").foregroundStyle(.orange).fontWeight(.semibold)
+                        }
+                    } header: {
+                        Text("Preview")
+                    }
+                }
+            }
+            .navigationTitle("Samples per Ha")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showSamplesPerHaEditor = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        if let n = Int(samplesPerHaText), n > 0, n <= 500 {
+                            var s = store.settings
+                            s.samplesPerHectare = n
+                            store.updateSettings(s)
+                        }
+                        showSamplesPerHaEditor = false
+                    }
+                    .fontWeight(.semibold)
+                    .disabled({
+                        guard let n = Int(samplesPerHaText) else { return true }
+                        return n <= 0 || n > 500
+                    }())
                 }
             }
         }
