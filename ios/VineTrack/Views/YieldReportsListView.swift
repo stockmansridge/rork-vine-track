@@ -833,6 +833,15 @@ private struct HistoricalYieldDetailSheet: View {
                                 color: .teal
                             )
                         }
+
+                        if let accuracy = currentRecord.estimateAccuracyPercent {
+                            detailCard(
+                                title: "Estimate Accuracy",
+                                value: String(format: "%.1f%%", accuracy),
+                                icon: "scope",
+                                color: accuracyColor(accuracy)
+                            )
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
@@ -938,6 +947,15 @@ private struct HistoricalYieldDetailSheet: View {
                     Text(String(format: "%@%.2f t vs estimate", variance >= 0 ? "+" : "", variance))
                         .font(.caption2.weight(.medium))
                     Spacer()
+                    if let accuracy = block.estimateAccuracyPercent {
+                        HStack(spacing: 3) {
+                            Image(systemName: "scope")
+                                .font(.caption2.weight(.bold))
+                            Text(String(format: "%.0f%% accurate", accuracy))
+                                .font(.caption2.weight(.semibold))
+                        }
+                        .foregroundStyle(accuracyColor(accuracy))
+                    }
                 }
                 .foregroundStyle(variance >= 0 ? .green : .red)
             }
@@ -961,6 +979,12 @@ private struct HistoricalYieldDetailSheet: View {
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
+    }
+
+    private func accuracyColor(_ percent: Double) -> Color {
+        if percent >= 90 { return .green }
+        if percent >= 75 { return .orange }
+        return .red
     }
 
     private func detailCard(title: String, value: String, icon: String, color: Color) -> some View {
@@ -1045,6 +1069,16 @@ private struct EditActualYieldSheet: View {
                             Text(String(format: "%@%.2f t", variance >= 0 ? "+" : "", variance))
                                 .foregroundStyle(variance >= 0 ? .green : .red)
                                 .fontWeight(.semibold)
+                        }
+                        if parsed > 0 {
+                            let accuracy = max(0, (1 - abs(parsed - block.yieldTonnes) / parsed) * 100)
+                            HStack {
+                                Text("Estimate Accuracy")
+                                Spacer()
+                                Text(String(format: "%.1f%%", accuracy))
+                                    .foregroundStyle(accuracy >= 90 ? .green : (accuracy >= 75 ? .orange : .red))
+                                    .fontWeight(.semibold)
+                            }
                         }
                     }
                 } header: {

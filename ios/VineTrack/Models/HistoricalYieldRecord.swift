@@ -27,6 +27,17 @@ nonisolated struct HistoricalYieldRecord: Codable, Identifiable, Sendable {
         return total / totalAreaHectares
     }
 
+    /// Accuracy of estimate vs actual across all blocks that have an actual recorded.
+    /// Returns a value between 0 and 100 (can be 0 if the estimate is off by >= 100% of actual).
+    var estimateAccuracyPercent: Double? {
+        guard let actual = totalActualYieldTonnes, actual > 0 else { return nil }
+        let estimatedForBlocksWithActual = blockResults
+            .filter { $0.actualYieldTonnes != nil }
+            .reduce(0.0) { $0 + $1.yieldTonnes }
+        let error = abs(actual - estimatedForBlocksWithActual) / actual
+        return max(0, (1 - error) * 100)
+    }
+
     init(
         id: UUID = UUID(),
         vineyardId: UUID,
@@ -73,6 +84,14 @@ nonisolated struct HistoricalBlockResult: Codable, Identifiable, Sendable, Hasha
     var yieldVarianceTonnes: Double? {
         guard let actual = actualYieldTonnes else { return nil }
         return actual - yieldTonnes
+    }
+
+    /// Accuracy of the estimate for this block vs the actual recorded yield.
+    /// 100% means a perfect estimate; 0% means the estimate was off by at least 100% of actual.
+    var estimateAccuracyPercent: Double? {
+        guard let actual = actualYieldTonnes, actual > 0 else { return nil }
+        let error = abs(actual - yieldTonnes) / actual
+        return max(0, (1 - error) * 100)
     }
 
     init(
