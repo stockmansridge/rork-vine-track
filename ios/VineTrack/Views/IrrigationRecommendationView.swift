@@ -7,6 +7,7 @@ struct IrrigationRecommendationView: View {
     @State private var forecastService = IrrigationForecastService()
     @State private var rainAlertService = RainAlertService()
     @State private var showAlertPermissionInfo: Bool = false
+    @State private var showRainForecastDetail: Bool = false
 
     @State private var applicationRateText: String = ""
     @State private var kcText: String = "0.65"
@@ -105,6 +106,16 @@ struct IrrigationRecommendationView: View {
             }
             applyPaddockDefaults()
             Task { await rainAlertService.refreshAuthorizationStatus() }
+        }
+        .sheet(isPresented: $showRainForecastDetail) {
+            if let lat = latitude, let lon = longitude {
+                RainForecastDetailView(
+                    latitude: lat,
+                    longitude: lon,
+                    windowDays: store.settings.rainAlertWindowDays,
+                    thresholdMm: store.settings.rainAlertThresholdMm
+                )
+            }
         }
         .alert("Enable Notifications", isPresented: $showAlertPermissionInfo) {
             Button("OK", role: .cancel) {}
@@ -278,14 +289,30 @@ struct IrrigationRecommendationView: View {
                 .disabled(rainAlertService.isChecking || latitude == nil || longitude == nil)
 
                 if let total = rainAlertService.lastForecastTotalMm, let checked = rainAlertService.lastCheckDate {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(String(format: "%.1f mm forecast over %d days", total, rainAlertService.lastForecastDayCount))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(total >= store.settings.rainAlertThresholdMm ? VineyardTheme.vineRed : VineyardTheme.leafGreen)
-                        Text("Last checked \(checked.formatted(.relative(presentation: .named)))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    Button {
+                        showRainForecastDetail = true
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(String(format: "%.1f mm forecast over %d days", total, rainAlertService.lastForecastDayCount))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(total >= store.settings.rainAlertThresholdMm ? VineyardTheme.vineRed : VineyardTheme.leafGreen)
+                                Text("Last checked \(checked.formatted(.relative(presentation: .named)))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("Tap to view \(store.settings.rainAlertWindowDays)-day forecast")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tint)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .disabled(latitude == nil || longitude == nil)
                 }
 
                 if let err = rainAlertService.lastError {
