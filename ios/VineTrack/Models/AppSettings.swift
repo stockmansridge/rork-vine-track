@@ -61,6 +61,9 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
     var useBEDD: Bool
     var calculationMode: GDDCalculationMode
     var resetMode: GDDResetMode
+    var rainAlertEnabled: Bool
+    var rainAlertThresholdMm: Double
+    var rainAlertWindowDays: Int
 
     init(
         id: UUID = UUID(),
@@ -90,7 +93,10 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         vineyardElevationMetres: Double? = nil,
         useBEDD: Bool = true,
         calculationMode: GDDCalculationMode = .bedd,
-        resetMode: GDDResetMode = .budburst
+        resetMode: GDDResetMode = .budburst,
+        rainAlertEnabled: Bool = false,
+        rainAlertThresholdMm: Double = 10,
+        rainAlertWindowDays: Int = 28
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -120,6 +126,9 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         self.useBEDD = useBEDD
         self.calculationMode = calculationMode
         self.resetMode = resetMode
+        self.rainAlertEnabled = rainAlertEnabled
+        self.rainAlertThresholdMm = rainAlertThresholdMm
+        self.rainAlertWindowDays = rainAlertWindowDays
     }
 
     init(from decoder: Decoder) throws {
@@ -156,6 +165,9 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
             calculationMode = useBEDD ? .bedd : .gdd
         }
         resetMode = try container.decodeIfPresent(GDDResetMode.self, forKey: .resetMode) ?? .budburst
+        rainAlertEnabled = try container.decodeIfPresent(Bool.self, forKey: .rainAlertEnabled) ?? false
+        rainAlertThresholdMm = try container.decodeIfPresent(Double.self, forKey: .rainAlertThresholdMm) ?? 10
+        rainAlertWindowDays = try container.decodeIfPresent(Int.self, forKey: .rainAlertWindowDays) ?? 28
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
@@ -165,5 +177,6 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         case defaultWaterVolume, defaultSprayRate, defaultConcentrationFactor
         case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance, fillTimerEnabled, samplesPerHectare, defaultBlockBunchWeightsGrams, elConfirmationEnabled
         case vineyardLatitude, vineyardLongitude, vineyardElevationMetres, useBEDD, calculationMode, resetMode
+        case rainAlertEnabled, rainAlertThresholdMm, rainAlertWindowDays
     }
 }

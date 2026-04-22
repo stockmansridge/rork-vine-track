@@ -5,6 +5,8 @@ struct IrrigationRecommendationView: View {
 
     @State private var selectedPaddockId: UUID?
     @State private var forecastService = IrrigationForecastService()
+    @State private var rainAlertService = RainAlertService()
+    @State private var showAlertPermissionInfo: Bool = false
 
     @State private var applicationRateText: String = ""
     @State private var kcText: String = "0.65"
@@ -70,6 +72,7 @@ struct IrrigationRecommendationView: View {
         Form {
             blockSection
             forecastSection
+            rainAlertSection
             settingsSection
             if let result {
                 resultSection(result)
@@ -101,6 +104,12 @@ struct IrrigationRecommendationView: View {
                 selectedPaddockId = vineyardPaddocks.first?.id
             }
             applyPaddockDefaults()
+            Task { await rainAlertService.refreshAuthorizationStatus() }
+        }
+        .alert("Enable Notifications", isPresented: $showAlertPermissionInfo) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("To receive rain forecast alerts, please enable notifications for VineTrack in the iOS Settings app.")
         }
         .onChange(of: selectedPaddockId) { _, _ in
             applyPaddockDefaults()
@@ -187,6 +196,124 @@ struct IrrigationRecommendationView: View {
 
     private var appRateIsSiteData: Bool {
         (selectedPaddock?.mmPerHour ?? 0) > 0
+    }
+
+    private var rainAlertSection: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { store.settings.rainAlertEnabled },
+                set: { newValue in
+                    var s = store.settings
+                    s.rainAlertEnabled = newValue
+                    store.updateSettings(s)
+                    if newValue {
+                        Task {
+                            let status = rainAlertService.authorizationStatus
+                            if status == .notDetermined {
+                                let granted = await rainAlertService.requestAuthorization()
+                                if !granted { showAlertPermissionInfo = true }
+                            } else if status == .denied {
+                                showAlertPermissionInfo = true
+                            }
+                            await runAlertCheck()
+                        }
+                    } else {
+                        rainAlertService.cancelPending()
+                    }
+                }
+            )) {
+                Label("Rain Forecast Alert", systemImage: "cloud.rain.fill")
+            }
+
+            if store.settings.rainAlertEnabled {
+                HStack {
+                    Text("Window")
+                    Spacer()
+                    Stepper(value: Binding(
+                        get: { store.settings.rainAlertWindowDays },
+                        set: { newValue in
+                            var s = store.settings
+                            s.rainAlertWindowDays = min(max(newValue, 1), 16)
+                            store.updateSettings(s)
+                        }
+                    ), in: 1...16) {
+                        Text("\(store.settings.rainAlertWindowDays) days")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+
+                HStack {
+                    Text("Threshold")
+                    Spacer()
+                    TextField("10", value: Binding(
+                        get: { store.settings.rainAlertThresholdMm },
+                        set: { newValue in
+                            var s = store.settings
+                            s.rainAlertThresholdMm = max(0, newValue)
+                            store.updateSettings(s)
+                        }
+                    ), format: .number.precision(.fractionLength(0...1)))
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 80)
+                    Text("mm")
+                        .foregroundStyle(.secondary)
+                }
+
+                Button {
+                    Task { await runAlertCheck() }
+                } label: {
+                    if rainAlertService.isChecking {
+                        HStack {
+                            ProgressView()
+                            Text("Checking forecast…")
+                        }
+                    } else {
+                        Label("Check Forecast Now", systemImage: "bell.badge")
+                    }
+                }
+                .disabled(rainAlertService.isChecking || latitude == nil || longitude == nil)
+
+                if let total = rainAlertService.lastForecastTotalMm, let checked = rainAlertService.lastCheckDate {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(format: "%.1f mm forecast over %d days", total, rainAlertService.lastForecastDayCount))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(total >= store.settings.rainAlertThresholdMm ? VineyardTheme.vineRed : VineyardTheme.leafGreen)
+                        Text("Last checked \(checked.formatted(.relative(presentation: .named)))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let err = rainAlertService.lastError {
+                    Label(err, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                if rainAlertService.authorizationStatus == .denied {
+                    Label("Notifications are disabled for VineTrack. Enable them in iOS Settings to receive alerts.", systemImage: "bell.slash.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+        } header: {
+            Text("Rain Forecast Alert")
+        } footer: {
+            Text("Get notified when the forecast rainfall over the next 28 days (up to 16 supported by Open-Meteo) exceeds your threshold. Helps you hold off on irrigation when rain is coming.")
+        }
+    }
+
+    private func runAlertCheck() async {
+        guard store.settings.rainAlertEnabled else { return }
+        guard let lat = latitude, let lon = longitude else { return }
+        await rainAlertService.checkForecastAndNotify(
+            latitude: lat,
+            longitude: lon,
+            windowDays: store.settings.rainAlertWindowDays,
+            thresholdMm: store.settings.rainAlertThresholdMm
+        )
     }
 
     private var settingsSection: some View {
