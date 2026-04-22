@@ -16,6 +16,17 @@ nonisolated struct HistoricalYieldRecord: Codable, Identifiable, Sendable {
         return totalYieldTonnes / totalAreaHectares
     }
 
+    var totalActualYieldTonnes: Double? {
+        let actuals = blockResults.compactMap { $0.actualYieldTonnes }
+        guard !actuals.isEmpty else { return nil }
+        return actuals.reduce(0, +)
+    }
+
+    var actualYieldPerHectare: Double? {
+        guard let total = totalActualYieldTonnes, totalAreaHectares > 0 else { return nil }
+        return total / totalAreaHectares
+    }
+
     init(
         id: UUID = UUID(),
         vineyardId: UUID,
@@ -51,6 +62,18 @@ nonisolated struct HistoricalBlockResult: Codable, Identifiable, Sendable, Hasha
     var totalVines: Int
     var samplesRecorded: Int
     var damageFactor: Double
+    var actualYieldTonnes: Double?
+    var actualRecordedAt: Date?
+
+    var actualYieldPerHectare: Double? {
+        guard let actual = actualYieldTonnes, areaHectares > 0 else { return nil }
+        return actual / areaHectares
+    }
+
+    var yieldVarianceTonnes: Double? {
+        guard let actual = actualYieldTonnes else { return nil }
+        return actual - yieldTonnes
+    }
 
     init(
         id: UUID = UUID(),
@@ -63,7 +86,9 @@ nonisolated struct HistoricalBlockResult: Codable, Identifiable, Sendable, Hasha
         averageBunchWeightGrams: Double = 0,
         totalVines: Int = 0,
         samplesRecorded: Int = 0,
-        damageFactor: Double = 1.0
+        damageFactor: Double = 1.0,
+        actualYieldTonnes: Double? = nil,
+        actualRecordedAt: Date? = nil
     ) {
         self.id = id
         self.paddockId = paddockId
@@ -76,5 +101,7 @@ nonisolated struct HistoricalBlockResult: Codable, Identifiable, Sendable, Hasha
         self.totalVines = totalVines
         self.samplesRecorded = samplesRecorded
         self.damageFactor = damageFactor
+        self.actualYieldTonnes = actualYieldTonnes
+        self.actualRecordedAt = actualRecordedAt
     }
 }

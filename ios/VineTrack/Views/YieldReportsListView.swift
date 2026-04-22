@@ -791,7 +791,13 @@ private struct ArchiveYieldSheet: View {
 
 private struct HistoricalYieldDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(DataStore.self) private var store
     let record: HistoricalYieldRecord
+    @State private var editingBlock: HistoricalBlockResult?
+
+    private var currentRecord: HistoricalYieldRecord {
+        store.historicalYieldRecords.first(where: { $0.id == record.id }) ?? record
+    }
 
     var body: some View {
         NavigationStack {
@@ -800,29 +806,29 @@ private struct HistoricalYieldDetailSheet: View {
                     VStack(spacing: 12) {
                         HStack(spacing: 12) {
                             detailCard(
-                                title: "Total Yield",
-                                value: String(format: "%.2f t", record.totalYieldTonnes),
-                                icon: "scalemass.fill",
+                                title: "Estimated",
+                                value: String(format: "%.2f t", currentRecord.totalYieldTonnes),
+                                icon: "scalemass",
                                 color: VineyardTheme.leafGreen
                             )
                             detailCard(
-                                title: "Yield/Ha",
-                                value: record.totalAreaHectares > 0 ? String(format: "%.2f t/Ha", record.yieldPerHectare) : "—",
-                                icon: "square.dashed",
-                                color: .orange
+                                title: "Actual",
+                                value: currentRecord.totalActualYieldTonnes.map { String(format: "%.2f t", $0) } ?? "—",
+                                icon: "scalemass.fill",
+                                color: .blue
                             )
                         }
 
                         HStack(spacing: 12) {
                             detailCard(
-                                title: "Blocks",
-                                value: "\(record.blockResults.count)",
-                                icon: "map.fill",
-                                color: .purple
+                                title: "Est. Yield/Ha",
+                                value: currentRecord.totalAreaHectares > 0 ? String(format: "%.2f t/Ha", currentRecord.yieldPerHectare) : "—",
+                                icon: "square.dashed",
+                                color: .orange
                             )
                             detailCard(
                                 title: "Total Area",
-                                value: String(format: "%.2f Ha", record.totalAreaHectares),
+                                value: String(format: "%.2f Ha", currentRecord.totalAreaHectares),
                                 icon: "ruler.fill",
                                 color: .teal
                             )
@@ -833,52 +839,22 @@ private struct HistoricalYieldDetailSheet: View {
                         Label("Block Results", systemImage: "chart.bar.doc.horizontal")
                             .font(.headline)
 
-                        ForEach(record.blockResults) { block in
-                            VStack(spacing: 8) {
-                                HStack {
-                                    Text(block.paddockName)
-                                        .font(.subheadline.weight(.semibold))
-                                    Spacer()
-                                    Text(String(format: "%.2f t", block.yieldTonnes))
-                                        .font(.subheadline.weight(.bold))
-                                        .foregroundStyle(VineyardTheme.leafGreen)
-                                }
-
-                                HStack {
-                                    Text(String(format: "%.2f Ha", block.areaHectares))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Spacer()
-                                    if block.areaHectares > 0 {
-                                        Text(String(format: "%.2f t/Ha", block.yieldPerHectare))
-                                            .font(.caption.weight(.medium))
-                                            .foregroundStyle(.orange)
-                                    }
-                                }
-
-                                if block.samplesRecorded > 0 {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "mappin.and.ellipse")
-                                            .font(.caption2)
-                                            .foregroundStyle(.purple)
-                                        Text("\(block.samplesRecorded) samples")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                        Spacer()
-                                    }
-                                }
+                        ForEach(currentRecord.blockResults) { block in
+                            Button {
+                                editingBlock = block
+                            } label: {
+                                blockCard(block)
                             }
-                            .padding(12)
-                            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
+                            .buttonStyle(.plain)
                         }
                     }
 
-                    if !record.notes.isEmpty {
+                    if !currentRecord.notes.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Label("Notes", systemImage: "note.text")
                                 .font(.headline)
 
-                            Text(record.notes)
+                            Text(currentRecord.notes)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .padding(12)
@@ -890,14 +866,101 @@ private struct HistoricalYieldDetailSheet: View {
                 .padding(.horizontal)
                 .padding(.bottom, 32)
             }
-            .navigationTitle(record.season.isEmpty ? "\(record.year)" : record.season)
+            .navigationTitle(currentRecord.season.isEmpty ? "\(currentRecord.year)" : currentRecord.season)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }
+            .sheet(item: $editingBlock) { block in
+                EditActualYieldSheet(recordId: currentRecord.id, block: block)
+            }
         }
+    }
+
+    private func blockCard(_ block: HistoricalBlockResult) -> some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text(block.paddockName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "pencil.circle")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Estimated")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(String(format: "%.2f t", block.yieldTonnes))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(VineyardTheme.leafGreen)
+                    if block.areaHectares > 0 {
+                        Text(String(format: "%.2f t/Ha", block.yieldPerHectare))
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Divider().frame(height: 40)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Actual")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    if let actual = block.actualYieldTonnes {
+                        Text(String(format: "%.2f t", actual))
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.blue)
+                        if let perHa = block.actualYieldPerHectare {
+                            Text(String(format: "%.2f t/Ha", perHa))
+                                .font(.caption2)
+                                .foregroundStyle(.blue.opacity(0.8))
+                        }
+                    } else {
+                        Text("Tap to add")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let variance = block.yieldVarianceTonnes {
+                HStack(spacing: 4) {
+                    Image(systemName: variance >= 0 ? "arrow.up.right" : "arrow.down.right")
+                        .font(.caption2.weight(.bold))
+                    Text(String(format: "%@%.2f t vs estimate", variance >= 0 ? "+" : "", variance))
+                        .font(.caption2.weight(.medium))
+                    Spacer()
+                }
+                .foregroundStyle(variance >= 0 ? .green : .red)
+            }
+
+            HStack {
+                Text(String(format: "%.2f Ha", block.areaHectares))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if block.samplesRecorded > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.caption2)
+                            .foregroundStyle(.purple)
+                        Text("\(block.samplesRecorded) samples")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
     }
 
     private func detailCard(title: String, value: String, icon: String, color: Color) -> some View {
@@ -917,5 +980,134 @@ private struct HistoricalYieldDetailSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
+    }
+}
+
+// MARK: - Edit Actual Yield Sheet
+
+private struct EditActualYieldSheet: View {
+    @Environment(DataStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    let recordId: UUID
+    let block: HistoricalBlockResult
+    @State private var actualYieldText: String = ""
+    @FocusState private var fieldFocused: Bool
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack {
+                        Text("Block")
+                        Spacer()
+                        Text(block.paddockName)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Area")
+                        Spacer()
+                        Text(String(format: "%.2f Ha", block.areaHectares))
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Estimated")
+                        Spacer()
+                        Text(String(format: "%.2f t", block.yieldTonnes))
+                            .foregroundStyle(VineyardTheme.leafGreen)
+                            .fontWeight(.semibold)
+                    }
+                }
+
+                Section {
+                    HStack {
+                        Text("Actual Yield")
+                        Spacer()
+                        TextField("0.00", text: $actualYieldText)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .focused($fieldFocused)
+                            .frame(width: 120)
+                        Text("t")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let parsed = parsedActualYield, block.areaHectares > 0 {
+                        HStack {
+                            Text("Yield / Ha")
+                            Spacer()
+                            Text(String(format: "%.2f t/Ha", parsed / block.areaHectares))
+                                .foregroundStyle(.blue)
+                        }
+                        let variance = parsed - block.yieldTonnes
+                        HStack {
+                            Text("Variance")
+                            Spacer()
+                            Text(String(format: "%@%.2f t", variance >= 0 ? "+" : "", variance))
+                                .foregroundStyle(variance >= 0 ? .green : .red)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                } header: {
+                    Text("Harvest Result")
+                } footer: {
+                    Text("Enter the actual harvested tonnage for this block.")
+                }
+
+                if block.actualYieldTonnes != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            clearActual()
+                        } label: {
+                            Label("Clear Actual Yield", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Actual Yield")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveActual()
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(parsedActualYield == nil)
+                }
+            }
+            .onAppear {
+                if let existing = block.actualYieldTonnes {
+                    actualYieldText = String(format: "%.2f", existing)
+                }
+                fieldFocused = true
+            }
+        }
+    }
+
+    private var parsedActualYield: Double? {
+        let trimmed = actualYieldText.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        guard !trimmed.isEmpty, let value = Double(trimmed), value >= 0 else { return nil }
+        return value
+    }
+
+    private func saveActual() {
+        guard let value = parsedActualYield else { return }
+        guard var record = store.historicalYieldRecords.first(where: { $0.id == recordId }) else { return }
+        guard let idx = record.blockResults.firstIndex(where: { $0.id == block.id }) else { return }
+        record.blockResults[idx].actualYieldTonnes = value
+        record.blockResults[idx].actualRecordedAt = Date()
+        store.updateHistoricalYieldRecord(record)
+    }
+
+    private func clearActual() {
+        guard var record = store.historicalYieldRecords.first(where: { $0.id == recordId }) else { return }
+        guard let idx = record.blockResults.firstIndex(where: { $0.id == block.id }) else { return }
+        record.blockResults[idx].actualYieldTonnes = nil
+        record.blockResults[idx].actualRecordedAt = nil
+        store.updateHistoricalYieldRecord(record)
+        dismiss()
     }
 }
