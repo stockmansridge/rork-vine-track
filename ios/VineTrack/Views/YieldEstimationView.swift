@@ -544,26 +544,53 @@ struct YieldEstimationView: View {
     // MARK: - Generate Button
 
     private var generateButton: some View {
-        Button {
-            withAnimation(.smooth(duration: 0.3)) {
-                viewModel.generateSampleSites(paddocks: paddocks, samplesPerHectare: samplesPerHa)
-                applyDefaultBunchWeights()
-                viewModel.generatePath(paddocks: paddocks)
+        VStack(spacing: 8) {
+            Button {
+                withAnimation(.smooth(duration: 0.3)) {
+                    viewModel.generateSampleSites(paddocks: paddocks, samplesPerHectare: samplesPerHa)
+                    applyDefaultBunchWeights()
+                    viewModel.generatePath(paddocks: paddocks)
+                }
+                fitMapToSites()
+                saveSession()
+            } label: {
+                Label(
+                    viewModel.isGenerated ? "Regenerate Sample Sites" : "Generate Sample Sites",
+                    systemImage: viewModel.isGenerated ? "arrow.clockwise" : "mappin.and.ellipse"
+                )
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
             }
-            fitMapToSites()
-            saveSession()
-        } label: {
-            Label(
-                viewModel.isGenerated ? "Regenerate Sample Sites" : "Generate Sample Sites",
-                systemImage: viewModel.isGenerated ? "arrow.clockwise" : "mappin.and.ellipse"
-            )
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .buttonStyle(.borderedProminent)
+            .tint(VineyardTheme.leafGreen)
+            .disabled(viewModel.selectedPaddockIds.isEmpty || viewModel.isCompleted)
+
+            if viewModel.isCompleted {
+                Button {
+                    withAnimation(.smooth(duration: 0.3)) {
+                        viewModel.resetForNewEstimation()
+                    }
+                    if let vid = store.selectedVineyardId,
+                       let existing = store.yieldSessions.first(where: { $0.vineyardId == vid }) {
+                        store.deleteYieldSession(existing)
+                    }
+                } label: {
+                    Label("Start New Estimation", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.bordered)
+                .tint(VineyardTheme.leafGreen)
+            } else if viewModel.selectedPaddockIds.isEmpty {
+                Text("Select one or more blocks above to generate sample sites.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .buttonStyle(.borderedProminent)
-        .tint(VineyardTheme.leafGreen)
-        .disabled(viewModel.selectedPaddockIds.isEmpty || viewModel.isCompleted)
     }
 
     // MARK: - Path Button

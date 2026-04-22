@@ -374,6 +374,19 @@ class YieldEstimationViewModel {
         completedAt = Date()
     }
 
+    func resetForNewEstimation() {
+        sessionId = nil
+        selectedPaddockIds.removeAll()
+        sampleSites = []
+        isGenerated = false
+        pathWaypoints = []
+        isPathGenerated = false
+        blockBunchWeightsKg = [:]
+        selectedSite = nil
+        isCompleted = false
+        completedAt = nil
+    }
+
     // MARK: - Sample Generation
 
     func bunchWeightKg(for paddockId: UUID) -> Double {
