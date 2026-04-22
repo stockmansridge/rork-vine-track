@@ -26,6 +26,7 @@ struct RecordDamageView: View {
     @State private var draggingIndex: Int?
     @State private var visibleRegion: MKCoordinateRegion?
     @State private var showConfirmation: Bool = false
+    @State private var isFullScreenMap: Bool = false
 
     private var damageAreaHa: Double {
         let points = polygonPoints
@@ -84,6 +85,9 @@ struct RecordDamageView: View {
         .navigationTitle(editingRecord == nil ? "Record Damage" : "Edit Damage")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { fitMapToPaddock() }
+        .fullScreenCover(isPresented: $isFullScreenMap) {
+            fullScreenMap
+        }
         .sensoryFeedback(.success, trigger: showConfirmation)
         .alert(editingRecord == nil ? "Damage Recorded" : "Damage Updated", isPresented: $showConfirmation) {
             Button("OK") { dismiss() }
@@ -191,6 +195,19 @@ struct RecordDamageView: View {
                 .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
                 .padding(10)
             }
+            .overlay(alignment: .topLeading) {
+                Button {
+                    isFullScreenMap = true
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 36, height: 36)
+                        .background(.ultraThinMaterial)
+                        .clipShape(.rect(cornerRadius: 8))
+                        .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                }
+                .padding(10)
+            }
             .onMapCameraChange { context in
                 visibleRegion = context.region
             }
@@ -201,6 +218,178 @@ struct RecordDamageView: View {
                         polygonPoints.append(CoordinatePoint(coordinate: coordinate))
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: - Full Screen Map
+
+    private var fullScreenMap: some View {
+        ZStack(alignment: .top) {
+            MapReader { proxy in
+                Map(position: $mapPosition, interactionModes: draggingIndex != nil ? [] : [.pan, .zoom, .pitch, .rotate]) {
+                    MapPolygon(coordinates: paddock.polygonPoints.map(\.coordinate))
+                        .foregroundStyle(.blue.opacity(0.08))
+                        .stroke(.blue.opacity(0.6), lineWidth: 2)
+
+                    Annotation("", coordinate: paddock.polygonPoints.centroid) {
+                        Text(paddock.name)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(.blue.opacity(0.8), in: .capsule)
+                            .allowsHitTesting(false)
+                    }
+
+                    ForEach(paddock.rows) { row in
+                        MapPolyline(coordinates: [row.startPoint.coordinate, row.endPoint.coordinate])
+                            .stroke(.blue.opacity(0.15), lineWidth: 0.5)
+                    }
+
+                    let existingDamage = store.damageRecords(for: paddock.id).filter { $0.id != editingRecord?.id }
+                    ForEach(existingDamage) { record in
+                        if record.polygonPoints.count >= 3 {
+                            MapPolygon(coordinates: record.polygonPoints.map(\.coordinate))
+                                .foregroundStyle(.red.opacity(0.2))
+                                .stroke(.red.opacity(0.6), lineWidth: 1.5)
+                        }
+                    }
+
+                    if polygonPoints.count > 2 {
+                        MapPolygon(coordinates: polygonPoints.map(\.coordinate))
+                            .foregroundStyle(.orange.opacity(0.25))
+                            .stroke(.orange, lineWidth: 2.5)
+                    } else if polygonPoints.count == 2 {
+                        MapPolyline(coordinates: polygonPoints.map(\.coordinate))
+                            .stroke(.orange, lineWidth: 2.5)
+                    }
+
+                    ForEach(Array(polygonPoints.enumerated()), id: \.element.id) { index, point in
+                        Annotation("", coordinate: point.coordinate) {
+                            DamagePointHandle(index: index, isDragging: draggingIndex == index)
+                                .gesture(
+                                    DragGesture(coordinateSpace: .global)
+                                        .onChanged { value in
+                                            draggingIndex = index
+                                            if let coord = proxy.convert(value.location, from: .global) {
+                                                let existingId = polygonPoints[index].id
+                                                polygonPoints[index] = CoordinatePoint(id: existingId, coordinate: coord)
+                                            }
+                                        }
+                                        .onEnded { _ in
+                                            draggingIndex = nil
+                                        }
+                                )
+                        }
+                    }
+
+                    ForEach(midpointEdges, id: \.id) { edge in
+                        Annotation("", coordinate: edge.midpoint) {
+                            DamageMidpointHandle()
+                                .onTapGesture {
+                                    withAnimation(.snappy(duration: 0.2)) {
+                                        let newPoint = CoordinatePoint(coordinate: edge.midpoint)
+                                        polygonPoints.insert(newPoint, at: edge.insertIndex)
+                                    }
+                                }
+                        }
+                    }
+                }
+                .mapStyle(.hybrid)
+                .ignoresSafeArea()
+                .onMapCameraChange { context in
+                    visibleRegion = context.region
+                }
+                .onTapGesture { screenCoord in
+                    guard draggingIndex == nil else { return }
+                    if let coordinate = proxy.convert(screenCoord, from: .local) {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            polygonPoints.append(CoordinatePoint(coordinate: coordinate))
+                        }
+                    }
+                }
+            }
+
+            VStack {
+                HStack {
+                    Button {
+                        isFullScreenMap = false
+                    } label: {
+                        Label("Done", systemImage: "checkmark")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(.ultraThinMaterial, in: .capsule)
+                    }
+                    Spacer()
+                    VStack(spacing: 0) {
+                        Button { zoomMap(zoomIn: true) } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(width: 40, height: 40)
+                        }
+                        Divider()
+                        Button { zoomMap(zoomIn: false) } label: {
+                            Image(systemName: "minus")
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(width: 40, height: 40)
+                        }
+                    }
+                    .background(.ultraThinMaterial)
+                    .clipShape(.rect(cornerRadius: 10))
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+                Spacer()
+
+                VStack(spacing: 10) {
+                    Text(polygonPoints.isEmpty
+                         ? "Tap the map to draw a damage zone polygon"
+                         : "\(polygonPoints.count) point\(polygonPoints.count == 1 ? "" : "s") — tap to add more")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: .capsule)
+
+                    HStack(spacing: 10) {
+                        if !polygonPoints.isEmpty {
+                            Button {
+                                withAnimation(.snappy(duration: 0.2)) { _ = polygonPoints.popLast() }
+                            } label: {
+                                Label("Undo", systemImage: "arrow.uturn.backward")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.gray)
+
+                            Button(role: .destructive) {
+                                withAnimation(.snappy(duration: 0.2)) { polygonPoints.removeAll() }
+                            } label: {
+                                Label("Clear", systemImage: "trash")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                        }
+
+                        if let region = visibleRegion {
+                            Button {
+                                withAnimation(.snappy(duration: 0.2)) {
+                                    polygonPoints.append(CoordinatePoint(coordinate: region.center))
+                                }
+                            } label: {
+                                Label("Add Center", systemImage: "mappin")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.orange)
+                        }
+                    }
+                }
+                .padding(.bottom, 24)
             }
         }
     }
