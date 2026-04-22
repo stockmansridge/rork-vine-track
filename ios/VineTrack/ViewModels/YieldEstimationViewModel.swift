@@ -527,10 +527,17 @@ class YieldEstimationViewModel {
         guard totalLength > 0 else { return [] }
 
         let spacingMetres = totalLength / Double(totalSamples + 1)
+        let jitterRange = spacingMetres * 0.4
+        var rng = SystemRandomNumberGenerator()
+
+        func jitteredStep() -> Double {
+            let offset = Double.random(in: -jitterRange...jitterRange, using: &rng)
+            return max(spacingMetres * 0.25, spacingMetres + offset)
+        }
 
         var sites: [SampleSite] = []
         var accumulatedDistance: Double = 0
-        var nextSiteDistance = spacingMetres
+        var nextSiteDistance = Double.random(in: (spacingMetres * 0.5)...(spacingMetres * 1.5), using: &rng)
         var siteIndex = startIndex
 
         for seg in orderedSegments {
@@ -553,7 +560,7 @@ class YieldEstimationViewModel {
                     siteIndex: siteIndex
                 ))
                 siteIndex += 1
-                nextSiteDistance += spacingMetres
+                nextSiteDistance += jitteredStep()
             }
 
             accumulatedDistance = segEndDist
