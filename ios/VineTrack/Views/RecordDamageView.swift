@@ -27,6 +27,7 @@ struct RecordDamageView: View {
     @State private var visibleRegion: MKCoordinateRegion?
     @State private var showConfirmation: Bool = false
     @State private var isFullScreenMap: Bool = false
+    @State private var showDeleteConfirmation: Bool = false
 
     private var damageAreaHa: Double {
         let points = polygonPoints
@@ -78,6 +79,9 @@ struct RecordDamageView: View {
                 damageAreaInfo
                 damageDetailsSection
                 saveButton
+                if editingRecord != nil {
+                    deleteButton
+                }
             }
             .padding(.horizontal)
             .padding(.bottom, 32)
@@ -94,6 +98,30 @@ struct RecordDamageView: View {
         } message: {
             Text("Damage of \(Int(damagePercent))% \(damageType.rawValue) has been \(editingRecord == nil ? "recorded" : "updated") for \(paddock.name).")
         }
+        .confirmationDialog("Delete Damage Record?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete Record", role: .destructive) {
+                if let record = editingRecord {
+                    store.deleteDamageRecord(record)
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This damage record will be permanently removed. This action cannot be undone.")
+        }
+    }
+
+    private var deleteButton: some View {
+        Button(role: .destructive) {
+            showDeleteConfirmation = true
+        } label: {
+            Label("Delete Damage Record", systemImage: "trash")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+        }
+        .buttonStyle(.bordered)
+        .tint(.red)
     }
 
     // MARK: - Map
