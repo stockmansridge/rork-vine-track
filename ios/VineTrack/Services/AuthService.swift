@@ -501,6 +501,24 @@ class AuthService {
 
     func loadSentInvitations(vineyardId: UUID) async {
         guard isSupabaseConfigured else { return }
+
+        nonisolated struct ListParams: Codable, Sendable {
+            let p_vineyard_id: String
+        }
+        let params = ListParams(p_vineyard_id: vineyardId.uuidString)
+
+        do {
+            let invitations: [TeamInvitation] = try await supabase
+                .rpc("list_invitations_for_vineyard", params: params)
+                .execute()
+                .value
+            sentInvitations = invitations
+            print("[AuthService] RPC loaded \(invitations.count) invitations for vineyard \(vineyardId.uuidString)")
+            return
+        } catch {
+            print("[AuthService] list_invitations_for_vineyard RPC failed, falling back to direct select: \(error)")
+        }
+
         do {
             let invitations: [TeamInvitation] = try await supabase.from("invitations")
                 .select()
@@ -509,9 +527,10 @@ class AuthService {
                 .execute()
                 .value
             sentInvitations = invitations
-            print("[AuthService] loaded \(invitations.count) sent invitations for vineyard \(vineyardId.uuidString)")
+            print("[AuthService] direct-select loaded \(invitations.count) invitations for vineyard \(vineyardId.uuidString)")
         } catch {
             print("[AuthService] Failed to load sent invitations: \(error)")
+            errorMessage = "Couldn't load invitations. Run sql/list_invitations_rpc.sql and sql/invitations_rls_migration.sql in the Supabase SQL Editor."
         }
     }
 
