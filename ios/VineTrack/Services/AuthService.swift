@@ -272,6 +272,8 @@ class AuthService {
         }
 
         isSendingPasswordReset = true
+        print("[AuthService] resetPasswordForEmail using redirect: \(Self.passwordResetRedirectURL.absoluteString)")
+        print("[AuthService] SUPABASE_URL: \(Config.EXPO_PUBLIC_SUPABASE_URL)")
         Task {
             do {
                 try await supabase.auth.resetPasswordForEmail(trimmedEmail, redirectTo: Self.passwordResetRedirectURL)

@@ -24,6 +24,8 @@ struct VineTrackApp: App {
                 await Self.handleBackgroundRainCheck(task: task)
             }
         }
+        print("[Config] SUPABASE_URL = \(Config.EXPO_PUBLIC_SUPABASE_URL)")
+        print("[Config] SUPABASE_ANON_KEY present = \(!Config.EXPO_PUBLIC_SUPABASE_ANON_KEY.isEmpty)")
         let s = DataStore()
         let a = AuthService()
         _store = State(initialValue: s)
