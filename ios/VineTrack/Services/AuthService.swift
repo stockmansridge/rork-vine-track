@@ -507,15 +507,18 @@ class AuthService {
         }
         let params = ListParams(p_vineyard_id: vineyardId.uuidString.lowercased())
 
+        var rpcError: Error?
         do {
             let invitations: [TeamInvitation] = try await supabase
                 .rpc("list_invitations_for_vineyard", params: params)
                 .execute()
                 .value
             sentInvitations = invitations
+            errorMessage = nil
             print("[AuthService] RPC loaded \(invitations.count) invitations for vineyard \(vineyardId.uuidString)")
             return
         } catch {
+            rpcError = error
             print("[AuthService] list_invitations_for_vineyard RPC failed, falling back to direct select: \(error)")
         }
 
@@ -527,10 +530,12 @@ class AuthService {
                 .execute()
                 .value
             sentInvitations = invitations
+            errorMessage = nil
             print("[AuthService] direct-select loaded \(invitations.count) invitations for vineyard \(vineyardId.uuidString)")
         } catch {
             print("[AuthService] Failed to load sent invitations: \(error)")
-            errorMessage = "Couldn't load invitations. Run sql/list_invitations_rpc.sql and sql/invitations_rls_migration.sql in the Supabase SQL Editor."
+            let rpcDesc = rpcError.map { String(describing: $0) } ?? "n/a"
+            errorMessage = "Couldn't load invitations.\nRPC error: \(rpcDesc)\nSelect error: \(error.localizedDescription)"
         }
     }
 
