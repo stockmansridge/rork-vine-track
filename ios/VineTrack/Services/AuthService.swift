@@ -659,7 +659,7 @@ class AuthService {
                 .rpc("list_invitations_for_vineyard", params: params)
                 .execute()
                 .value
-            sentInvitations = invitations
+            sentInvitations = invitations.filter { $0.status.lowercased() != "cancelled" }
             errorMessage = nil
             print("[AuthService] RPC loaded \(invitations.count) invitations for vineyard \(vineyardId.uuidString)")
             return
@@ -672,10 +672,11 @@ class AuthService {
             let invitations: [TeamInvitation] = try await supabase.from("invitations")
                 .select()
                 .eq("vineyard_id", value: vineyardId.uuidString.lowercased())
+                .neq("status", value: "cancelled")
                 .order("created_at", ascending: false)
                 .execute()
                 .value
-            sentInvitations = invitations
+            sentInvitations = invitations.filter { $0.status.lowercased() != "cancelled" }
             errorMessage = nil
             print("[AuthService] direct-select loaded \(invitations.count) invitations for vineyard \(vineyardId.uuidString)")
         } catch {
@@ -718,7 +719,14 @@ class AuthService {
     func cancelInvitation(_ invitation: TeamInvitation) async -> Bool {
         guard isSupabaseConfigured else { return false }
         do {
+            nonisolated struct StatusUpdate: Codable, Sendable {
+                let status: String
+            }
             try await supabase.from("invitations")
+                .update(StatusUpdate(status: "cancelled"))
+                .eq("id", value: invitation.id.uuidString)
+                .execute()
+            try? await supabase.from("invitations")
                 .delete()
                 .eq("id", value: invitation.id.uuidString)
                 .execute()
