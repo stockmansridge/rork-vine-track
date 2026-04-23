@@ -522,7 +522,10 @@ class AuthService {
     }
 
     func handleURL(_ url: URL) -> Bool {
+        print("[AuthService] handleURL received: \(url.absoluteString)")
         if url.scheme?.lowercased() == "vinetrack" {
+            let host = url.host?.lowercased() ?? ""
+            print("[AuthService] custom scheme host: \(host)")
             Task { await handleSupabaseCallbackURL(url) }
             return true
         }
@@ -531,8 +534,13 @@ class AuthService {
     }
 
     private func handleSupabaseCallbackURL(_ url: URL) async {
-        guard isSupabaseConfigured else { return }
+        print("[AuthService] handleSupabaseCallbackURL: \(url.absoluteString)")
+        guard isSupabaseConfigured else {
+            print("[AuthService] Supabase not configured; ignoring callback URL")
+            return
+        }
         let isPasswordRecovery = isPasswordRecoveryCallback(url)
+        print("[AuthService] isPasswordRecovery: \(isPasswordRecovery)")
 
         do {
             try await establishSupabaseSession(from: url)
@@ -543,8 +551,10 @@ class AuthService {
             if isPasswordRecovery {
                 passwordResetMessage = nil
                 showPasswordRecovery = true
+                print("[AuthService] Password recovery session established")
             }
         } catch {
+            print("[AuthService] Callback failed: \(error)")
             if isPasswordRecovery {
                 showPasswordRecovery = false
                 errorMessage = "Password reset link is invalid or expired: \(error.localizedDescription)"
