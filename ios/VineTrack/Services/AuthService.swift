@@ -505,7 +505,7 @@ class AuthService {
         nonisolated struct ListParams: Codable, Sendable {
             let p_vineyard_id: String
         }
-        let params = ListParams(p_vineyard_id: vineyardId.uuidString)
+        let params = ListParams(p_vineyard_id: vineyardId.uuidString.lowercased())
 
         do {
             let invitations: [TeamInvitation] = try await supabase
@@ -522,7 +522,7 @@ class AuthService {
         do {
             let invitations: [TeamInvitation] = try await supabase.from("invitations")
                 .select()
-                .eq("vineyard_id", value: vineyardId.uuidString)
+                .eq("vineyard_id", value: vineyardId.uuidString.lowercased())
                 .order("created_at", ascending: false)
                 .execute()
                 .value
@@ -641,7 +641,7 @@ class AuthService {
             let p_invited_by_name: String
         }
         let params = CreateInvitationParams(
-            p_vineyard_id: vineyardId.uuidString,
+            p_vineyard_id: vineyardId.uuidString.lowercased(),
             p_vineyard_name: vineyardName,
             p_email: lowered,
             p_role: role.rawValue,
@@ -670,7 +670,7 @@ class AuthService {
                     let status: String
                 }
                 let row = InsertRow(
-                    vineyard_id: vineyardId.uuidString,
+                    vineyard_id: vineyardId.uuidString.lowercased(),
                     vineyard_name: vineyardName,
                     email: lowered,
                     role: role.rawValue,
