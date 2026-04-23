@@ -544,6 +544,22 @@ class AuthService {
     func inviteMember(email: String, role: VineyardRole, vineyardId: UUID, vineyardName: String) async -> Bool {
         guard isSupabaseConfigured, let uid = userId else { return false }
         do {
+            nonisolated struct OwnerMembershipUpsert: Codable, Sendable {
+                let vineyard_id: String
+                let user_id: String
+                let name: String
+                let role: String
+            }
+            let ownerMembership = OwnerMembershipUpsert(
+                vineyard_id: vineyardId.uuidString,
+                user_id: uid,
+                name: userEmail.isEmpty ? userName : userEmail,
+                role: VineyardRole.owner.rawValue
+            )
+            try? await supabase.from("vineyard_members")
+                .upsert(ownerMembership, onConflict: "vineyard_id,user_id")
+                .execute()
+
             nonisolated struct InvitationInsert: Codable, Sendable {
                 let vineyard_id: String
                 let vineyard_name: String
