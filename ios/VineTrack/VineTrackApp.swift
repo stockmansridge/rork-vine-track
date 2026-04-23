@@ -98,10 +98,10 @@ struct VineTrackApp: App {
                         analytics.setUser(authService.userId)
                         analytics.track("user_signed_in")
                         Task {
+                            await authService.loadPendingInvitations()
                             await cloudSync.pullAllData(for: store)
                             await cloudSync.startRealtime(for: store)
-                            await authService.loadPendingInvitations()
-                        await adminService.checkAdminStatus()
+                            await adminService.checkAdminStatus()
                         }
                     } else {
                         if oldValue && !authService.isDemoMode {
