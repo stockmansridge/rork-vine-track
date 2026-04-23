@@ -542,45 +542,23 @@ class AuthService {
     }
 
     func inviteMember(email: String, role: VineyardRole, vineyardId: UUID, vineyardName: String) async -> Bool {
-        guard isSupabaseConfigured, let uid = userId else { return false }
+        guard isSupabaseConfigured, userId != nil else { return false }
         do {
-            nonisolated struct OwnerMembershipUpsert: Codable, Sendable {
-                let vineyard_id: String
-                let user_id: String
-                let name: String
-                let role: String
+            nonisolated struct CreateInvitationParams: Codable, Sendable {
+                let p_vineyard_id: String
+                let p_vineyard_name: String
+                let p_email: String
+                let p_role: String
+                let p_invited_by_name: String
             }
-            let ownerMembership = OwnerMembershipUpsert(
-                vineyard_id: vineyardId.uuidString,
-                user_id: uid,
-                name: userEmail.isEmpty ? userName : userEmail,
-                role: VineyardRole.owner.rawValue
+            let params = CreateInvitationParams(
+                p_vineyard_id: vineyardId.uuidString,
+                p_vineyard_name: vineyardName,
+                p_email: email.lowercased(),
+                p_role: role.rawValue,
+                p_invited_by_name: userName
             )
-            try? await supabase.from("vineyard_members")
-                .upsert(ownerMembership, onConflict: "vineyard_id,user_id")
-                .execute()
-
-            nonisolated struct InvitationInsert: Codable, Sendable {
-                let vineyard_id: String
-                let vineyard_name: String
-                let email: String
-                let role: String
-                let invited_by: String
-                let invited_by_name: String
-                let status: String
-            }
-            let payload = InvitationInsert(
-                vineyard_id: vineyardId.uuidString,
-                vineyard_name: vineyardName,
-                email: email.lowercased(),
-                role: role.rawValue,
-                invited_by: uid,
-                invited_by_name: userName,
-                status: "pending"
-            )
-            try await supabase.from("invitations")
-                .insert(payload)
-                .execute()
+            try await supabase.rpc("create_invitation", params: params).execute()
             return true
         } catch {
             errorMessage = "Failed to send invitation: \(error.localizedDescription)"
