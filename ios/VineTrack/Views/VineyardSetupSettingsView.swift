@@ -150,6 +150,16 @@ struct VineyardSetupSettingsView: View {
 
     private var paddocksSection: some View {
         Section {
+            Button {
+                showAddPaddock = true
+            } label: {
+                HStack {
+                    Label("Add Block", systemImage: "plus.circle.fill")
+                        .foregroundStyle(.blue)
+                    Spacer()
+                }
+            }
+
             ForEach(store.orderedPaddocks) { paddock in
                 Button {
                     editingPaddock = paddock
