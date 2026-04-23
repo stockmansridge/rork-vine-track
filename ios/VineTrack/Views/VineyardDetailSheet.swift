@@ -234,10 +234,21 @@ struct VineyardDetailSheet: View {
 
     @ViewBuilder
     private var invitationsSection: some View {
-        if isSupabaseConfigured && canManage && !authService.sentInvitations.isEmpty {
+        if isSupabaseConfigured && canManage {
             Section {
-                ForEach(authService.sentInvitations) { invitation in
-                    invitationRow(invitation)
+                if authService.sentInvitations.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "envelope")
+                            .foregroundStyle(.secondary)
+                        Text("No invitations sent yet")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                } else {
+                    ForEach(authService.sentInvitations) { invitation in
+                        invitationRow(invitation)
+                    }
                 }
             } header: {
                 HStack {
@@ -251,7 +262,7 @@ struct VineyardDetailSheet: View {
                     }
                 }
             } footer: {
-                Text("Pending invitations haven't been accepted yet. Accepted invitations mean the user has joined and appears above. You can resend or cancel any invitation.")
+                Text("People you've invited appear here. Pending invitations haven't been accepted yet; accepted invitations mean the user has joined and appears above. You can resend or cancel any invitation.")
             }
         }
     }
