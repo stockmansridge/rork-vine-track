@@ -687,7 +687,8 @@ class AuthService {
                 print("[AuthService] direct insert fallback succeeded")
             } catch {
                 print("[AuthService] direct insert fallback failed: \(error)")
-                errorMessage = "Failed to save invitation: \(error.localizedDescription). Run sql/create_invitation_rpc.sql in Supabase SQL Editor."
+                let rpcDesc = rpcError.map { "\($0)" } ?? "nil"
+                errorMessage = "Failed to save invitation.\nRPC error: \(rpcDesc)\nInsert error: \(error.localizedDescription)\nRun sql/fix_create_invitation_owner.sql in Supabase SQL Editor."
                 return false
             }
         }
