@@ -160,12 +160,19 @@ struct PendingInvitationsView: View {
     @Environment(CloudSyncService.self) private var cloudSync
     @Environment(DataStore.self) private var store
     @State private var activeInvitationId: UUID?
+    @State private var localError: String?
 
     var body: some View {
         if !authService.pendingInvitations.isEmpty {
             Section {
                 ForEach(authService.pendingInvitations) { invitation in
                     invitationRow(invitation)
+                }
+                if let localError {
+                    Text(localError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .padding(.vertical, 4)
                 }
             } header: {
                 HStack(spacing: 6) {
@@ -249,10 +256,14 @@ struct PendingInvitationsView: View {
     private func acceptInvitation(_ invitation: TeamInvitation) async {
         activeInvitationId = invitation.id
         authService.errorMessage = nil
+        localError = nil
         await authService.acceptInvitation(invitation)
 
-        if authService.errorMessage == nil {
+        if let err = authService.errorMessage {
+            localError = err
+        } else {
             await cloudSync.pullAllData(for: store)
+            await authService.loadPendingInvitations()
             if let vineyardId = UUID(uuidString: invitation.vineyard_id),
                let vineyard = store.vineyards.first(where: { $0.id == vineyardId }) {
                 store.selectVineyard(vineyard)

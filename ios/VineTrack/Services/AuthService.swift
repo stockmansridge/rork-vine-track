@@ -739,8 +739,12 @@ class AuthService {
     }
 
     func acceptInvitation(_ invitation: TeamInvitation) async {
-        guard isSupabaseConfigured, let uid = userId else { return }
+        guard isSupabaseConfigured, let uid = userId else {
+            errorMessage = "You must be signed in to accept invitations."
+            return
+        }
         let lowerUid = uid.lowercased()
+        var rpcError: Error?
 
         // Primary path: SECURITY DEFINER RPC - bypasses RLS, normalizes
         // the uuid casing, and inserts into vineyard_members atomically.
@@ -754,7 +758,19 @@ class AuthService {
             print("[AuthService] accept_invitation RPC succeeded for \(invitation.id.uuidString)")
             return
         } catch {
-            print("[AuthService] accept_invitation RPC failed, falling back to direct insert: \(error)")
+            rpcError = error
+            print("[AuthService] accept_invitation RPC failed, trying bulk RPC: \(error)")
+        }
+
+        // Secondary path: bulk RPC that matches by email from auth.users,
+        // tolerant to any JWT-email claim issues.
+        do {
+            try await supabase.rpc("accept_pending_invitations_for_me").execute()
+            pendingInvitations.removeAll { $0.id == invitation.id }
+            print("[AuthService] accept_pending_invitations_for_me RPC succeeded")
+            return
+        } catch {
+            print("[AuthService] accept_pending_invitations_for_me RPC failed, falling back to direct insert: \(error)")
         }
 
         // Fallback: direct upsert. Uses the LOWERCASE uid so the RLS
@@ -784,7 +800,8 @@ class AuthService {
             print("[AuthService] accept_invitation fallback insert succeeded for \(invitation.id.uuidString)")
         } catch {
             print("[AuthService] accept_invitation fallback insert failed: \(error)")
-            errorMessage = "Failed to accept invitation: \(error.localizedDescription)\nRun sql/accept_invitation_rpc.sql in the Supabase SQL Editor."
+            let rpcDesc = rpcError.map { $0.localizedDescription } ?? "n/a"
+            errorMessage = "Failed to accept invitation.\nRPC: \(rpcDesc)\nInsert: \(error.localizedDescription)\nRun sql/fix_accept_invitation_email_from_users.sql in Supabase SQL Editor."
         }
     }
 
