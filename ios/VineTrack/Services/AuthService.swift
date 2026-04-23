@@ -696,10 +696,27 @@ class AuthService {
             invitation_id: invitationId
         )
         do {
-            try await supabase.functions.invoke(
-                "send-invitation-email",
-                options: FunctionInvokeOptions(body: payload)
-            )
+            let urlString = Config.EXPO_PUBLIC_SUPABASE_URL
+            let anonKey = Config.EXPO_PUBLIC_SUPABASE_ANON_KEY
+            guard let base = URL(string: urlString),
+                  let url = URL(string: "/functions/v1/send-invitation-email", relativeTo: base),
+                  !anonKey.isEmpty else {
+                throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Supabase not configured"])
+            }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.httpBody = try JSONEncoder().encode(payload)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+            }
+            if !(200..<300).contains(http.statusCode) {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                throw NSError(domain: "AuthService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(body)"])
+            }
             print("[AuthService] send-invitation-email invoked for \(email)")
         } catch {
             print("[AuthService] send-invitation-email failed: \(error)")
