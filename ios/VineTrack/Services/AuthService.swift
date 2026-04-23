@@ -765,12 +765,23 @@ class AuthService {
         }
 
         // Secondary path: bulk RPC that matches by email from auth.users,
-        // tolerant to any JWT-email claim issues.
+        // tolerant to any JWT-email claim issues. Only treat it as success
+        // if membership actually exists afterwards, so we don't silently
+        // swallow the original error when the RPC did nothing.
         do {
             try await supabase.rpc("accept_pending_invitations_for_me").execute()
-            pendingInvitations.removeAll { $0.id == invitation.id }
-            print("[AuthService] accept_pending_invitations_for_me RPC succeeded")
-            return
+            let memberships: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
+                .select()
+                .eq("vineyard_id", value: invitation.vineyard_id)
+                .eq("user_id", value: lowerUid)
+                .execute()
+                .value) ?? []
+            if !memberships.isEmpty {
+                pendingInvitations.removeAll { $0.id == invitation.id }
+                print("[AuthService] accept_pending_invitations_for_me RPC succeeded and membership confirmed")
+                return
+            }
+            print("[AuthService] bulk RPC ran but no membership row found - trying direct insert")
         } catch {
             print("[AuthService] accept_pending_invitations_for_me RPC failed, falling back to direct insert: \(error)")
         }
@@ -803,7 +814,7 @@ class AuthService {
         } catch {
             print("[AuthService] accept_invitation fallback insert failed: \(error)")
             let rpcDesc = rpcError.map { $0.localizedDescription } ?? "n/a"
-            errorMessage = "Failed to accept invitation.\nRPC: \(rpcDesc)\nInsert: \(error.localizedDescription)\nRun sql/fix_accept_invitation_email_from_users.sql in Supabase SQL Editor."
+            errorMessage = "Failed to accept invitation.\nRPC: \(rpcDesc)\nInsert: \(error.localizedDescription)\nRun sql/fix_accept_creates_vineyard_stub.sql in the Supabase SQL Editor."
         }
     }
 

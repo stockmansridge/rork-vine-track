@@ -4,6 +4,7 @@ struct InviteMemberSheet: View {
     let vineyard: Vineyard
     @Environment(AuthService.self) private var authService
     @Environment(DataStore.self) private var store
+    @Environment(CloudSyncService.self) private var cloudSync
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessControl) private var accessControl
     @State private var email: String = ""
@@ -131,6 +132,11 @@ struct InviteMemberSheet: View {
         showSuccess = false
         isSending = true
         Task {
+            // Ensure the vineyard exists in the cloud BEFORE creating the
+            // invitation, so the vineyard_members FK is always satisfied
+            // when the invitee accepts.
+            try? await cloudSync.uploadVineyard(vineyard)
+
             let success = await authService.inviteMember(
                 email: trimmed,
                 role: selectedRole,
