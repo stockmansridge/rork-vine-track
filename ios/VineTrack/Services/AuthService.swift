@@ -617,7 +617,8 @@ class AuthService {
     }
 
     func loadPendingInvitations() async {
-        guard isSupabaseConfigured, !userEmail.isEmpty else {
+        let normalizedEmail: String = normalizedEmailAddress(userEmail)
+        guard isSupabaseConfigured, !normalizedEmail.isEmpty else {
             pendingInvitations = []
             return
         }
@@ -625,12 +626,12 @@ class AuthService {
         do {
             let invitations: [TeamInvitation] = try await supabase.from("invitations")
                 .select()
-                .eq("email", value: userEmail.lowercased())
                 .eq("status", value: "pending")
+                .ilike("email", pattern: "%\(normalizedEmail)%")
                 .order("created_at", ascending: false)
                 .execute()
                 .value
-            pendingInvitations = invitations
+            pendingInvitations = invitations.filter { normalizedEmailAddress($0.email) == normalizedEmail }
             if errorMessage?.contains("Couldn't load invitations") == true {
                 errorMessage = nil
             }
@@ -931,6 +932,10 @@ class AuthService {
         } catch {
             print("Failed to create profile: \(error)")
         }
+    }
+
+    private func normalizedEmailAddress(_ email: String) -> String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func persistUserLocally() {

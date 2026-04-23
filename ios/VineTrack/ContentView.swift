@@ -34,7 +34,7 @@ struct ContentView: View {
                         }
                     }
                 }
-            } else if !authService.pendingInvitations.isEmpty {
+            } else if store.vineyards.isEmpty && !authService.pendingInvitations.isEmpty {
                 InvitationInboxView()
             } else if store.vineyards.isEmpty {
                 VineyardListView()

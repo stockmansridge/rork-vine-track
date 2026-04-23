@@ -159,50 +159,13 @@ struct PendingInvitationsView: View {
     @Environment(AuthService.self) private var authService
     @Environment(CloudSyncService.self) private var cloudSync
     @Environment(DataStore.self) private var store
+    @State private var activeInvitationId: UUID?
 
     var body: some View {
         if !authService.pendingInvitations.isEmpty {
             Section {
                 ForEach(authService.pendingInvitations) { invitation in
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(invitation.vineyard_name ?? "Vineyard")
-                                .font(.headline)
-                            HStack(spacing: 4) {
-                                Text("Role: \(invitation.role)")
-                                if let inviter = invitation.invited_by_name {
-                                    Text("from \(inviter)")
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        HStack(spacing: 8) {
-                            Button {
-                                Task {
-                                    await authService.acceptInvitation(invitation)
-                                    await cloudSync.pullAllData(for: store)
-                                }
-                            } label: {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.title2)
-                                    .foregroundStyle(VineyardTheme.leafGreen)
-                            }
-                            .buttonStyle(.plain)
-
-                            Button {
-                                Task { await authService.declineInvitation(invitation) }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.title2)
-                                    .foregroundStyle(.red)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                    invitationRow(invitation)
                 }
             } header: {
                 HStack(spacing: 6) {
@@ -211,7 +174,98 @@ struct PendingInvitationsView: View {
                         .font(.caption)
                     Text("Pending Invitations")
                 }
+            } footer: {
+                Text("If this email has been invited to another vineyard, accept it here to add that vineyard to your account.")
             }
         }
+    }
+
+    private func invitationRow(_ invitation: TeamInvitation) -> some View {
+        let isProcessing: Bool = activeInvitationId == invitation.id
+
+        return VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(invitation.vineyard_name ?? "Vineyard")
+                    .font(.headline)
+
+                HStack(spacing: 6) {
+                    Text(invitation.role)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(VineyardTheme.leafGreen)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(VineyardTheme.leafGreen.opacity(0.12), in: Capsule())
+
+                    if let inviter = invitation.invited_by_name, !inviter.isEmpty {
+                        Text("Invited by \(inviter)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text("Accept to add this vineyard to your switcher.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    Task {
+                        await acceptInvitation(invitation)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isProcessing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                        }
+                        Text(isProcessing ? "Accepting…" : "Accept")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(VineyardTheme.leafGreen)
+                .disabled(activeInvitationId != nil)
+
+                Button(role: .destructive) {
+                    Task {
+                        await declineInvitation(invitation)
+                    }
+                } label: {
+                    Text("Decline")
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .disabled(activeInvitationId != nil)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func acceptInvitation(_ invitation: TeamInvitation) async {
+        activeInvitationId = invitation.id
+        authService.errorMessage = nil
+        await authService.acceptInvitation(invitation)
+
+        if authService.errorMessage == nil {
+            await cloudSync.pullAllData(for: store)
+            if let vineyardId = UUID(uuidString: invitation.vineyard_id),
+               let vineyard = store.vineyards.first(where: { $0.id == vineyardId }) {
+                store.selectVineyard(vineyard)
+            }
+        }
+
+        activeInvitationId = nil
+    }
+
+    private func declineInvitation(_ invitation: TeamInvitation) async {
+        activeInvitationId = invitation.id
+        authService.errorMessage = nil
+        await authService.declineInvitation(invitation)
+        activeInvitationId = nil
     }
 }
