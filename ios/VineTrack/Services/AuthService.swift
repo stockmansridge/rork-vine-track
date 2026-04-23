@@ -787,10 +787,12 @@ class AuthService {
 
         // Primary path: SECURITY DEFINER RPC - bypasses RLS, normalizes
         // the uuid casing, and inserts into vineyard_members atomically.
+        // The SQL function (FINAL_FIX_INVITE_CASE.sql) accepts either a
+        // token or the invitation id as p_token.
         nonisolated struct AcceptParams: Codable, Sendable {
-            let p_invitation_id: String
+            let p_token: String
         }
-        let params = AcceptParams(p_invitation_id: invitation.id.uuidString.lowercased())
+        let params = AcceptParams(p_token: invitation.id.uuidString.lowercased())
         do {
             try await supabase.rpc("accept_invitation", params: params).execute()
             pendingInvitations.removeAll { $0.id == invitation.id }
@@ -851,7 +853,7 @@ class AuthService {
         } catch {
             print("[AuthService] accept_invitation fallback insert failed: \(error)")
             let rpcDesc = rpcError.map { $0.localizedDescription } ?? "n/a"
-            errorMessage = "Failed to accept invitation.\nRPC: \(rpcDesc)\nInsert: \(error.localizedDescription)\nRun sql/fix_accept_creates_vineyard_stub.sql in the Supabase SQL Editor."
+            errorMessage = "Failed to accept invitation.\nRPC: \(rpcDesc)\nInsert: \(error.localizedDescription)"
         }
     }
 
