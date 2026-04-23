@@ -576,23 +576,29 @@ class AuthService {
     }
 
     func loadPendingInvitations() async {
-        guard isSupabaseConfigured, !userEmail.isEmpty else { return }
+        guard isSupabaseConfigured, !userEmail.isEmpty else {
+            print("[AuthService] loadPendingInvitations skipped (configured=\(isSupabaseConfigured), email='\(userEmail)')")
+            return
+        }
+        print("[AuthService] loadPendingInvitations for \(userEmail) uid=\(userId ?? "nil")")
 
-        // Primary path: SECURITY DEFINER RPC bypasses RLS and the
-        // lowercase-uuid mismatch that was silently dropping accepts.
+        // Primary path: SECURITY DEFINER RPC auto-accepts everything.
+        var rpcAccepted: Int?
+        var rpcError: Error?
         do {
             let accepted: Int = try await supabase
                 .rpc("accept_pending_invitations_for_me")
                 .execute()
                 .value
-            print("[AuthService] accept_pending_invitations_for_me accepted \(accepted) invitation(s)")
-            pendingInvitations = []
-            return
+            rpcAccepted = accepted
+            print("[AuthService] accept_pending_invitations_for_me -> \(accepted)")
         } catch {
-            print("[AuthService] accept_pending_invitations_for_me RPC failed, falling back: \(error)")
+            rpcError = error
+            print("[AuthService] accept_pending_invitations_for_me RPC failed: \(error)")
         }
 
-        // Fallback: direct select + per-row accept_invitation RPC.
+        // Always do the direct-select afterwards so we can (a) surface any
+        // leftover pending invitations in the UI and (b) log ground truth.
         do {
             let invitations: [TeamInvitation] = try await supabase.from("invitations")
                 .select()
@@ -601,13 +607,18 @@ class AuthService {
                 .execute()
                 .value
             pendingInvitations = invitations
-            print("[AuthService] Found \(invitations.count) pending invitation(s) for \(userEmail)")
-            for invitation in invitations {
-                await acceptInvitation(invitation)
+            print("[AuthService] direct-select found \(invitations.count) pending invitation(s) for \(userEmail) (RPC accepted \(rpcAccepted.map(String.init) ?? "nil"))")
+
+            if rpcAccepted == nil {
+                // RPC failed — try the per-row fallback so we don't strand the user.
+                for invitation in invitations {
+                    await acceptInvitation(invitation)
+                }
             }
         } catch {
-            print("[AuthService] Failed to load invitations: \(error)")
-            errorMessage = "Couldn't load pending invitations: \(error.localizedDescription)"
+            print("[AuthService] Direct-select of invitations failed: \(error)")
+            let rpcDesc = rpcError.map { "\($0.localizedDescription)" } ?? "ok"
+            errorMessage = "Couldn't load invitations.\nRPC: \(rpcDesc)\nSelect: \(error.localizedDescription)\n\nRun sql/MASTER_FIX_INVITATIONS.sql in Supabase."
         }
     }
 

@@ -3,8 +3,10 @@ import SwiftUI
 struct VineyardListView: View {
     @Environment(DataStore.self) private var store
     @Environment(AuthService.self) private var authService
+    @Environment(CloudSyncService.self) private var cloudSync
     @Environment(\.accessControl) private var accessControl
     @State private var showAddVineyard: Bool = false
+    @State private var isRefreshing: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -17,6 +19,18 @@ struct VineyardListView: View {
             }
             .navigationTitle("Vineyards")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Task { await refreshInvitations() }
+                    } label: {
+                        if isRefreshing {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(isRefreshing)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showAddVineyard = true
@@ -25,10 +39,19 @@ struct VineyardListView: View {
                     }
                 }
             }
+            .refreshable { await refreshInvitations() }
             .sheet(isPresented: $showAddVineyard) {
                 EditVineyardSheet(vineyard: nil)
             }
+            .task { await refreshInvitations() }
         }
+    }
+
+    private func refreshInvitations() async {
+        isRefreshing = true
+        defer { isRefreshing = false }
+        await authService.loadPendingInvitations()
+        await cloudSync.pullAllData(for: store)
     }
 
     private var emptyState: some View {
@@ -41,11 +64,16 @@ struct VineyardListView: View {
             VStack(spacing: 8) {
                 Text("Welcome to VineTrack")
                     .font(.title2.weight(.semibold))
-                Text("Create your first vineyard to get started. All blocks, pins, trips, and settings belong to a vineyard.")
+                Text("Create your first vineyard to get started, or check for a pending invitation below.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
+                if !authService.userEmail.isEmpty {
+                    Text("Signed in as \(authService.userEmail)")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             Button {
@@ -59,6 +87,29 @@ struct VineyardListView: View {
             .tint(VineyardTheme.olive)
             .controlSize(.large)
             .padding(.horizontal, 40)
+
+            Button {
+                Task { await refreshInvitations() }
+            } label: {
+                if isRefreshing {
+                    ProgressView()
+                } else {
+                    Label("Check for invitations", systemImage: "envelope.badge")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .padding(.horizontal, 40)
+            .disabled(isRefreshing)
+
+            if let error = authService.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
 
             Spacer()
         }
