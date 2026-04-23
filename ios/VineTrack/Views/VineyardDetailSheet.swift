@@ -20,6 +20,7 @@ struct VineyardDetailSheet: View {
     let vineyard: Vineyard
     @Environment(DataStore.self) private var store
     @Environment(AuthService.self) private var authService
+    @Environment(CloudSyncService.self) private var cloudSync
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessControl) private var accessControl
     @Environment(AuditService.self) private var auditService
@@ -45,11 +46,13 @@ struct VineyardDetailSheet: View {
             .task {
                 selectedCountry = vineyard.country
                 if isSupabaseConfigured {
+                    await cloudSync.refreshMembers(for: vineyard.id, store: store)
                     await authService.loadSentInvitations(vineyardId: vineyard.id)
                 }
             }
             .refreshable {
                 if isSupabaseConfigured {
+                    await cloudSync.refreshMembers(for: vineyard.id, store: store)
                     await authService.loadSentInvitations(vineyardId: vineyard.id)
                 }
             }

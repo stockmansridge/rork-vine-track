@@ -46,11 +46,16 @@ final class VineyardRepository {
 
     // MARK: - Sync
 
-    /// Add-if-not-exists merge (does not overwrite existing items).
+    /// Merge remote vineyards. Adds new ones and refreshes the users list of
+    /// existing ones so accepted invitations appear in the team roster.
     func merge(_ remote: [Vineyard]) -> [Vineyard] {
         var all = loadAll()
         for item in remote {
-            if !all.contains(where: { $0.id == item.id }) {
+            if let index = all.firstIndex(where: { $0.id == item.id }) {
+                var existing = all[index]
+                existing.users = item.users
+                all[index] = existing
+            } else {
                 all.append(item)
             }
         }

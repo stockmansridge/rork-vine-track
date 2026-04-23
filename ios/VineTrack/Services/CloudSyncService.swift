@@ -227,13 +227,13 @@ class CloudSyncService {
         syncStatus = .syncing
 
         do {
-            let memberRecords: [VineyardMemberRecord] = try await supabase.from("vineyard_members")
+            let myMemberships: [VineyardMemberRecord] = try await supabase.from("vineyard_members")
                 .select()
                 .eq("user_id", value: userId)
                 .execute()
                 .value
 
-            let vineyardIds = memberRecords.map { $0.vineyard_id }
+            let vineyardIds = myMemberships.map { $0.vineyard_id }
 
             guard !vineyardIds.isEmpty else {
                 syncStatus = .synced
@@ -250,8 +250,12 @@ class CloudSyncService {
                     .value
 
                 if let record = records.first {
-                    let members = memberRecords.filter { $0.vineyard_id == vid }
-                    let users = members.map { m in
+                    let allMembers: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
+                        .select()
+                        .eq("vineyard_id", value: vid)
+                        .execute()
+                        .value) ?? []
+                    let users = allMembers.map { m in
                         VineyardUser(
                             id: UUID(uuidString: m.user_id) ?? UUID(),
                             name: m.name,
@@ -304,6 +308,34 @@ class CloudSyncService {
             lastSyncDate = Date()
         } catch {
             syncStatus = .error(error.localizedDescription)
+        }
+    }
+
+    /// Refresh just the members list for a specific vineyard from Supabase
+    /// and update the local vineyard record. Used by the Team & Access screen
+    /// so newly-accepted invitations appear without a full re-sync.
+    func refreshMembers(for vineyardId: UUID, store: DataStore) async {
+        guard isConfigured else { return }
+        do {
+            let members: [VineyardMemberRecord] = try await supabase.from("vineyard_members")
+                .select()
+                .eq("vineyard_id", value: vineyardId.uuidString)
+                .execute()
+                .value
+
+            let users = members.map { m in
+                VineyardUser(
+                    id: UUID(uuidString: m.user_id) ?? UUID(),
+                    name: m.name,
+                    role: VineyardRole(rawValue: m.role) ?? .operator_
+                )
+            }
+
+            guard var vineyard = store.vineyards.first(where: { $0.id == vineyardId }) else { return }
+            vineyard.users = users
+            store.updateVineyardUsers(vineyard)
+        } catch {
+            print("CloudSync: Failed to refresh members: \(error)")
         }
     }
 

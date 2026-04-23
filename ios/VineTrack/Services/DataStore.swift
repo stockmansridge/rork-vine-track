@@ -303,6 +303,14 @@ class DataStore {
         syncVineyardToCloud(vineyard)
     }
 
+    /// Local-only update of the users array for a vineyard. Used after pulling
+    /// members from Supabase — avoids re-uploading to the cloud since members
+    /// already live in the `vineyard_members` table.
+    func updateVineyardUsers(_ vineyard: Vineyard) {
+        guard vineyards.contains(where: { $0.id == vineyard.id }) else { return }
+        vineyards = vineyardRepository.upsert(vineyard)
+    }
+
     func deleteVineyard(_ vineyard: Vineyard) {
         guard assertCanDelete("Vineyard") else { return }
         let vid = vineyard.id
