@@ -29,6 +29,7 @@ struct VineyardDetailSheet: View {
     @State private var editedName: String = ""
     @State private var selectedCountry: String = ""
     @State private var editingUser: VineyardUser?
+    @State private var vineyardPendingDeletion: Vineyard?
 
     var body: some View {
         NavigationStack {
@@ -80,6 +81,10 @@ struct VineyardDetailSheet: View {
             }
             .sheet(item: $editingUser) { user in
                 EditUserSheet(vineyard: vineyard, user: user)
+            }
+            .deleteVineyardConfirmation(vineyardPendingDeletion: $vineyardPendingDeletion) { vineyard in
+                store.deleteVineyard(vineyard)
+                dismiss()
             }
         }
     }
@@ -379,13 +384,12 @@ struct VineyardDetailSheet: View {
         if accessControl?.canDelete ?? false {
             Section {
                 Button(role: .destructive) {
-                    store.deleteVineyard(vineyard)
-                    dismiss()
+                    vineyardPendingDeletion = vineyard
                 } label: {
                     Label("Delete Vineyard", systemImage: "trash")
                 }
             } footer: {
-                Text("This will permanently delete the vineyard and all its data.")
+                Text("This will permanently delete the vineyard and all its data. You'll need to confirm and then type DELETE.")
             }
         }
     }

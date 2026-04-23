@@ -7,6 +7,7 @@ struct VineyardListView: View {
     @Environment(\.accessControl) private var accessControl
     @State private var showAddVineyard: Bool = false
     @State private var isRefreshing: Bool = false
+    @State private var vineyardPendingDeletion: Vineyard?
 
     var body: some View {
         NavigationStack {
@@ -44,6 +45,9 @@ struct VineyardListView: View {
                 EditVineyardSheet(vineyard: nil)
             }
             .task { await refreshInvitations() }
+            .deleteVineyardConfirmation(vineyardPendingDeletion: $vineyardPendingDeletion) { vineyard in
+                store.deleteVineyard(vineyard)
+            }
         }
     }
 
@@ -146,7 +150,7 @@ struct VineyardListView: View {
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             if accessControl?.canDelete ?? false {
                                 Button(role: .destructive) {
-                                    store.deleteVineyard(vineyard)
+                                    vineyardPendingDeletion = vineyard
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
