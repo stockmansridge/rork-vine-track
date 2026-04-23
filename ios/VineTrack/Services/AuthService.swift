@@ -77,7 +77,7 @@ class AuthService {
         do {
             let session = try await supabase.auth.session
             let user = session.user
-            userId = user.id.uuidString
+            userId = user.id.uuidString.lowercased()
             userEmail = user.email ?? ""
             userName = user.userMetadata["full_name"]?.value as? String ?? UserDefaults.standard.string(forKey: userNameKey) ?? ""
             isSignedIn = true
@@ -160,7 +160,7 @@ class AuthService {
                     accessToken: accessToken
                 )
             )
-            userId = session.user.id.uuidString
+            userId = session.user.id.uuidString.lowercased()
             updateGoogleUser(user)
             isSignedIn = true
             persistUserLocally()
@@ -207,7 +207,7 @@ class AuthService {
                 redirectTo: Self.emailConfirmRedirectURL
             )
             if result.session != nil {
-                userId = result.user.id.uuidString
+                userId = result.user.id.uuidString.lowercased()
                 userName = name
                 userEmail = email
                 isSignedIn = true
@@ -246,7 +246,7 @@ class AuthService {
                 email: email,
                 password: password
             )
-            userId = session.user.id.uuidString
+            userId = session.user.id.uuidString.lowercased()
             userEmail = email
             userName = session.user.userMetadata["full_name"]?.value as? String ?? email
             isSignedIn = true
@@ -577,6 +577,22 @@ class AuthService {
 
     func loadPendingInvitations() async {
         guard isSupabaseConfigured, !userEmail.isEmpty else { return }
+
+        // Primary path: SECURITY DEFINER RPC bypasses RLS and the
+        // lowercase-uuid mismatch that was silently dropping accepts.
+        do {
+            let accepted: Int = try await supabase
+                .rpc("accept_pending_invitations_for_me")
+                .execute()
+                .value
+            print("[AuthService] accept_pending_invitations_for_me accepted \(accepted) invitation(s)")
+            pendingInvitations = []
+            return
+        } catch {
+            print("[AuthService] accept_pending_invitations_for_me RPC failed, falling back: \(error)")
+        }
+
+        // Fallback: direct select + per-row accept_invitation RPC.
         do {
             let invitations: [TeamInvitation] = try await supabase.from("invitations")
                 .select()
@@ -585,11 +601,13 @@ class AuthService {
                 .execute()
                 .value
             pendingInvitations = invitations
+            print("[AuthService] Found \(invitations.count) pending invitation(s) for \(userEmail)")
             for invitation in invitations {
                 await acceptInvitation(invitation)
             }
         } catch {
-            print("Failed to load invitations: \(error)")
+            print("[AuthService] Failed to load invitations: \(error)")
+            errorMessage = "Couldn't load pending invitations: \(error.localizedDescription)"
         }
     }
 
@@ -680,12 +698,31 @@ class AuthService {
 
     func acceptInvitation(_ invitation: TeamInvitation) async {
         guard isSupabaseConfigured, let uid = userId else { return }
+        let lowerUid = uid.lowercased()
+
+        // Primary path: SECURITY DEFINER RPC - bypasses RLS, normalizes
+        // the uuid casing, and inserts into vineyard_members atomically.
+        nonisolated struct AcceptParams: Codable, Sendable {
+            let p_invitation_id: String
+        }
+        let params = AcceptParams(p_invitation_id: invitation.id.uuidString.lowercased())
+        do {
+            try await supabase.rpc("accept_invitation", params: params).execute()
+            pendingInvitations.removeAll { $0.id == invitation.id }
+            print("[AuthService] accept_invitation RPC succeeded for \(invitation.id.uuidString)")
+            return
+        } catch {
+            print("[AuthService] accept_invitation RPC failed, falling back to direct insert: \(error)")
+        }
+
+        // Fallback: direct upsert. Uses the LOWERCASE uid so the RLS
+        // insert policy (auth.uid()::text = user_id) actually matches.
         do {
             let memberRecord = VineyardMemberRecord(
                 id: nil,
                 vineyard_id: invitation.vineyard_id,
-                user_id: uid,
-                name: userName,
+                user_id: lowerUid,
+                name: userName.isEmpty ? userEmail : userName,
                 role: invitation.role,
                 joined_at: nil
             )
@@ -702,8 +739,10 @@ class AuthService {
                 .execute()
 
             pendingInvitations.removeAll { $0.id == invitation.id }
+            print("[AuthService] accept_invitation fallback insert succeeded for \(invitation.id.uuidString)")
         } catch {
-            errorMessage = "Failed to accept invitation: \(error.localizedDescription)"
+            print("[AuthService] accept_invitation fallback insert failed: \(error)")
+            errorMessage = "Failed to accept invitation: \(error.localizedDescription)\nRun sql/accept_invitation_rpc.sql in the Supabase SQL Editor."
         }
     }
 
