@@ -17,7 +17,7 @@ struct RoleSummaryRow: View {
 }
 
 struct VineyardDetailSheet: View {
-    let vineyard: Vineyard
+    let initialVineyard: Vineyard
     @Environment(DataStore.self) private var store
     @Environment(AuthService.self) private var authService
     @Environment(CloudSyncService.self) private var cloudSync
@@ -27,6 +27,17 @@ struct VineyardDetailSheet: View {
     @State private var showAddUser: Bool = false
     @State private var showEditName: Bool = false
     private var canManage: Bool { accessControl?.canManageUsers ?? false }
+
+    init(vineyard: Vineyard) {
+        self.initialVineyard = vineyard
+    }
+
+    /// Always read the latest vineyard from the store so that freshly-pulled
+    /// members from Supabase appear in the Users list without having to
+    /// close and reopen the sheet.
+    private var vineyard: Vineyard {
+        store.vineyards.first(where: { $0.id == initialVineyard.id }) ?? initialVineyard
+    }
     @State private var editedName: String = ""
     @State private var selectedCountry: String = ""
     @State private var editingUser: VineyardUser?
