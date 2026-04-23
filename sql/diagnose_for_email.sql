@@ -47,8 +47,8 @@ select '3. vineyards for those invitations' as step,
        v.name,
        v.owner_id::text
 from public.vineyards v
-where v.id in (
-    select i.vineyard_id
+where v.id::text in (
+    select i.vineyard_id::text
     from public.invitations i, target t
     where lower(i.email) = t.email
 );
@@ -61,7 +61,7 @@ select '4. vineyard_members for this user' as step,
        vm.role,
        vm.joined_at
 from public.vineyard_members vm
-join auth.users au on au.id::text = vm.user_id,
+join auth.users au on au.id::text = vm.user_id::text,
      target t
 where lower(au.email) = t.email;
 
