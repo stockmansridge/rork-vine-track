@@ -566,9 +566,36 @@ class AuthService {
 
     private func establishSupabaseSession(from url: URL) async throws {
         if let authCode = authCode(from: url) {
+            print("[AuthService] Exchanging auth code for session")
             _ = try await supabase.auth.exchangeCodeForSession(authCode: authCode)
             return
         }
+
+        if let accessToken = parameter(named: "access_token", in: url),
+           let refreshToken = parameter(named: "refresh_token", in: url) {
+            print("[AuthService] Setting session from access/refresh tokens in URL")
+            _ = try await supabase.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
+            return
+        }
+
+        if let tokenHash = parameter(named: "token_hash", in: url) ?? parameter(named: "token", in: url) {
+            let typeString = parameter(named: "type", in: url)?.lowercased() ?? "recovery"
+            let otpType: EmailOTPType = {
+                switch typeString {
+                case "signup": return .signup
+                case "invite": return .invite
+                case "magiclink": return .magiclink
+                case "email_change": return .emailChange
+                case "email": return .email
+                default: return .recovery
+                }
+            }()
+            print("[AuthService] Verifying OTP token_hash with type: \(typeString)")
+            _ = try await supabase.auth.verifyOTP(tokenHash: tokenHash, type: otpType)
+            return
+        }
+
+        print("[AuthService] Falling back to session(from:) parsing")
         try await supabase.auth.session(from: url)
     }
 
