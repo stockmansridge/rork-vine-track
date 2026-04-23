@@ -539,10 +539,14 @@ class AuthService {
     private func handleSupabaseRecoveryURL(_ url: URL) async {
         guard isSupabaseConfigured else { return }
         do {
-            try await supabase.auth.session(from: url)
+            try await establishSupabaseSession(from: url)
+            await restoreSupabaseSession()
+            passwordResetMessage = nil
+            showEmailConfirmation = false
             showPasswordRecovery = true
             errorMessage = nil
         } catch {
+            showPasswordRecovery = false
             errorMessage = "Password reset link is invalid or expired: \(error.localizedDescription)"
         }
     }
@@ -550,13 +554,42 @@ class AuthService {
     private func handleSupabaseAuthCallbackURL(_ url: URL) async {
         guard isSupabaseConfigured else { return }
         do {
-            try await supabase.auth.session(from: url)
+            try await establishSupabaseSession(from: url)
             showEmailConfirmation = false
             errorMessage = nil
             await restoreSupabaseSession()
         } catch {
             errorMessage = "Confirmation link is invalid or expired: \(error.localizedDescription)"
         }
+    }
+
+    private func establishSupabaseSession(from url: URL) async throws {
+        if let authCode = authCode(from: url) {
+            _ = try await supabase.auth.exchangeCodeForSession(authCode: authCode)
+            return
+        }
+        try await supabase.auth.session(from: url)
+    }
+
+    private func authCode(from url: URL) -> String? {
+        parameter(named: "code", in: url) ?? parameter(named: "auth_code", in: url)
+    }
+
+    private func parameter(named name: String, in url: URL) -> String? {
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let value = components.queryItems?.first(where: { $0.name == name })?.value,
+           !value.isEmpty {
+            return value
+        }
+
+        guard let fragment = url.fragment, !fragment.isEmpty,
+              let components = URLComponents(string: "vinetrack://callback?\(fragment)"),
+              let value = components.queryItems?.first(where: { $0.name == name })?.value,
+              !value.isEmpty else {
+            return nil
+        }
+
+        return value
     }
 
     func updatePassword(_ newPassword: String) async -> Bool {
