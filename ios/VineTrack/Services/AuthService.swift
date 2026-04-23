@@ -660,6 +660,7 @@ class AuthService {
             )
         } catch {
             print("[AuthService] send-invitation-email failed: \(error)")
+            errorMessage = "Invitation saved, but email could not be sent: \(error.localizedDescription)"
         }
     }
 
