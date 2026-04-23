@@ -26,6 +26,16 @@ update public.vineyard_members
    set user_id = lower(user_id)
  where user_id <> lower(user_id);
 
+-- ---------- Cancel orphaned invitations whose vineyard was deleted ----
+-- Prevents FK violations in the backfill + RPC below.
+update public.invitations
+   set status = 'cancelled'
+ where status = 'pending'
+   and not exists (
+       select 1 from public.vineyards v
+        where v.id::text = invitations.vineyard_id::text
+   );
+
 -- ---------- Ensure (vineyard_id, user_id) is unique so upsert works ---
 -- (No-op if the constraint already exists.)
 do $$
@@ -83,6 +93,11 @@ begin
 
     if v_inv.id is null then
         raise exception 'Invitation not found: %', p_invitation_id;
+    end if;
+
+    if not exists (select 1 from public.vineyards v where v.id::text = v_inv.vineyard_id::text) then
+        update public.invitations set status = 'cancelled' where id = v_inv.id;
+        raise exception 'The vineyard for this invitation no longer exists';
     end if;
 
     if lower(v_inv.email) <> v_email then
@@ -144,9 +159,10 @@ begin
     ) into v_name;
 
     for v_inv in
-        select * from public.invitations
-         where lower(email) = v_email
-           and status = 'pending'
+        select i.* from public.invitations i
+         where lower(i.email) = v_email
+           and i.status = 'pending'
+           and exists (select 1 from public.vineyards v where v.id::text = i.vineyard_id::text)
     loop
         insert into public.vineyard_members (vineyard_id, user_id, name, role)
         values (v_inv.vineyard_id, v_uid, coalesce(v_name, ''), v_inv.role)
@@ -181,6 +197,7 @@ begin
         select i.*
           from public.invitations i
          where i.status = 'pending'
+           and exists (select 1 from public.vineyards v where v.id::text = i.vineyard_id::text)
     loop
         select lower(au.id::text) into v_uid
           from auth.users au
