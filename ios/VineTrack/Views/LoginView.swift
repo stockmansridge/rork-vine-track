@@ -122,6 +122,26 @@ struct LoginView: View {
                     .tint(VineyardTheme.olive)
                     .clipShape(.rect(cornerRadius: 12))
 
+                    if !isSignUp {
+                        HStack {
+                            Spacer()
+                            Button {
+                                focusedField = nil
+                                authService.sendPasswordReset(email: email)
+                            } label: {
+                                if authService.isSendingPasswordReset {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Text("Forgot password?")
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(VineyardTheme.olive)
+                                }
+                            }
+                            .disabled(authService.isSendingPasswordReset)
+                        }
+                    }
+
                     Button {
                         withAnimation(.easeInOut(duration: 0.25)) {
                             isSignUp.toggle()
@@ -195,6 +215,22 @@ struct LoginView: View {
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(.rect(cornerRadius: 12))
+                    .padding(.top, 12)
+                    .padding(.horizontal, 32)
+                }
+
+                if let resetMessage = authService.passwordResetMessage {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(VineyardTheme.olive)
+                        Text(resetMessage)
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(12)
                     .background(Color(.secondarySystemGroupedBackground))
                     .clipShape(.rect(cornerRadius: 12))
                     .padding(.top, 12)

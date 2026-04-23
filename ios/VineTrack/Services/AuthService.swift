@@ -21,6 +21,8 @@ class AuthService {
     var isDeletingAccount: Bool = false
     var showEmailConfirmation: Bool = false
     var isOfflineSession: Bool = false
+    var passwordResetMessage: String?
+    var isSendingPasswordReset: Bool = false
 
     private let signedInKey = "vinetrack_signed_in"
     private let userNameKey = "vinetrack_user_name"
@@ -245,6 +247,36 @@ class AuthService {
             persistUserLocally()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func sendPasswordReset(email: String) {
+        errorMessage = nil
+        passwordResetMessage = nil
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        guard !trimmedEmail.isEmpty else {
+            errorMessage = "Please enter your email address first"
+            return
+        }
+        guard trimmedEmail.contains("@"), trimmedEmail.contains(".") else {
+            errorMessage = "Please enter a valid email address"
+            return
+        }
+        guard isSupabaseConfigured else {
+            errorMessage = "Cloud service is not configured. Please try again later."
+            return
+        }
+
+        isSendingPasswordReset = true
+        Task {
+            do {
+                try await supabase.auth.resetPasswordForEmail(trimmedEmail)
+                passwordResetMessage = "Password reset email sent to \(trimmedEmail). Check your inbox (and spam folder)."
+            } catch {
+                errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
+            }
+            isSendingPasswordReset = false
         }
     }
 
