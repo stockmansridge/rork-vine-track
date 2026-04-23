@@ -83,6 +83,13 @@ struct VineTrackApp: App {
                 .onOpenURL { url in
                     _ = authService.handleURL(url)
                 }
+                .sheet(isPresented: Binding(
+                    get: { authService.showPasswordRecovery },
+                    set: { authService.showPasswordRecovery = $0 }
+                )) {
+                    PasswordRecoveryView()
+                        .environment(authService)
+                }
                 .onChange(of: authService.isSignedIn) { oldValue, isSignedIn in
                     if isSignedIn {
                         if !authService.isDemoMode {

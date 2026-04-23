@@ -23,6 +23,10 @@ class AuthService {
     var isOfflineSession: Bool = false
     var passwordResetMessage: String?
     var isSendingPasswordReset: Bool = false
+    var showPasswordRecovery: Bool = false
+    var isUpdatingPassword: Bool = false
+
+    static let passwordResetRedirectURL = URL(string: "vinetrack://reset-password")!
 
     private let signedInKey = "vinetrack_signed_in"
     private let userNameKey = "vinetrack_user_name"
@@ -271,7 +275,7 @@ class AuthService {
         isSendingPasswordReset = true
         Task {
             do {
-                try await supabase.auth.resetPasswordForEmail(trimmedEmail)
+                try await supabase.auth.resetPasswordForEmail(trimmedEmail, redirectTo: Self.passwordResetRedirectURL)
                 passwordResetMessage = "Password reset email sent to \(trimmedEmail). Check your inbox (and spam folder)."
             } catch {
                 errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
@@ -509,8 +513,47 @@ class AuthService {
     }
 
     func handleURL(_ url: URL) -> Bool {
+        if url.scheme?.lowercased() == "vinetrack" {
+            Task { await handleSupabaseRecoveryURL(url) }
+            return true
+        }
         guard isGoogleConfigured else { return false }
         return GIDSignIn.sharedInstance.handle(url)
+    }
+
+    private func handleSupabaseRecoveryURL(_ url: URL) async {
+        guard isSupabaseConfigured else { return }
+        do {
+            try await supabase.auth.session(from: url)
+            showPasswordRecovery = true
+            errorMessage = nil
+        } catch {
+            errorMessage = "Password reset link is invalid or expired: \(error.localizedDescription)"
+        }
+    }
+
+    func updatePassword(_ newPassword: String) async -> Bool {
+        guard isSupabaseConfigured else {
+            errorMessage = "Cloud service is not configured."
+            return false
+        }
+        let trimmed = newPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 6 else {
+            errorMessage = "Password must be at least 6 characters."
+            return false
+        }
+        isUpdatingPassword = true
+        defer { isUpdatingPassword = false }
+        do {
+            _ = try await supabase.auth.update(user: UserAttributes(password: trimmed))
+            passwordResetMessage = "Password updated. You're signed in."
+            showPasswordRecovery = false
+            await restoreSupabaseSession()
+            return true
+        } catch {
+            errorMessage = "Couldn't update password: \(error.localizedDescription)"
+            return false
+        }
     }
 
     func loadPendingInvitations() async {
