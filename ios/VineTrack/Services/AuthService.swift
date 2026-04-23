@@ -26,8 +26,10 @@ class AuthService {
     var showPasswordRecovery: Bool = false
     var isUpdatingPassword: Bool = false
 
-    static let passwordResetRedirectURL = URL(string: "vinetrack://reset-password")!
+    static let passwordResetRedirectURL = URL(string: "vinetrack://auth-callback")!
     static let emailConfirmRedirectURL = URL(string: "vinetrack://auth-callback")!
+
+    private var authStateChangesTask: Task<Void, Never>?
 
     private let signedInKey = "vinetrack_signed_in"
     private let userNameKey = "vinetrack_user_name"
@@ -52,6 +54,7 @@ class AuthService {
         userEmail = UserDefaults.standard.string(forKey: userEmailKey) ?? ""
         userId = UserDefaults.standard.string(forKey: userIdKey)
         configureGoogleSignIn()
+        startAuthStateListener()
     }
 
     private func configureGoogleSignIn() {
@@ -76,13 +79,7 @@ class AuthService {
         }
         do {
             let session = try await supabase.auth.session
-            let user = session.user
-            userId = user.id.uuidString.lowercased()
-            userEmail = user.email ?? ""
-            userName = user.userMetadata["full_name"]?.value as? String ?? UserDefaults.standard.string(forKey: userNameKey) ?? ""
-            isSignedIn = true
-            isOfflineSession = false
-            persistUserLocally()
+            applySession(session)
             isLoading = false
         } catch {
             if tryRestoreOfflineSession() {
@@ -278,7 +275,7 @@ class AuthService {
         Task {
             do {
                 try await supabase.auth.resetPasswordForEmail(trimmedEmail, redirectTo: Self.passwordResetRedirectURL)
-                passwordResetMessage = "Password reset email sent to \(trimmedEmail). Check your inbox (and spam folder)."
+                passwordResetMessage = "Password reset email sent to \(trimmedEmail). Open the link on the device where VineTrack is installed."
             } catch {
                 errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
             }
@@ -524,42 +521,34 @@ class AuthService {
 
     func handleURL(_ url: URL) -> Bool {
         if url.scheme?.lowercased() == "vinetrack" {
-            let host = url.host?.lowercased() ?? ""
-            if host == "reset-password" {
-                Task { await handleSupabaseRecoveryURL(url) }
-            } else {
-                Task { await handleSupabaseAuthCallbackURL(url) }
-            }
+            Task { await handleSupabaseCallbackURL(url) }
             return true
         }
         guard isGoogleConfigured else { return false }
         return GIDSignIn.sharedInstance.handle(url)
     }
 
-    private func handleSupabaseRecoveryURL(_ url: URL) async {
+    private func handleSupabaseCallbackURL(_ url: URL) async {
         guard isSupabaseConfigured else { return }
-        do {
-            try await establishSupabaseSession(from: url)
-            await restoreSupabaseSession()
-            passwordResetMessage = nil
-            showEmailConfirmation = false
-            showPasswordRecovery = true
-            errorMessage = nil
-        } catch {
-            showPasswordRecovery = false
-            errorMessage = "Password reset link is invalid or expired: \(error.localizedDescription)"
-        }
-    }
+        let isPasswordRecovery = isPasswordRecoveryCallback(url)
 
-    private func handleSupabaseAuthCallbackURL(_ url: URL) async {
-        guard isSupabaseConfigured else { return }
         do {
             try await establishSupabaseSession(from: url)
+            await restoreSupabaseSession()
             showEmailConfirmation = false
             errorMessage = nil
-            await restoreSupabaseSession()
+
+            if isPasswordRecovery {
+                passwordResetMessage = nil
+                showPasswordRecovery = true
+            }
         } catch {
-            errorMessage = "Confirmation link is invalid or expired: \(error.localizedDescription)"
+            if isPasswordRecovery {
+                showPasswordRecovery = false
+                errorMessage = "Password reset link is invalid or expired: \(error.localizedDescription)"
+            } else {
+                errorMessage = "Confirmation link is invalid or expired: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -573,6 +562,21 @@ class AuthService {
 
     private func authCode(from url: URL) -> String? {
         parameter(named: "code", in: url) ?? parameter(named: "auth_code", in: url)
+    }
+
+    private func isPasswordRecoveryCallback(_ url: URL) -> Bool {
+        let host = url.host?.lowercased() ?? ""
+        if host == "reset-password" {
+            return true
+        }
+
+        let type = parameter(named: "type", in: url)?.lowercased() ?? ""
+        if type == "recovery" {
+            return true
+        }
+
+        let flow = parameter(named: "flow", in: url)?.lowercased() ?? ""
+        return flow == "recovery" || flow == "reset-password"
     }
 
     private func parameter(named name: String, in url: URL) -> String? {
@@ -936,6 +940,46 @@ class AuthService {
 
     private func normalizedEmailAddress(_ email: String) -> String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func startAuthStateListener() {
+        guard isSupabaseConfigured else { return }
+
+        authStateChangesTask?.cancel()
+        authStateChangesTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            for await state in supabase.auth.authStateChanges {
+                guard !Task.isCancelled else { return }
+                guard state.event == .passwordRecovery else { continue }
+
+                if let session = state.session {
+                    self.applySession(session)
+                }
+
+                self.passwordResetMessage = nil
+                self.showEmailConfirmation = false
+                self.showPasswordRecovery = true
+                self.errorMessage = nil
+            }
+        }
+    }
+
+    private func applySession(_ session: Session) {
+        let user = session.user
+        userId = user.id.uuidString.lowercased()
+        userEmail = user.email ?? userEmail
+
+        if let fullName = user.userMetadata["full_name"]?.value as? String,
+           !fullName.isEmpty {
+            userName = fullName
+        } else if userName.isEmpty {
+            userName = UserDefaults.standard.string(forKey: userNameKey) ?? ""
+        }
+
+        isSignedIn = true
+        isOfflineSession = false
+        persistUserLocally()
     }
 
     private func persistUserLocally() {
