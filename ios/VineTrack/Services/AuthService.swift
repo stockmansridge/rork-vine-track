@@ -528,6 +528,12 @@ class AuthService {
                 sentInvitations[idx].status = "pending"
                 sentInvitations[idx].created_at = iso
             }
+            await sendInvitationEmail(
+                email: invitation.email,
+                vineyardName: invitation.vineyard_name ?? "a vineyard",
+                role: invitation.role,
+                invitationId: invitation.id.uuidString
+            )
             return true
         } catch {
             errorMessage = "Failed to resend invitation: \(error.localizedDescription)"
@@ -614,10 +620,46 @@ class AuthService {
                 p_invited_by_name: userName
             )
             try await supabase.rpc("create_invitation", params: params).execute()
+            await sendInvitationEmail(
+                email: email.lowercased(),
+                vineyardName: vineyardName,
+                role: role.rawValue,
+                invitationId: nil
+            )
             return true
         } catch {
             errorMessage = "Failed to send invitation: \(error.localizedDescription)"
             return false
+        }
+    }
+
+    private func sendInvitationEmail(
+        email: String,
+        vineyardName: String,
+        role: String,
+        invitationId: String?
+    ) async {
+        nonisolated struct EmailPayload: Encodable, Sendable {
+            let email: String
+            let vineyard_name: String
+            let role: String
+            let invited_by_name: String
+            let invitation_id: String?
+        }
+        let payload = EmailPayload(
+            email: email,
+            vineyard_name: vineyardName,
+            role: role,
+            invited_by_name: userName.isEmpty ? "A VineTrack user" : userName,
+            invitation_id: invitationId
+        )
+        do {
+            try await supabase.functions.invoke(
+                "send-invitation-email",
+                options: FunctionInvokeOptions(body: payload)
+            )
+        } catch {
+            print("[AuthService] send-invitation-email failed: \(error)")
         }
     }
 
