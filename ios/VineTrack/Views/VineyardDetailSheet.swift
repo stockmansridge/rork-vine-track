@@ -35,6 +35,7 @@ struct VineyardDetailSheet: View {
             List {
                 vineyardInfoSection
                 usersSection
+                invitationsSection
                 dangerSection
             }
             .listStyle(.insetGrouped)
@@ -42,6 +43,9 @@ struct VineyardDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 selectedCountry = vineyard.country
+                if isSupabaseConfigured && canManage {
+                    await authService.loadSentInvitations(vineyardId: vineyard.id)
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -58,7 +62,11 @@ struct VineyardDetailSheet: View {
                 }
                 Button("Cancel", role: .cancel) {}
             }
-            .sheet(isPresented: $showAddUser) {
+            .sheet(isPresented: $showAddUser, onDismiss: {
+                if isSupabaseConfigured && canManage {
+                    Task { await authService.loadSentInvitations(vineyardId: vineyard.id) }
+                }
+            }) {
                 if isSupabaseConfigured {
                     InviteMemberSheet(vineyard: vineyard)
                 } else {
@@ -222,6 +230,132 @@ struct VineyardDetailSheet: View {
                         .foregroundStyle(.tertiary)
         }
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var invitationsSection: some View {
+        if isSupabaseConfigured && canManage && !authService.sentInvitations.isEmpty {
+            Section {
+                ForEach(authService.sentInvitations) { invitation in
+                    invitationRow(invitation)
+                }
+            } header: {
+                HStack {
+                    Text("Invitations")
+                    Spacer()
+                    Button {
+                        Task { await authService.loadSentInvitations(vineyardId: vineyard.id) }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption)
+                    }
+                }
+            } footer: {
+                Text("Pending invitations haven't been accepted yet. Accepted invitations mean the user has joined and appears above. You can resend or cancel any invitation.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func invitationRow(_ invitation: TeamInvitation) -> some View {
+        let status = invitation.status.lowercased()
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(statusColor(status).gradient)
+                        .frame(width: 36, height: 36)
+                    Image(systemName: statusIcon(status))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(invitation.email)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    HStack(spacing: 6) {
+                        Text(invitation.role)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("•")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(statusLabel(status))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(statusColor(status))
+                        if let sent = formattedSentDate(invitation.created_at) {
+                            Text("•")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(sent)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Spacer()
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    Task { _ = await authService.resendInvitation(invitation) }
+                } label: {
+                    Label(status == "pending" ? "Resend" : "Re-invite", systemImage: "paperplane")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button(role: .destructive) {
+                    Task { _ = await authService.cancelInvitation(invitation) }
+                } label: {
+                    Label("Cancel", systemImage: "xmark")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "pending": return .orange
+        case "accepted": return VineyardTheme.leafGreen
+        case "declined": return .red
+        default: return .gray
+        }
+    }
+
+    private func statusIcon(_ status: String) -> String {
+        switch status {
+        case "pending": return "clock.fill"
+        case "accepted": return "checkmark"
+        case "declined": return "xmark"
+        default: return "envelope"
+        }
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        switch status {
+        case "pending": return "Pending"
+        case "accepted": return "Accepted"
+        case "declined": return "Declined"
+        default: return status.capitalized
+        }
+    }
+
+    private func formattedSentDate(_ iso: String?) -> String? {
+        guard let iso else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = formatter.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+        guard let date else { return nil }
+        let rel = RelativeDateTimeFormatter()
+        rel.unitsStyle = .short
+        return rel.localizedString(for: date, relativeTo: Date())
     }
 
     @ViewBuilder

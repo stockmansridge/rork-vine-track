@@ -17,6 +17,7 @@ class AuthService {
     var userId: String?
     var isDemoMode: Bool = false
     var pendingInvitations: [TeamInvitation] = []
+    var sentInvitations: [TeamInvitation] = []
     var isDeletingAccount: Bool = false
     var showEmailConfirmation: Bool = false
     var isOfflineSession: Bool = false
@@ -492,6 +493,60 @@ class AuthService {
             pendingInvitations = invitations
         } catch {
             print("Failed to load invitations: \(error)")
+        }
+    }
+
+    func loadSentInvitations(vineyardId: UUID) async {
+        guard isSupabaseConfigured else { return }
+        do {
+            let invitations: [TeamInvitation] = try await supabase.from("invitations")
+                .select()
+                .eq("vineyard_id", value: vineyardId.uuidString)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            sentInvitations = invitations
+        } catch {
+            print("Failed to load sent invitations: \(error)")
+        }
+    }
+
+    func resendInvitation(_ invitation: TeamInvitation) async -> Bool {
+        guard isSupabaseConfigured else { return false }
+        do {
+            nonisolated struct ResendUpdate: Codable, Sendable {
+                let status: String
+                let created_at: String
+            }
+            let iso = ISO8601DateFormatter().string(from: Date())
+            let update = ResendUpdate(status: "pending", created_at: iso)
+            try await supabase.from("invitations")
+                .update(update)
+                .eq("id", value: invitation.id.uuidString)
+                .execute()
+            if let idx = sentInvitations.firstIndex(where: { $0.id == invitation.id }) {
+                sentInvitations[idx].status = "pending"
+                sentInvitations[idx].created_at = iso
+            }
+            return true
+        } catch {
+            errorMessage = "Failed to resend invitation: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func cancelInvitation(_ invitation: TeamInvitation) async -> Bool {
+        guard isSupabaseConfigured else { return false }
+        do {
+            try await supabase.from("invitations")
+                .delete()
+                .eq("id", value: invitation.id.uuidString)
+                .execute()
+            sentInvitations.removeAll { $0.id == invitation.id }
+            return true
+        } catch {
+            errorMessage = "Failed to cancel invitation: \(error.localizedDescription)"
+            return false
         }
     }
 
