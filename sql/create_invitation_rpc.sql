@@ -51,12 +51,12 @@ begin
     select
         exists (
             select 1 from public.vineyards v
-            where v.id = p_vineyard_id::uuid
+            where v.id::text = p_vineyard_id
               and v.owner_id::text = v_uid
         )
         or exists (
             select 1 from public.vineyard_members vm
-            where vm.vineyard_id = p_vineyard_id::uuid
+            where vm.vineyard_id::text = p_vineyard_id
               and vm.user_id::text    = v_uid
               and vm.role in ('Owner', 'Manager')
         )
@@ -66,10 +66,11 @@ begin
         raise exception 'You do not have permission to invite members to this vineyard';
     end if;
 
+    -- Insert; cast vineyard_id/invited_by to invitations' column types automatically.
     insert into public.invitations
         (vineyard_id, vineyard_name, email, role, invited_by, invited_by_name, status)
     values
-        (p_vineyard_id::uuid, p_vineyard_name, lower(p_email), p_role, v_uid::uuid, p_invited_by_name, 'pending')
+        (p_vineyard_id, p_vineyard_name, lower(p_email), p_role, v_uid, p_invited_by_name, 'pending')
     returning * into v_row;
 
     return v_row;

@@ -39,12 +39,12 @@ begin
     select
         exists (
             select 1 from public.vineyards v
-            where v.id = p_vineyard_id::uuid
+            where v.id::text = p_vineyard_id
               and v.owner_id::text = v_uid
         )
         or exists (
             select 1 from public.vineyard_members vm
-            where vm.vineyard_id = p_vineyard_id::uuid
+            where vm.vineyard_id::text = p_vineyard_id
               and vm.user_id::text     = v_uid
         )
     into v_authorized;
@@ -56,7 +56,7 @@ begin
     return query
         select *
         from public.invitations
-        where vineyard_id = p_vineyard_id::uuid
+        where vineyard_id::text = p_vineyard_id
         order by created_at desc nulls last;
 end;
 $$;
