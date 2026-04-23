@@ -91,9 +91,16 @@ struct InviteMemberSheet: View {
 
                 if let error = authService.errorMessage {
                     Section {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                            Text(error)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    } header: {
+                        Text("Error")
                     }
                 }
             }
@@ -120,6 +127,8 @@ struct InviteMemberSheet: View {
             return
         }
 
+        authService.errorMessage = nil
+        showSuccess = false
         isSending = true
         Task {
             let success = await authService.inviteMember(
@@ -129,7 +138,7 @@ struct InviteMemberSheet: View {
                 vineyardName: vineyard.name
             )
             isSending = false
-            if success {
+            if success && authService.errorMessage == nil {
                 showSuccess = true
                 email = ""
                 Task {

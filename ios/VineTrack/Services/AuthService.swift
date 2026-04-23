@@ -695,10 +695,14 @@ class AuthService {
             invited_by_name: userName.isEmpty ? "A VineTrack user" : userName,
             invitation_id: invitationId
         )
+        var headers: [String: String] = [:]
+        if let token = try? await supabase.auth.session.accessToken {
+            headers["Authorization"] = "Bearer \(token)"
+        }
         do {
             try await supabase.functions.invoke(
                 "send-invitation-email",
-                options: FunctionInvokeOptions(body: payload)
+                options: FunctionInvokeOptions(headers: headers, body: payload)
             )
             print("[AuthService] send-invitation-email invoked for \(email)")
         } catch {
