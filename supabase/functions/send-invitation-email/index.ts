@@ -21,6 +21,7 @@ interface InvitePayload {
   role?: string;
   invited_by_name?: string;
   invitation_id?: string;
+  app_store_url?: string;
 }
 
 const CORS_HEADERS: Record<string, string> = {
@@ -134,7 +135,9 @@ Deno.serve(async (req: Request) => {
   }
 
   const appStoreUrl =
-    Deno.env.get("INVITE_APP_STORE_URL") || "https://apps.apple.com/";
+    (payload.app_store_url && payload.app_store_url.trim()) ||
+    Deno.env.get("INVITE_APP_STORE_URL") ||
+    "https://apps.apple.com/us/app/vineyard-tracker/id6761143377";
 
   const vineyardName = payload.vineyard_name || "a vineyard";
   const role = payload.role || "Member";

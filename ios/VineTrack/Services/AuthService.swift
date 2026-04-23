@@ -491,6 +491,9 @@ class AuthService {
                 .execute()
                 .value
             pendingInvitations = invitations
+            for invitation in invitations {
+                await acceptInvitation(invitation)
+            }
         } catch {
             print("Failed to load invitations: \(error)")
         }
@@ -687,13 +690,15 @@ class AuthService {
             let role: String
             let invited_by_name: String
             let invitation_id: String?
+            let app_store_url: String
         }
         let payload = EmailPayload(
             email: email,
             vineyard_name: vineyardName,
             role: role,
             invited_by_name: userName.isEmpty ? "A VineTrack user" : userName,
-            invitation_id: invitationId
+            invitation_id: invitationId,
+            app_store_url: "https://apps.apple.com/us/app/vineyard-tracker/id6761143377"
         )
         do {
             let urlString = Config.EXPO_PUBLIC_SUPABASE_URL
