@@ -65,6 +65,9 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     todaySection
+                    if isManager {
+                        vineyardOverviewCard
+                    }
                     quickActionsSection
                     operationalToolsSection
                     if isManager {
@@ -482,8 +485,6 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Management")
                 .font(.headline)
-
-            vineyardOverviewCard
 
             HStack(spacing: 12) {
                 toolCard(
