@@ -506,8 +506,9 @@ class AuthService {
                 .execute()
                 .value
             sentInvitations = invitations
+            print("[AuthService] loaded \(invitations.count) sent invitations for vineyard \(vineyardId.uuidString)")
         } catch {
-            print("Failed to load sent invitations: \(error)")
+            print("[AuthService] Failed to load sent invitations: \(error)")
         }
     }
 
@@ -603,34 +604,75 @@ class AuthService {
     }
 
     func inviteMember(email: String, role: VineyardRole, vineyardId: UUID, vineyardName: String) async -> Bool {
-        guard isSupabaseConfigured, userId != nil else { return false }
-        do {
-            nonisolated struct CreateInvitationParams: Codable, Sendable {
-                let p_vineyard_id: String
-                let p_vineyard_name: String
-                let p_email: String
-                let p_role: String
-                let p_invited_by_name: String
-            }
-            let params = CreateInvitationParams(
-                p_vineyard_id: vineyardId.uuidString,
-                p_vineyard_name: vineyardName,
-                p_email: email.lowercased(),
-                p_role: role.rawValue,
-                p_invited_by_name: userName
-            )
-            try await supabase.rpc("create_invitation", params: params).execute()
-            await sendInvitationEmail(
-                email: email.lowercased(),
-                vineyardName: vineyardName,
-                role: role.rawValue,
-                invitationId: nil
-            )
-            return true
-        } catch {
-            errorMessage = "Failed to send invitation: \(error.localizedDescription)"
+        guard isSupabaseConfigured, let uid = userId else {
+            errorMessage = "You must be signed in to send invitations."
             return false
         }
+        let lowered = email.lowercased()
+        print("[AuthService] inviteMember email=\(lowered) vineyard=\(vineyardId.uuidString) role=\(role.rawValue)")
+
+        nonisolated struct CreateInvitationParams: Codable, Sendable {
+            let p_vineyard_id: String
+            let p_vineyard_name: String
+            let p_email: String
+            let p_role: String
+            let p_invited_by_name: String
+        }
+        let params = CreateInvitationParams(
+            p_vineyard_id: vineyardId.uuidString,
+            p_vineyard_name: vineyardName,
+            p_email: lowered,
+            p_role: role.rawValue,
+            p_invited_by_name: userName
+        )
+
+        var rpcError: Error?
+        do {
+            try await supabase.rpc("create_invitation", params: params).execute()
+            print("[AuthService] create_invitation RPC succeeded")
+        } catch {
+            rpcError = error
+            print("[AuthService] create_invitation RPC failed: \(error)")
+        }
+
+        if rpcError != nil {
+            // Fallback: direct insert (requires invitations RLS insert policy to be in place)
+            do {
+                nonisolated struct InsertRow: Codable, Sendable {
+                    let vineyard_id: String
+                    let vineyard_name: String
+                    let email: String
+                    let role: String
+                    let invited_by: String
+                    let invited_by_name: String
+                    let status: String
+                }
+                let row = InsertRow(
+                    vineyard_id: vineyardId.uuidString,
+                    vineyard_name: vineyardName,
+                    email: lowered,
+                    role: role.rawValue,
+                    invited_by: uid,
+                    invited_by_name: userName,
+                    status: "pending"
+                )
+                try await supabase.from("invitations").insert(row).execute()
+                print("[AuthService] direct insert fallback succeeded")
+            } catch {
+                print("[AuthService] direct insert fallback failed: \(error)")
+                errorMessage = "Failed to save invitation: \(error.localizedDescription). Run sql/create_invitation_rpc.sql in Supabase SQL Editor."
+                return false
+            }
+        }
+
+        await sendInvitationEmail(
+            email: lowered,
+            vineyardName: vineyardName,
+            role: role.rawValue,
+            invitationId: nil
+        )
+        await loadSentInvitations(vineyardId: vineyardId)
+        return true
     }
 
     private func sendInvitationEmail(
@@ -658,6 +700,7 @@ class AuthService {
                 "send-invitation-email",
                 options: FunctionInvokeOptions(body: payload)
             )
+            print("[AuthService] send-invitation-email invoked for \(email)")
         } catch {
             print("[AuthService] send-invitation-email failed: \(error)")
             errorMessage = "Invitation saved, but email could not be sent: \(error.localizedDescription)"
