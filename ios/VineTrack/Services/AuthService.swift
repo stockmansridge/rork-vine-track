@@ -27,6 +27,7 @@ class AuthService {
     var isUpdatingPassword: Bool = false
 
     static let passwordResetRedirectURL = URL(string: "vinetrack://reset-password")!
+    static let emailConfirmRedirectURL = URL(string: "vinetrack://auth-callback")!
 
     private let signedInKey = "vinetrack_signed_in"
     private let userNameKey = "vinetrack_user_name"
@@ -202,7 +203,8 @@ class AuthService {
             let result = try await supabase.auth.signUp(
                 email: email,
                 password: password,
-                data: ["full_name": .string(name)]
+                data: ["full_name": .string(name)],
+                redirectTo: Self.emailConfirmRedirectURL
             )
             if result.session != nil {
                 userId = result.user.id.uuidString
@@ -514,7 +516,12 @@ class AuthService {
 
     func handleURL(_ url: URL) -> Bool {
         if url.scheme?.lowercased() == "vinetrack" {
-            Task { await handleSupabaseRecoveryURL(url) }
+            let host = url.host?.lowercased() ?? ""
+            if host == "reset-password" {
+                Task { await handleSupabaseRecoveryURL(url) }
+            } else {
+                Task { await handleSupabaseAuthCallbackURL(url) }
+            }
             return true
         }
         guard isGoogleConfigured else { return false }
@@ -529,6 +536,18 @@ class AuthService {
             errorMessage = nil
         } catch {
             errorMessage = "Password reset link is invalid or expired: \(error.localizedDescription)"
+        }
+    }
+
+    private func handleSupabaseAuthCallbackURL(_ url: URL) async {
+        guard isSupabaseConfigured else { return }
+        do {
+            try await supabase.auth.session(from: url)
+            showEmailConfirmation = false
+            errorMessage = nil
+            await restoreSupabaseSession()
+        } catch {
+            errorMessage = "Confirmation link is invalid or expired: \(error.localizedDescription)"
         }
     }
 
