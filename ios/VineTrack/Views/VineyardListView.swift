@@ -2,13 +2,14 @@ import SwiftUI
 
 struct VineyardListView: View {
     @Environment(DataStore.self) private var store
+    @Environment(AuthService.self) private var authService
     @Environment(\.accessControl) private var accessControl
     @State private var showAddVineyard: Bool = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if store.vineyards.isEmpty {
+                if store.vineyards.isEmpty && authService.pendingInvitations.isEmpty {
                     emptyState
                 } else {
                     vineyardList
@@ -66,17 +67,41 @@ struct VineyardListView: View {
 
     private var vineyardList: some View {
         List {
-            ForEach(store.vineyards) { vineyard in
-                VineyardCardRow(vineyard: vineyard, isSelected: vineyard.id == store.selectedVineyardId)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        if accessControl?.canDelete ?? false {
-                            Button(role: .destructive) {
-                                store.deleteVineyard(vineyard)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+            PendingInvitationsView()
+
+            if store.vineyards.isEmpty {
+                Section {
+                    VStack(spacing: 12) {
+                        Text("No vineyards yet")
+                            .font(.headline)
+                        Text("Accept a pending invitation above, or create your first vineyard.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button {
+                            showAddVineyard = true
+                        } label: {
+                            Label("Create Vineyard", systemImage: "plus")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(VineyardTheme.olive)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                }
+            } else {
+                ForEach(store.vineyards) { vineyard in
+                    VineyardCardRow(vineyard: vineyard, isSelected: vineyard.id == store.selectedVineyardId)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            if accessControl?.canDelete ?? false {
+                                Button(role: .destructive) {
+                                    store.deleteVineyard(vineyard)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
                         }
-                    }
+                }
             }
         }
         .listStyle(.insetGrouped)

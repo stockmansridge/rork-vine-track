@@ -157,6 +157,8 @@ struct InviteMemberSheet: View {
 
 struct PendingInvitationsView: View {
     @Environment(AuthService.self) private var authService
+    @Environment(CloudSyncService.self) private var cloudSync
+    @Environment(DataStore.self) private var store
 
     var body: some View {
         if !authService.pendingInvitations.isEmpty {
@@ -180,7 +182,10 @@ struct PendingInvitationsView: View {
 
                         HStack(spacing: 8) {
                             Button {
-                                Task { await authService.acceptInvitation(invitation) }
+                                Task {
+                                    await authService.acceptInvitation(invitation)
+                                    await cloudSync.pullAllData(for: store)
+                                }
                             } label: {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.title2)
