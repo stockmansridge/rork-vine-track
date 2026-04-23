@@ -137,6 +137,7 @@ struct InviteMemberSheet: View {
                 vineyardId: vineyard.id,
                 vineyardName: vineyard.name
             )
+            await authService.loadSentInvitations(vineyardId: vineyard.id)
             isSending = false
             if success && authService.errorMessage == nil {
                 showSuccess = true

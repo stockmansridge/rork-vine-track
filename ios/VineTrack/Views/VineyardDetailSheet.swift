@@ -43,7 +43,12 @@ struct VineyardDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 selectedCountry = vineyard.country
-                if isSupabaseConfigured && canManage {
+                if isSupabaseConfigured {
+                    await authService.loadSentInvitations(vineyardId: vineyard.id)
+                }
+            }
+            .refreshable {
+                if isSupabaseConfigured {
                     await authService.loadSentInvitations(vineyardId: vineyard.id)
                 }
             }
@@ -63,7 +68,7 @@ struct VineyardDetailSheet: View {
                 Button("Cancel", role: .cancel) {}
             }
             .sheet(isPresented: $showAddUser, onDismiss: {
-                if isSupabaseConfigured && canManage {
+                if isSupabaseConfigured {
                     Task { await authService.loadSentInvitations(vineyardId: vineyard.id) }
                 }
             }) {
@@ -234,7 +239,7 @@ struct VineyardDetailSheet: View {
 
     @ViewBuilder
     private var invitationsSection: some View {
-        if isSupabaseConfigured && canManage {
+        if isSupabaseConfigured {
             Section {
                 if authService.sentInvitations.isEmpty {
                     HStack(spacing: 10) {
