@@ -542,23 +542,29 @@ class AuthService {
     }
 
     func inviteMember(email: String, role: VineyardRole, vineyardId: UUID, vineyardName: String) async -> Bool {
-        guard isSupabaseConfigured, userId != nil else { return false }
+        guard isSupabaseConfigured, let uid = userId else { return false }
         do {
-            nonisolated struct InvitationParams: Codable, Sendable {
-                let p_vineyard_id: String
-                let p_vineyard_name: String
-                let p_email: String
-                let p_role: String
-                let p_invited_by_name: String
+            nonisolated struct InvitationInsert: Codable, Sendable {
+                let vineyard_id: String
+                let vineyard_name: String
+                let email: String
+                let role: String
+                let invited_by: String
+                let invited_by_name: String
+                let status: String
             }
-            let params = InvitationParams(
-                p_vineyard_id: vineyardId.uuidString,
-                p_vineyard_name: vineyardName,
-                p_email: email.lowercased(),
-                p_role: role.rawValue,
-                p_invited_by_name: userName
+            let payload = InvitationInsert(
+                vineyard_id: vineyardId.uuidString,
+                vineyard_name: vineyardName,
+                email: email.lowercased(),
+                role: role.rawValue,
+                invited_by: uid,
+                invited_by_name: userName,
+                status: "pending"
             )
-            try await supabase.rpc("create_invitation", params: params).execute()
+            try await supabase.from("invitations")
+                .insert(payload)
+                .execute()
             return true
         } catch {
             errorMessage = "Failed to send invitation: \(error.localizedDescription)"
