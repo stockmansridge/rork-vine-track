@@ -461,6 +461,7 @@ struct PinsListView: View {
     @State private var selectedPinForMap: VinePin?
     @State private var selectedPinForDirections: VinePin?
     @State private var selectedPinForPhoto: VinePin?
+    @State private var selectedPinForDetail: VinePin?
     @State private var pinToDelete: VinePin?
     @State private var showDeleteConfirmation: Bool = false
 
@@ -478,7 +479,8 @@ struct PinsListView: View {
                     onDelete: {
                         pinToDelete = pin
                         showDeleteConfirmation = true
-                    }
+                    },
+                    onHeadingTap: { selectedPinForDetail = pin }
                 )
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     Button {
@@ -498,6 +500,11 @@ struct PinsListView: View {
             if pins.isEmpty {
                 ContentUnavailableView("No Pins", systemImage: "mappin.slash", description: Text("Drop pins from the Home tab to see them here."))
             }
+        }
+        .sheet(item: $selectedPinForDetail) { pin in
+            PinDetailSheet(pin: pin)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(item: $selectedPinForMap) { pin in
             PinLocationMapSheet(pin: pin)
@@ -557,6 +564,7 @@ struct PinRowView: View {
     let onPhoto: () -> Void
     let onComplete: () -> Void
     let onDelete: () -> Void
+    let onHeadingTap: () -> Void
     @Environment(\.accessControl) private var accessControl
     @State private var showFullPhoto: Bool = false
 
@@ -586,21 +594,28 @@ struct PinRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    if pin.isCompleted {
-                        Image(systemName: "checkmark")
-                            .font(.caption.bold())
+                Button(action: onHeadingTap) {
+                    HStack(spacing: 8) {
+                        if pin.isCompleted {
+                            Image(systemName: "checkmark")
+                                .font(.caption.bold())
+                                .foregroundStyle(.white)
+                        }
+                        Text(pin.buttonName)
+                            .font(.headline)
                             .foregroundStyle(.white)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.white.opacity(0.8))
                     }
-                    Text(pin.buttonName)
-                        .font(.headline)
-                        .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.fromString(pin.buttonColor).gradient)
+                    .clipShape(.rect(cornerRadius: 8))
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.fromString(pin.buttonColor).gradient)
-                .clipShape(.rect(cornerRadius: 8))
+                .buttonStyle(.plain)
 
                 if let photoData = pin.photoData, let uiImage = UIImage(data: photoData) {
                     Button {
