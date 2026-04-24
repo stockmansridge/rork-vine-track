@@ -70,6 +70,29 @@ class CloudSyncService {
         isSupabaseConfigured
     }
 
+    /// Choose the best human-readable name for a vineyard member row.
+    /// - If the RPC returned a real display_name (different from the email), use it.
+    /// - Otherwise humanise the email's local-part (e.g. "john.doe@foo.com" -> "John Doe").
+    /// - Otherwise fall back to the email, or an empty string.
+    nonisolated static func preferredName(displayName: String, email: String) -> String {
+        let trimmedName = displayName.trimmingCharacters(in: .whitespaces)
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
+        if !trimmedName.isEmpty && trimmedName.lowercased() != trimmedEmail.lowercased() {
+            return trimmedName
+        }
+        guard !trimmedEmail.isEmpty, let atIndex = trimmedEmail.firstIndex(of: "@") else {
+            return trimmedName
+        }
+        let local = String(trimmedEmail[..<atIndex])
+        let parts = local
+            .replacingOccurrences(of: "_", with: ".")
+            .replacingOccurrences(of: "-", with: ".")
+            .split(separator: ".")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst().lowercased() }
+        let humanised = parts.joined(separator: " ")
+        return humanised.isEmpty ? trimmedEmail : humanised
+    }
+
     private var currentUserId: String? {
         supabase.auth.currentUser?.id.uuidString.lowercased()
     }
@@ -270,7 +293,7 @@ class CloudSyncService {
                         users = rows.map { r in
                             VineyardUser(
                                 id: UUID(uuidString: r.user_id) ?? UUID(),
-                                name: r.display_name,
+                                name: Self.preferredName(displayName: r.display_name, email: r.email),
                                 email: r.email,
                                 role: VineyardRole(rawValue: r.role) ?? .operator_
                             )
@@ -367,7 +390,7 @@ class CloudSyncService {
             users = rows.map { r in
                 VineyardUser(
                     id: UUID(uuidString: r.user_id) ?? UUID(),
-                    name: r.display_name,
+                    name: Self.preferredName(displayName: r.display_name, email: r.email),
                     email: r.email,
                     role: VineyardRole(rawValue: r.role) ?? .operator_
                 )
