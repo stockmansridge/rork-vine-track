@@ -954,6 +954,22 @@ struct PinDetailSheet: View {
                         ActionButton(icon: "camera", label: "Photo", color: .purple) {
                             showPhotoPicker = true
                         }
+                        Spacer()
+                        ActionButton(
+                            icon: pin.isCompleted ? "arrow.uturn.backward" : "checkmark.circle",
+                            label: pin.isCompleted ? "Undo" : "Complete",
+                            color: pin.isCompleted ? .orange : VineyardTheme.leafGreen
+                        ) {
+                            store.togglePinCompletion(pin, by: authService.userName)
+                            dismiss()
+                        }
+                        if accessControl?.canDelete ?? false {
+                            Spacer()
+                            ActionButton(icon: "trash", label: "Delete", color: .red) {
+                                store.deletePin(pin)
+                                dismiss()
+                            }
+                        }
                     }
                     .padding(.vertical, 4)
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -1010,26 +1026,6 @@ struct PinDetailSheet: View {
                     }
                 }
 
-                Section {
-                    Button {
-                        store.togglePinCompletion(pin, by: authService.userName)
-                        dismiss()
-                    } label: {
-                        Label(
-                            pin.isCompleted ? "Mark as Active" : "Mark as Complete",
-                            systemImage: pin.isCompleted ? "arrow.uturn.backward" : "checkmark.circle"
-                        )
-                    }
-
-                    if accessControl?.canDelete ?? false {
-                        Button(role: .destructive) {
-                            store.deletePin(pin)
-                            dismiss()
-                        } label: {
-                            Label("Delete Pin", systemImage: "trash")
-                        }
-                    }
-                }
             }
             .navigationTitle("Pin Details")
             .navigationBarTitleDisplayMode(.inline)
