@@ -207,19 +207,30 @@ struct VineyardDetailSheet: View {
 
     @ViewBuilder
     private func userRow(_ user: VineyardUser) -> some View {
+        let label = user.displayLabel
+        let showEmailLine = !user.email.isEmpty && user.email.lowercased() != user.name.lowercased()
         HStack(spacing: 12) {
                     ZStack {
                         Circle()
                             .fill(roleColor(user.role).gradient)
                             .frame(width: 36, height: 36)
-                        Text(String(user.name.prefix(1)).uppercased())
+                        Text(String(label.prefix(1)).uppercased())
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(.white)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(user.name)
+                        Text(label)
                             .font(.headline)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        if showEmailLine {
+                            Text(user.email)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
                         HStack(spacing: 4) {
                             Text(user.role.rawValue)
                                 .font(.caption)
@@ -412,6 +423,11 @@ struct VineyardDetailSheet: View {
         var updated = vineyard
         updated.users.removeAll { $0.id == user.id }
         store.updateVineyard(updated)
+        let vineyardId = vineyard.id
+        let userId = user.id
+        Task {
+            await cloudSync.removeMember(vineyardId: vineyardId, userId: userId)
+        }
         auditService.log(
             action: .userRemoved,
             entityType: "VineyardUser",
@@ -554,6 +570,7 @@ struct EditUserSheet: View {
     let user: VineyardUser
     @Environment(DataStore.self) private var store
     @Environment(AuditService.self) private var auditService
+    @Environment(CloudSyncService.self) private var cloudSync
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessControl) private var accessControl
     @State private var userName: String = ""
@@ -566,9 +583,44 @@ struct EditUserSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Name", text: $userName)
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(roleColor(user.role).gradient)
+                                .frame(width: 44, height: 44)
+                            Text(String(user.displayLabel.prefix(1)).uppercased())
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(.white)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(user.displayLabel)
+                                .font(.headline)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            if !user.email.isEmpty {
+                                Text(user.email)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            Text(user.role.rawValue)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(roleColor(user.role))
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
                 } header: {
-                    Text("User Details")
+                    Text("Member")
+                }
+
+                Section {
+                    TextField("Display name", text: $userName)
+                } header: {
+                    Text("Name")
+                } footer: {
+                    Text("How this person appears in reports and trips. Defaults to their email if blank.")
                 }
 
                 Section {
@@ -625,7 +677,7 @@ struct EditUserSheet: View {
                     Text("Sets the hourly rate used in trip and task cost reports. This is independent of the user's role.")
                 }
             }
-            .navigationTitle("Edit User")
+            .navigationTitle("Edit Access")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -633,7 +685,6 @@ struct EditUserSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(userName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
             .onAppear {
@@ -644,6 +695,15 @@ struct EditUserSheet: View {
         }
     }
 
+    private func roleColor(_ role: VineyardRole) -> Color {
+        switch role {
+        case .owner: return .orange
+        case .manager: return .blue
+        case .supervisor: return .purple
+        case .operator_: return .green
+        }
+    }
+
     private func save() {
         var updated = vineyard
         guard let idx = updated.users.firstIndex(where: { $0.id == user.id }) else {
@@ -651,19 +711,26 @@ struct EditUserSheet: View {
             return
         }
         let oldRole = updated.users[idx].role
+        let newRole = isOwner ? oldRole : selectedRole
         updated.users[idx].name = userName.trimmingCharacters(in: .whitespaces)
         if !isOwner {
-            updated.users[idx].role = selectedRole
+            updated.users[idx].role = newRole
         }
         updated.users[idx].operatorCategoryId = selectedCategoryId
         store.updateVineyard(updated)
-        if !isOwner && oldRole != selectedRole {
+
+        if !isOwner && oldRole != newRole {
+            let vineyardId = vineyard.id
+            let userId = user.id
+            Task {
+                await cloudSync.updateMemberRole(vineyardId: vineyardId, userId: userId, role: newRole)
+            }
             auditService.log(
                 action: .roleChanged,
                 entityType: "VineyardUser",
                 entityId: user.id.uuidString,
                 entityLabel: user.name,
-                details: "\(oldRole.rawValue) → \(selectedRole.rawValue)"
+                details: "\(oldRole.rawValue) → \(newRole.rawValue)"
             )
         }
         dismiss()

@@ -42,29 +42,44 @@ nonisolated struct Vineyard: Codable, Identifiable, Sendable, Hashable {
 nonisolated struct VineyardUser: Codable, Identifiable, Sendable, Hashable {
     let id: UUID
     var name: String
+    var email: String
     var role: VineyardRole
     var operatorCategoryId: UUID?
 
     init(
         id: UUID = UUID(),
         name: String = "",
+        email: String = "",
         role: VineyardRole = .operator_,
         operatorCategoryId: UUID? = nil
     ) {
         self.id = id
         self.name = name
+        self.email = email
         self.role = role
         self.operatorCategoryId = operatorCategoryId
     }
 
+    /// Best human-readable label: display name if set, otherwise email,
+    /// otherwise a short form of the UUID. Never returns an empty string,
+    /// so the Team & Access list never renders blank rows.
+    var displayLabel: String {
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        if !trimmedName.isEmpty { return trimmedName }
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
+        if !trimmedEmail.isEmpty { return trimmedEmail }
+        return "User " + String(id.uuidString.prefix(8))
+    }
+
     nonisolated enum CodingKeys: String, CodingKey {
-        case id, name, role, operatorCategoryId
+        case id, name, email, role, operatorCategoryId
     }
 
     nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        email = try container.decodeIfPresent(String.self, forKey: .email) ?? ""
         role = try container.decodeIfPresent(VineyardRole.self, forKey: .role) ?? .operator_
         operatorCategoryId = try container.decodeIfPresent(UUID.self, forKey: .operatorCategoryId)
     }

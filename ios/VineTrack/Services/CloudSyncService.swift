@@ -28,6 +28,14 @@ nonisolated struct VineyardMemberRecord: Codable, Sendable {
     let joined_at: String?
 }
 
+nonisolated struct MemberWithEmailRow: Codable, Sendable {
+    let user_id: String
+    let email: String
+    let display_name: String
+    let role: String
+    let joined_at: String?
+}
+
 nonisolated struct ELStageImageManifestEntry: Codable, Sendable, Equatable {
     let code: String
     let updated_at: String
@@ -250,17 +258,37 @@ class CloudSyncService {
                     .value
 
                 if let record = records.first {
-                    let allMembers: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
-                        .select()
-                        .eq("vineyard_id", value: vid)
-                        .execute()
-                        .value) ?? []
-                    let users = allMembers.map { m in
-                        VineyardUser(
-                            id: UUID(uuidString: m.user_id) ?? UUID(),
-                            name: m.name,
-                            role: VineyardRole(rawValue: m.role) ?? .operator_
-                        )
+                    nonisolated struct RPCParams: Codable, Sendable {
+                        let p_vineyard_id: String
+                    }
+                    let rpcParams = RPCParams(p_vineyard_id: vid.lowercased())
+                    var users: [VineyardUser] = []
+                    if let rows: [MemberWithEmailRow] = try? await supabase.rpc(
+                        "get_vineyard_members_with_email",
+                        params: rpcParams
+                    ).execute().value {
+                        users = rows.map { r in
+                            VineyardUser(
+                                id: UUID(uuidString: r.user_id) ?? UUID(),
+                                name: r.display_name,
+                                email: r.email,
+                                role: VineyardRole(rawValue: r.role) ?? .operator_
+                            )
+                        }
+                    } else {
+                        let allMembers: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
+                            .select()
+                            .eq("vineyard_id", value: vid)
+                            .execute()
+                            .value) ?? []
+                        users = allMembers.map { m in
+                            VineyardUser(
+                                id: UUID(uuidString: m.user_id) ?? UUID(),
+                                name: m.name,
+                                email: "",
+                                role: VineyardRole(rawValue: m.role) ?? .operator_
+                            )
+                        }
                     }
                     var logoData: Data?
                     if let logoBase64 = record.logo_data {
@@ -314,28 +342,101 @@ class CloudSyncService {
     /// Refresh just the members list for a specific vineyard from Supabase
     /// and update the local vineyard record. Used by the Team & Access screen
     /// so newly-accepted invitations appear without a full re-sync.
+    ///
+    /// Uses the SECURITY DEFINER RPC `get_vineyard_members_with_email` which
+    /// reliably returns every member joined with their auth email, bypassing
+    /// RLS quirks and empty profile names that previously caused blank rows.
     func refreshMembers(for vineyardId: UUID, store: DataStore) async {
         guard isConfigured else { return }
+
+        nonisolated struct RPCParams: Codable, Sendable {
+            let p_vineyard_id: String
+        }
+        let params = RPCParams(p_vineyard_id: vineyardId.uuidString.lowercased())
+
+        var users: [VineyardUser] = []
+
         do {
-            let members: [VineyardMemberRecord] = try await supabase.from("vineyard_members")
+            let rows: [MemberWithEmailRow] = try await supabase.rpc(
+                "get_vineyard_members_with_email",
+                params: params
+            )
+            .execute()
+            .value
+
+            users = rows.map { r in
+                VineyardUser(
+                    id: UUID(uuidString: r.user_id) ?? UUID(),
+                    name: r.display_name,
+                    email: r.email,
+                    role: VineyardRole(rawValue: r.role) ?? .operator_
+                )
+            }
+        } catch {
+            print("CloudSync: get_vineyard_members_with_email RPC failed, falling back to direct query: \(error)")
+
+            let members: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
                 .select()
                 .eq("vineyard_id", value: vineyardId.uuidString)
                 .execute()
-                .value
+                .value) ?? []
 
-            let users = members.map { m in
+            users = members.map { m in
                 VineyardUser(
                     id: UUID(uuidString: m.user_id) ?? UUID(),
                     name: m.name,
+                    email: "",
                     role: VineyardRole(rawValue: m.role) ?? .operator_
                 )
             }
+        }
 
-            guard var vineyard = store.vineyards.first(where: { $0.id == vineyardId }) else { return }
-            vineyard.users = users
-            store.updateVineyardUsers(vineyard)
+        guard var vineyard = store.vineyards.first(where: { $0.id == vineyardId }) else { return }
+
+        // Preserve the operatorCategoryId we already have locally, since the
+        // RPC only returns membership info, not the local-only operator
+        // category assignment.
+        let existingCategories = Dictionary(uniqueKeysWithValues: vineyard.users.map { ($0.id, $0.operatorCategoryId) })
+        for i in users.indices {
+            if let catId = existingCategories[users[i].id] {
+                users[i].operatorCategoryId = catId
+            }
+        }
+
+        vineyard.users = users
+        store.updateVineyardUsers(vineyard)
+    }
+
+    /// Update a member's role in the vineyard_members table. Called from the
+    /// Edit Access sheet so the role change actually takes effect (not just
+    /// locally). Silent no-op if Supabase is not configured.
+    func updateMemberRole(vineyardId: UUID, userId: UUID, role: VineyardRole) async {
+        guard isConfigured else { return }
+        nonisolated struct RoleUpdate: Codable, Sendable {
+            let role: String
+        }
+        do {
+            try await supabase.from("vineyard_members")
+                .update(RoleUpdate(role: role.rawValue))
+                .eq("vineyard_id", value: vineyardId.uuidString.lowercased())
+                .eq("user_id", value: userId.uuidString.lowercased())
+                .execute()
         } catch {
-            print("CloudSync: Failed to refresh members: \(error)")
+            print("CloudSync: Failed to update member role: \(error)")
+        }
+    }
+
+    /// Remove a member from a vineyard in the vineyard_members table.
+    func removeMember(vineyardId: UUID, userId: UUID) async {
+        guard isConfigured else { return }
+        do {
+            try await supabase.from("vineyard_members")
+                .delete()
+                .eq("vineyard_id", value: vineyardId.uuidString.lowercased())
+                .eq("user_id", value: userId.uuidString.lowercased())
+                .execute()
+        } catch {
+            print("CloudSync: Failed to remove member: \(error)")
         }
     }
 
