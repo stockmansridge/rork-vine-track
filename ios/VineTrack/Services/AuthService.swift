@@ -25,6 +25,9 @@ class AuthService {
     var isSendingPasswordReset: Bool = false
     var showPasswordRecovery: Bool = false
     var isUpdatingPassword: Bool = false
+    var showPasswordResetCodeEntry: Bool = false
+    var passwordResetPendingEmail: String = ""
+    var isVerifyingResetCode: Bool = false
 
     static let passwordResetRedirectURL = URL(string: "vinetrack://auth-callback")!
     static let emailConfirmRedirectURL = URL(string: "vinetrack://auth-callback")!
@@ -272,16 +275,63 @@ class AuthService {
         }
 
         isSendingPasswordReset = true
-        print("[AuthService] resetPasswordForEmail using redirect: \(Self.passwordResetRedirectURL.absoluteString)")
-        print("[AuthService] SUPABASE_URL: \(Config.EXPO_PUBLIC_SUPABASE_URL)")
+        print("[AuthService] resetPasswordForEmail (code flow) for: \(trimmedEmail)")
         Task {
             do {
-                try await supabase.auth.resetPasswordForEmail(trimmedEmail, redirectTo: Self.passwordResetRedirectURL)
-                passwordResetMessage = "Password reset email sent to \(trimmedEmail). Open the link on the device where VineTrack is installed."
+                try await supabase.auth.resetPasswordForEmail(trimmedEmail)
+                passwordResetPendingEmail = trimmedEmail
+                showPasswordResetCodeEntry = true
+                passwordResetMessage = "We sent a 6-digit code to \(trimmedEmail). Enter it below to reset your password."
             } catch {
                 errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
             }
             isSendingPasswordReset = false
+        }
+    }
+
+    func verifyResetCodeAndUpdatePassword(email: String, code: String, newPassword: String) async -> Bool {
+        errorMessage = nil
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPassword = newPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedEmail.isEmpty else {
+            errorMessage = "Please enter your email."
+            return false
+        }
+        guard !trimmedCode.isEmpty else {
+            errorMessage = "Please enter the code from your email."
+            return false
+        }
+        guard trimmedPassword.count >= 6 else {
+            errorMessage = "Password must be at least 6 characters."
+            return false
+        }
+        guard isSupabaseConfigured else {
+            errorMessage = "Cloud service is not configured."
+            return false
+        }
+
+        isVerifyingResetCode = true
+        defer { isVerifyingResetCode = false }
+
+        do {
+            _ = try await supabase.auth.verifyOTP(email: trimmedEmail, token: trimmedCode, type: .recovery)
+        } catch {
+            errorMessage = "Invalid or expired code. Please request a new one."
+            return false
+        }
+
+        do {
+            _ = try await supabase.auth.update(user: UserAttributes(password: trimmedPassword))
+            passwordResetMessage = "Password updated. You're signed in."
+            showPasswordResetCodeEntry = false
+            passwordResetPendingEmail = ""
+            await restoreSupabaseSession()
+            return true
+        } catch {
+            errorMessage = "Couldn't update password: \(error.localizedDescription)"
+            return false
         }
     }
 

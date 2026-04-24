@@ -263,6 +263,9 @@ struct LoginView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Color(.systemGroupedBackground))
+        .sheet(isPresented: Bindable(authService).showPasswordResetCodeEntry) {
+            PasswordResetCodeView()
+        }
         .onSubmit {
             switch focusedField {
             case .name:
