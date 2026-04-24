@@ -25,19 +25,19 @@ struct PasswordResetCodeView: View {
                         .autocorrectionDisabled()
                         .focused($focused, equals: .email)
 
-                    TextField("6-digit code", text: $code)
+                    TextField("Verification code", text: $code)
                         .textContentType(.oneTimeCode)
                         .keyboardType(.numberPad)
                         .focused($focused, equals: .code)
                         .onChange(of: code) { _, newValue in
                             let digits = newValue.filter { $0.isNumber }
                             if digits != newValue { code = digits }
-                            if digits.count > 6 { code = String(digits.prefix(6)) }
+                            if digits.count > 10 { code = String(digits.prefix(10)) }
                         }
                 } header: {
                     Text("Verification")
                 } footer: {
-                    Text("Check your inbox for a 6-digit code from Supabase. If you don't see it, check spam.")
+                    Text("Enter the code from the Supabase password reset email. If you don't see it, check spam.")
                 }
 
                 Section {
@@ -124,7 +124,7 @@ struct PasswordResetCodeView: View {
     }
 
     private var canSubmit: Bool {
-        !email.isEmpty && code.count == 6 && !newPassword.isEmpty && !confirmPassword.isEmpty
+        !email.isEmpty && code.count >= 6 && !newPassword.isEmpty && !confirmPassword.isEmpty
     }
 
     private func submit() async {
