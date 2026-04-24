@@ -902,10 +902,29 @@ struct PinDetailSheet: View {
     @Environment(AuthService.self) private var authService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessControl) private var accessControl
+    @State private var notesDraft: String = ""
+    @State private var showDirections: Bool = false
+    @State private var showPhotoPicker: Bool = false
+    @State private var showFullPhoto: Bool = false
 
     private var paddockName: String {
         guard let paddockId = pin.paddockId else { return "—" }
         return store.paddocks.first { $0.id == paddockId }?.name ?? "—"
+    }
+
+    private var compassDirection: String {
+        let h = pin.heading
+        switch h {
+        case 337.5..<360, 0..<22.5: return "N"
+        case 22.5..<67.5: return "NE"
+        case 67.5..<112.5: return "E"
+        case 112.5..<157.5: return "SE"
+        case 157.5..<202.5: return "S"
+        case 202.5..<247.5: return "SW"
+        case 247.5..<292.5: return "W"
+        case 292.5..<337.5: return "NW"
+        default: return "N"
+        }
     }
 
     var body: some View {
@@ -919,22 +938,49 @@ struct PinDetailSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(pin.buttonName)
                                 .font(.title3.weight(.semibold))
-                            Text("\(pin.mode.rawValue) \u{2022} \(pin.side.rawValue)")
+                            Text("\(pin.side.rawValue) hand side facing \(compassDirection)")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
 
+                Section {
+                    HStack(spacing: 0) {
+                        ActionButton(icon: "arrow.triangle.turn.up.right.diamond", label: "Directions", color: VineyardTheme.leafGreen) {
+                            showDirections = true
+                        }
+                        Spacer()
+                        ActionButton(icon: "camera", label: "Photo", color: .purple) {
+                            showPhotoPicker = true
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                }
+
                 if let photoData = pin.photoData, let uiImage = UIImage(data: photoData) {
                     Section("Photo") {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 250)
-                            .clipShape(.rect(cornerRadius: 8))
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        Button {
+                            showFullPhoto = true
+                        } label: {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxHeight: 250)
+                                .clipShape(.rect(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                     }
+                }
+
+                Section("Notes") {
+                    TextField("Add notes…", text: $notesDraft, axis: .vertical)
+                        .lineLimit(3...8)
+                        .onChange(of: notesDraft) { _, newValue in
+                            saveNotes(newValue)
+                        }
                 }
 
                 Section("Details") {
@@ -942,11 +988,12 @@ struct PinDetailSheet: View {
                     if let rowNumber = pin.rowNumber {
                         LabeledContent("Row", value: "\(rowNumber).5")
                     }
+                    LabeledContent("Side", value: "\(pin.side.rawValue) hand")
+                    LabeledContent("Facing", value: "\(compassDirection) (\(Int(pin.heading))\u{00B0})")
                     if let createdBy = pin.createdBy, !createdBy.isEmpty {
                         LabeledContent("Created By", value: createdBy)
                     }
                     LabeledContent("Time", value: pin.timestamp.formatted(date: .abbreviated, time: .shortened))
-                    LabeledContent("Heading", value: "\(Int(pin.heading))\u{00B0}")
                     LabeledContent("Latitude", value: String(format: "%.6f", pin.latitude))
                     LabeledContent("Longitude", value: String(format: "%.6f", pin.longitude))
                     LabeledContent("Status", value: pin.isCompleted ? "Completed" : "Active")
@@ -991,7 +1038,39 @@ struct PinDetailSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .onAppear {
+                notesDraft = pin.notes ?? ""
+            }
+            .sheet(isPresented: $showDirections) {
+                PinDirectionsSheet(pin: pin)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+            .fullScreenCover(isPresented: $showPhotoPicker) {
+                CameraImagePicker { data in
+                    handlePhotoCaptured(data)
+                }
+                .ignoresSafeArea()
+            }
+            .fullScreenCover(isPresented: $showFullPhoto) {
+                if let photoData = pin.photoData, let uiImage = UIImage(data: photoData) {
+                    PhotoViewerSheet(image: uiImage)
+                }
+            }
         }
+    }
+
+    private func saveNotes(_ text: String) {
+        var updated = pin
+        updated.notes = text.isEmpty ? nil : text
+        store.updatePin(updated)
+    }
+
+    private func handlePhotoCaptured(_ data: Data?) {
+        guard let data else { return }
+        var updated = pin
+        updated.photoData = data
+        store.updatePin(updated)
     }
 }
 

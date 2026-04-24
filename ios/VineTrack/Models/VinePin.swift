@@ -21,6 +21,7 @@ nonisolated struct VinePin: Codable, Identifiable, Sendable, Hashable {
     var photoData: Data?
     var tripId: UUID?
     var growthStageCode: String?
+    var notes: String?
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -45,7 +46,8 @@ nonisolated struct VinePin: Codable, Identifiable, Sendable, Hashable {
         completedAt: Date? = nil,
         photoData: Data? = nil,
         tripId: UUID? = nil,
-        growthStageCode: String? = nil
+        growthStageCode: String? = nil,
+        notes: String? = nil
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -66,6 +68,7 @@ nonisolated struct VinePin: Codable, Identifiable, Sendable, Hashable {
         self.photoData = photoData
         self.tripId = tripId
         self.growthStageCode = growthStageCode
+        self.notes = notes
     }
 }
 
