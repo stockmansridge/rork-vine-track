@@ -480,12 +480,23 @@ struct VineyardDetailsView: View {
     // MARK: - Map
 
     private var mapSection: some View {
-        VineyardBlocksMapView(selectedPaddock: $selectedPaddock)
-            .sheet(item: $selectedPaddock) { paddock in
-                BlockDetailSheet(paddock: paddock)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
+        VStack(alignment: .leading, spacing: 8) {
+            VineyardBlocksMapView(selectedPaddock: $selectedPaddock)
+                .sheet(item: $selectedPaddock) { paddock in
+                    BlockDetailSheet(paddock: paddock)
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                }
+
+            HStack(spacing: 6) {
+                Image(systemName: "hand.tap")
+                    .font(.caption)
+                Text("Tap on a block for details")
+                    .font(.caption)
             }
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
     }
 
     // MARK: - Vineyard Stats
