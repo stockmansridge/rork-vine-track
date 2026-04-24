@@ -462,7 +462,7 @@ struct DashboardView: View {
                     }
                 }
             } else {
-                // Operators get a single glanceable shortcut to growth report, no yield/irrigation
+                // Operators: growth report + yield estimation (they do the collection)
                 HStack(spacing: 12) {
                     toolCard(
                         title: "Growth Stage Report",
@@ -472,8 +472,15 @@ struct DashboardView: View {
                     ) {
                         showGrowthStageReport = true
                     }
-                    // Spacer card to keep two-column rhythm
-                    Color.clear.frame(height: 170)
+
+                    toolCard(
+                        title: "Yield Estimation",
+                        subtitle: yieldToolSubtitle,
+                        icon: "chart.bar.fill",
+                        color: .orange
+                    ) {
+                        showYieldHub = true
+                    }
                 }
             }
         }

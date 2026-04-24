@@ -14,7 +14,7 @@ struct RolesPermissionsInfoView: View {
                     title: "Operator",
                     color: .green,
                     icon: "person.fill",
-                    summary: "Basic staff. Can record daily work but cannot delete records or see financial data."
+                    summary: "Field staff. Records daily work and runs Yield Estimation collections, but cannot delete records or see financial data."
                 )
                 roleRow(
                     title: "Supervisor",
