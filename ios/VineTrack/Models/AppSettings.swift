@@ -64,6 +64,13 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
     var rainAlertEnabled: Bool
     var rainAlertThresholdMm: Double
     var rainAlertWindowDays: Int
+    var irrigationAlertEnabled: Bool
+    var irrigationAlertPaddockId: UUID?
+    var irrigationKc: Double
+    var irrigationEfficiencyPercent: Double
+    var irrigationRainfallEffectivenessPercent: Double
+    var irrigationReplacementPercent: Double
+    var irrigationSoilBufferMm: Double
 
     init(
         id: UUID = UUID(),
@@ -96,7 +103,14 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         resetMode: GDDResetMode = .budburst,
         rainAlertEnabled: Bool = false,
         rainAlertThresholdMm: Double = 5,
-        rainAlertWindowDays: Int = 28
+        rainAlertWindowDays: Int = 28,
+        irrigationAlertEnabled: Bool = false,
+        irrigationAlertPaddockId: UUID? = nil,
+        irrigationKc: Double = 0.65,
+        irrigationEfficiencyPercent: Double = 90,
+        irrigationRainfallEffectivenessPercent: Double = 80,
+        irrigationReplacementPercent: Double = 100,
+        irrigationSoilBufferMm: Double = 0
     ) {
         self.id = id
         self.vineyardId = vineyardId
@@ -129,6 +143,13 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         self.rainAlertEnabled = rainAlertEnabled
         self.rainAlertThresholdMm = rainAlertThresholdMm
         self.rainAlertWindowDays = rainAlertWindowDays
+        self.irrigationAlertEnabled = irrigationAlertEnabled
+        self.irrigationAlertPaddockId = irrigationAlertPaddockId
+        self.irrigationKc = irrigationKc
+        self.irrigationEfficiencyPercent = irrigationEfficiencyPercent
+        self.irrigationRainfallEffectivenessPercent = irrigationRainfallEffectivenessPercent
+        self.irrigationReplacementPercent = irrigationReplacementPercent
+        self.irrigationSoilBufferMm = irrigationSoilBufferMm
     }
 
     init(from decoder: Decoder) throws {
@@ -168,6 +189,13 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         rainAlertEnabled = try container.decodeIfPresent(Bool.self, forKey: .rainAlertEnabled) ?? false
         rainAlertThresholdMm = try container.decodeIfPresent(Double.self, forKey: .rainAlertThresholdMm) ?? 5
         rainAlertWindowDays = try container.decodeIfPresent(Int.self, forKey: .rainAlertWindowDays) ?? 28
+        irrigationAlertEnabled = try container.decodeIfPresent(Bool.self, forKey: .irrigationAlertEnabled) ?? false
+        irrigationAlertPaddockId = try container.decodeIfPresent(UUID.self, forKey: .irrigationAlertPaddockId)
+        irrigationKc = try container.decodeIfPresent(Double.self, forKey: .irrigationKc) ?? 0.65
+        irrigationEfficiencyPercent = try container.decodeIfPresent(Double.self, forKey: .irrigationEfficiencyPercent) ?? 90
+        irrigationRainfallEffectivenessPercent = try container.decodeIfPresent(Double.self, forKey: .irrigationRainfallEffectivenessPercent) ?? 80
+        irrigationReplacementPercent = try container.decodeIfPresent(Double.self, forKey: .irrigationReplacementPercent) ?? 100
+        irrigationSoilBufferMm = try container.decodeIfPresent(Double.self, forKey: .irrigationSoilBufferMm) ?? 0
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
@@ -178,5 +206,6 @@ nonisolated struct AppSettings: Codable, Sendable, Identifiable {
         case paddockOrder, canopyWaterRates, seasonFuelCostPerLitre, appearance, fillTimerEnabled, samplesPerHectare, defaultBlockBunchWeightsGrams, elConfirmationEnabled
         case vineyardLatitude, vineyardLongitude, vineyardElevationMetres, useBEDD, calculationMode, resetMode
         case rainAlertEnabled, rainAlertThresholdMm, rainAlertWindowDays
+        case irrigationAlertEnabled, irrigationAlertPaddockId, irrigationKc, irrigationEfficiencyPercent, irrigationRainfallEffectivenessPercent, irrigationReplacementPercent, irrigationSoilBufferMm
     }
 }

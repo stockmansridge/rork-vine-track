@@ -15,6 +15,7 @@ struct IrrigationRecommendationView: View {
     @State private var rainEffText: String = "80"
     @State private var replacementText: String = "100"
     @State private var bufferText: String = "0"
+    @State private var didLoadFromSettings: Bool = false
 
     @State private var manualEToOverrides: [Date: String] = [:]
     @State private var manualRainOverrides: [Date: String] = [:]
@@ -74,6 +75,7 @@ struct IrrigationRecommendationView: View {
             blockSection
             forecastSection
             rainAlertSection
+            irrigationAlertSection
             settingsSection
             if let result {
                 resultSection(result)
@@ -101,12 +103,21 @@ struct IrrigationRecommendationView: View {
             }
         }
         .onAppear {
+            if !didLoadFromSettings {
+                loadParametersFromSettings()
+                didLoadFromSettings = true
+            }
             if selectedPaddockId == nil {
-                selectedPaddockId = vineyardPaddocks.first?.id
+                selectedPaddockId = store.settings.irrigationAlertPaddockId ?? vineyardPaddocks.first?.id
             }
             applyPaddockDefaults()
             Task { await rainAlertService.refreshAuthorizationStatus() }
         }
+        .onChange(of: kcText) { _, _ in persistParameters() }
+        .onChange(of: efficiencyText) { _, _ in persistParameters() }
+        .onChange(of: rainEffText) { _, _ in persistParameters() }
+        .onChange(of: replacementText) { _, _ in persistParameters() }
+        .onChange(of: bufferText) { _, _ in persistParameters() }
         .sheet(isPresented: $showRainForecastDetail) {
             if let lat = latitude, let lon = longitude {
                 RainForecastDetailView(
@@ -607,6 +618,114 @@ struct IrrigationRecommendationView: View {
         if let mmHr = paddock.mmPerHour, mmHr > 0 {
             applicationRateText = String(format: "%.2f", mmHr)
         }
+    }
+
+    private func loadParametersFromSettings() {
+        let s = store.settings
+        kcText = String(format: "%.2f", s.irrigationKc)
+        efficiencyText = String(format: "%.0f", s.irrigationEfficiencyPercent)
+        rainEffText = String(format: "%.0f", s.irrigationRainfallEffectivenessPercent)
+        replacementText = String(format: "%.0f", s.irrigationReplacementPercent)
+        bufferText = String(format: "%.0f", s.irrigationSoilBufferMm)
+    }
+
+    private func persistParameters() {
+        guard didLoadFromSettings else { return }
+        var s = store.settings
+        s.irrigationKc = parse(kcText, default: 0.65)
+        s.irrigationEfficiencyPercent = parse(efficiencyText, default: 90)
+        s.irrigationRainfallEffectivenessPercent = parse(rainEffText, default: 80)
+        s.irrigationReplacementPercent = parse(replacementText, default: 100)
+        s.irrigationSoilBufferMm = parse(bufferText)
+        store.updateSettings(s)
+    }
+
+    private var irrigationAlertSection: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { store.settings.irrigationAlertEnabled },
+                set: { newValue in
+                    var s = store.settings
+                    s.irrigationAlertEnabled = newValue
+                    if newValue, s.irrigationAlertPaddockId == nil {
+                        s.irrigationAlertPaddockId = selectedPaddockId
+                    }
+                    store.updateSettings(s)
+                    if newValue {
+                        Task {
+                            let status = rainAlertService.authorizationStatus
+                            if status == .notDetermined {
+                                let granted = await rainAlertService.requestAuthorization()
+                                if !granted { showAlertPermissionInfo = true }
+                            } else if status == .denied {
+                                showAlertPermissionInfo = true
+                            }
+                            await runIrrigationAlertCheck()
+                            rainAlertService.scheduleDailyBackgroundCheck()
+                        }
+                    }
+                }
+            )) {
+                Label("Daily Irrigation Alert", systemImage: "drop.fill")
+            }
+
+            if store.settings.irrigationAlertEnabled {
+                Picker("Block to monitor", selection: Binding(
+                    get: { store.settings.irrigationAlertPaddockId ?? selectedPaddockId },
+                    set: { newValue in
+                        var s = store.settings
+                        s.irrigationAlertPaddockId = newValue
+                        store.updateSettings(s)
+                    }
+                )) {
+                    Text("All blocks").tag(UUID?.none)
+                    ForEach(vineyardPaddocks.filter { ($0.mmPerHour ?? 0) > 0 }) { paddock in
+                        Text(paddock.name).tag(Optional(paddock.id))
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button {
+                    Task { await runIrrigationAlertCheck() }
+                } label: {
+                    Label("Check Irrigation Now", systemImage: "arrow.clockwise")
+                }
+                .disabled(latitude == nil || longitude == nil)
+
+                if let checked = rainAlertService.lastIrrigationCheckDate {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Last checked \(checked.formatted(.relative(presentation: .named)))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let summary = rainAlertService.lastIrrigationChangeSummary {
+                            Text(summary)
+                                .font(.caption)
+                                .foregroundStyle(VineyardTheme.vineRed)
+                        } else if !rainAlertService.lastIrrigationHoursByPaddock.isEmpty {
+                            Text("No change since last check")
+                                .font(.caption)
+                                .foregroundStyle(VineyardTheme.leafGreen)
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Irrigation Forecast Alert")
+        } footer: {
+            Text("VineTrack recalculates the recommended irrigation hours each day at 9am local time using the latest 5-day forecast and the parameters below. You'll get a notification only if the recommendation has changed since the previous check.")
+        }
+    }
+
+    private func runIrrigationAlertCheck() async {
+        guard store.settings.irrigationAlertEnabled else { return }
+        guard let lat = latitude, let lon = longitude else { return }
+        let paddocks = vineyardPaddocks
+        await rainAlertService.checkIrrigationAndNotify(
+            latitude: lat,
+            longitude: lon,
+            paddocks: paddocks,
+            settings: store.settings
+        )
     }
 
     private func parse(_ text: String, default defaultValue: Double = 0) -> Double {

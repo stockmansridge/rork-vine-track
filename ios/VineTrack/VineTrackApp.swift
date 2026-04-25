@@ -66,12 +66,13 @@ struct VineTrackApp: App {
                     await refreshDailyGDDIfNeeded()
                     await rainAlertService.refreshAuthorizationStatus()
                     await runRainAlertCheckIfNeeded()
-                    if store.settings.rainAlertEnabled {
+                    await runIrrigationAlertCheckIfNeeded()
+                    if store.settings.rainAlertEnabled || store.settings.irrigationAlertEnabled {
                         rainAlertService.scheduleDailyBackgroundCheck()
                     }
                 }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .background, store.settings.rainAlertEnabled {
+                    if phase == .background, store.settings.rainAlertEnabled || store.settings.irrigationAlertEnabled {
                         rainAlertService.scheduleDailyBackgroundCheck()
                     }
                 }
@@ -139,6 +140,25 @@ struct VineTrackApp: App {
         )
     }
 
+    private func runIrrigationAlertCheckIfNeeded() async {
+        guard store.settings.irrigationAlertEnabled else { return }
+        let lat = store.settings.vineyardLatitude ?? store.paddockCentroidLatitude
+        let lon = store.settings.vineyardLongitude ?? store.paddockCentroidLongitude
+        guard let lat, let lon else { return }
+        if let last = rainAlertService.lastIrrigationCheckDate,
+           Calendar.current.isDateInToday(last) {
+            return
+        }
+        let vineyardId = store.selectedVineyard?.id
+        let paddocks = vineyardId.map { vid in store.paddocks.filter { $0.vineyardId == vid } } ?? store.paddocks
+        await rainAlertService.checkIrrigationAndNotify(
+            latitude: lat,
+            longitude: lon,
+            paddocks: paddocks,
+            settings: store.settings
+        )
+    }
+
     @MainActor
     static func handleBackgroundRainCheck(task: BGAppRefreshTask) async {
         let service = RainAlertService()
@@ -146,7 +166,7 @@ struct VineTrackApp: App {
         store.load()
 
         let settings = store.settings
-        guard settings.rainAlertEnabled else {
+        guard settings.rainAlertEnabled || settings.irrigationAlertEnabled else {
             task.setTaskCompleted(success: true)
             return
         }
@@ -160,12 +180,23 @@ struct VineTrackApp: App {
         service.scheduleDailyBackgroundCheck()
 
         let checkTask = Task {
-            await service.checkForecastAndNotify(
-                latitude: lat,
-                longitude: lon,
-                windowDays: settings.rainAlertWindowDays,
-                thresholdMm: settings.rainAlertThresholdMm
-            )
+            if settings.rainAlertEnabled {
+                await service.checkForecastAndNotify(
+                    latitude: lat,
+                    longitude: lon,
+                    windowDays: settings.rainAlertWindowDays,
+                    thresholdMm: settings.rainAlertThresholdMm
+                )
+            }
+            if settings.irrigationAlertEnabled {
+                let paddocks = store.paddocks
+                await service.checkIrrigationAndNotify(
+                    latitude: lat,
+                    longitude: lon,
+                    paddocks: paddocks,
+                    settings: settings
+                )
+            }
         }
 
         task.expirationHandler = {
