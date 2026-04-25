@@ -3,11 +3,23 @@ import UIKit
 
 struct YieldDeterminationCalculatorView: View {
     @Environment(DataStore.self) private var store
+    @Environment(AuthService.self) private var authService
 
     enum PruneMethod: String, CaseIterable, Identifiable {
         case spur = "Spur"
         case cane = "Cane"
         var id: String { rawValue }
+    }
+
+    private nonisolated struct SavedSettings: Codable {
+        var pruneMethod: String
+        var bunchesPerBud: String
+        var budsPerSpur: String
+        var spursPerVine: String
+        var budsPerCane: String
+        var canesPerVine: String
+        var vinesPerHa: String
+        var bunchWeight: String
     }
 
     @State private var selectedPaddockId: UUID?
@@ -196,10 +208,58 @@ struct YieldDeterminationCalculatorView: View {
             if selectedPaddockId == nil {
                 selectedPaddockId = vineyardPaddocks.first?.id
             }
-            applyPaddockDefaults()
+            loadSettings(for: selectedPaddockId)
         }
-        .onChange(of: selectedPaddockId) { _, _ in
+        .onChange(of: selectedPaddockId) { oldValue, newValue in
+            if let oldValue { saveSettings(for: oldValue) }
+            loadSettings(for: newValue)
+        }
+        .onChange(of: pruneMethod) { _, _ in saveSettings(for: selectedPaddockId) }
+        .onChange(of: bunchesPerBudText) { _, _ in saveSettings(for: selectedPaddockId) }
+        .onChange(of: budsPerSpurText) { _, _ in saveSettings(for: selectedPaddockId) }
+        .onChange(of: spursPerVineText) { _, _ in saveSettings(for: selectedPaddockId) }
+        .onChange(of: budsPerCaneText) { _, _ in saveSettings(for: selectedPaddockId) }
+        .onChange(of: canesPerVineText) { _, _ in saveSettings(for: selectedPaddockId) }
+        .onChange(of: vinesPerHaText) { _, _ in saveSettings(for: selectedPaddockId) }
+        .onChange(of: bunchWeightText) { _, _ in saveSettings(for: selectedPaddockId) }
+    }
+
+    private func settingsKey(for paddockId: UUID) -> String? {
+        guard let userId = authService.userId, !userId.isEmpty else { return nil }
+        return "vinetrack_yield_determination_\(userId)_\(paddockId.uuidString)"
+    }
+
+    private func loadSettings(for paddockId: UUID?) {
+        guard let paddockId, let key = settingsKey(for: paddockId),
+              let data = UserDefaults.standard.data(forKey: key),
+              let saved = try? JSONDecoder().decode(SavedSettings.self, from: data) else {
             applyPaddockDefaults()
+            return
+        }
+        pruneMethod = PruneMethod(rawValue: saved.pruneMethod) ?? .spur
+        bunchesPerBudText = saved.bunchesPerBud
+        budsPerSpurText = saved.budsPerSpur
+        spursPerVineText = saved.spursPerVine
+        budsPerCaneText = saved.budsPerCane
+        canesPerVineText = saved.canesPerVine
+        vinesPerHaText = saved.vinesPerHa
+        bunchWeightText = saved.bunchWeight
+    }
+
+    private func saveSettings(for paddockId: UUID?) {
+        guard let paddockId, let key = settingsKey(for: paddockId) else { return }
+        let settings = SavedSettings(
+            pruneMethod: pruneMethod.rawValue,
+            bunchesPerBud: bunchesPerBudText,
+            budsPerSpur: budsPerSpurText,
+            spursPerVine: spursPerVineText,
+            budsPerCane: budsPerCaneText,
+            canesPerVine: canesPerVineText,
+            vinesPerHa: vinesPerHaText,
+            bunchWeight: bunchWeightText
+        )
+        if let data = try? JSONEncoder().encode(settings) {
+            UserDefaults.standard.set(data, forKey: key)
         }
     }
 
