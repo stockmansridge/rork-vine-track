@@ -258,13 +258,36 @@ class CloudSyncService {
         syncStatus = .syncing
 
         do {
-            let myMemberships: [VineyardMemberRecord] = try await supabase.from("vineyard_members")
+            let myMemberships: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
                 .select()
                 .eq("user_id", value: userId)
                 .execute()
-                .value
+                .value) ?? []
 
-            let vineyardIds = myMemberships.map { $0.vineyard_id }
+            let ownedVineyards: [VineyardRecord] = (try? await supabase.from("vineyards")
+                .select()
+                .eq("owner_id", value: userId)
+                .execute()
+                .value) ?? []
+
+            var idSet = Set<String>()
+            for m in myMemberships { idSet.insert(m.vineyard_id.lowercased()) }
+            for v in ownedVineyards { idSet.insert(v.id.lowercased()) }
+            let vineyardIds = Array(idSet)
+
+            for owned in ownedVineyards where !myMemberships.contains(where: { $0.vineyard_id.lowercased() == owned.id.lowercased() }) {
+                let memberRecord = VineyardMemberRecord(
+                    id: nil,
+                    vineyard_id: owned.id,
+                    user_id: userId,
+                    name: supabase.auth.currentUser?.email ?? "",
+                    role: VineyardRole.owner.rawValue,
+                    joined_at: nil
+                )
+                _ = try? await supabase.from("vineyard_members")
+                    .upsert(memberRecord, onConflict: "vineyard_id,user_id")
+                    .execute()
+            }
 
             guard !vineyardIds.isEmpty else {
                 syncStatus = .synced
