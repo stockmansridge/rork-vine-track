@@ -8,6 +8,8 @@ struct VineyardListView: View {
     @State private var showAddVineyard: Bool = false
     @State private var isRefreshing: Bool = false
     @State private var vineyardPendingDeletion: Vineyard?
+    @State private var showSignOutConfirm: Bool = false
+    @State private var lastSyncMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -32,6 +34,14 @@ struct VineyardListView: View {
                     }
                     .disabled(isRefreshing)
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showSignOutConfirm = true
+                    } label: {
+                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                    .accessibilityLabel("Sign out and return to login")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showAddVineyard = true
@@ -39,6 +49,18 @@ struct VineyardListView: View {
                         Image(systemName: "plus")
                     }
                 }
+            }
+            .confirmationDialog(
+                "Sign out of \(authService.userEmail.isEmpty ? "this account" : authService.userEmail)?",
+                isPresented: $showSignOutConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Sign Out", role: .destructive) {
+                    authService.signOut()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You'll be returned to the login screen so you can sign in with a different account.")
             }
             .refreshable { await refreshInvitations() }
             .sheet(isPresented: $showAddVineyard) {
@@ -57,76 +79,106 @@ struct VineyardListView: View {
         await authService.loadPendingInvitations()
         await cloudSync.claimVineyardsByEmail()
         await cloudSync.pullAllData(for: store)
+        switch cloudSync.syncStatus {
+        case .error(let msg):
+            lastSyncMessage = "Sync failed: \(msg)"
+        case .synced:
+            if store.vineyards.isEmpty && authService.pendingInvitations.isEmpty {
+                lastSyncMessage = "No vineyards or invitations were found for \(authService.userEmail). If you own a vineyard under a different email, sign out and sign in with that account."
+            } else {
+                lastSyncMessage = nil
+            }
+        default:
+            break
+        }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 20) {
+                Spacer(minLength: 24)
 
-            GrapeLeafIcon(size: 64)
-                .foregroundStyle(VineyardTheme.leafGreen.opacity(0.6))
+                GrapeLeafIcon(size: 64)
+                    .foregroundStyle(VineyardTheme.leafGreen.opacity(0.6))
 
-            VStack(spacing: 8) {
-                Text("Welcome to VineTrack")
-                    .font(.title2.weight(.semibold))
-                Text("Create your first vineyard to get started, or check for a pending invitation below.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-                if !authService.userEmail.isEmpty {
-                    Text("Signed in as \(authService.userEmail)")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                VStack(spacing: 8) {
+                    Text("Welcome to VineTrack")
+                        .font(.title2.weight(.semibold))
+                    Text("Create your first vineyard to get started, or check for a pending invitation below.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                    if !authService.userEmail.isEmpty {
+                        Text("Signed in as \(authService.userEmail)")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-            }
 
-            Button {
-                showAddVineyard = true
-            } label: {
-                Label("Create Vineyard", systemImage: "plus")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(VineyardTheme.olive)
-            .controlSize(.large)
-            .padding(.horizontal, 40)
-
-            Button {
-                Task { await refreshInvitations() }
-            } label: {
-                if isRefreshing {
-                    ProgressView()
-                } else {
-                    Label("Check for invitations", systemImage: "envelope.badge")
+                if let msg = lastSyncMessage {
+                    Text(msg)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 10)
                         .frame(maxWidth: .infinity)
+                        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 12))
+                        .padding(.horizontal, 24)
                 }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .padding(.horizontal, 40)
-            .disabled(isRefreshing)
 
-            Button(role: .destructive) {
-                authService.signOut()
-            } label: {
-                Label("Back to Login", systemImage: "arrow.backward.square")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .padding(.horizontal, 40)
+                VStack(spacing: 12) {
+                    Button {
+                        showAddVineyard = true
+                    } label: {
+                        Label("Create Vineyard", systemImage: "plus")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(VineyardTheme.olive)
+                    .controlSize(.large)
 
-            if let error = authService.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-            }
+                    Button {
+                        Task { await refreshInvitations() }
+                    } label: {
+                        if isRefreshing {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            Label("Check for invitations", systemImage: "envelope.badge")
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .disabled(isRefreshing)
 
-            Spacer()
+                    Button {
+                        showSignOutConfirm = true
+                    } label: {
+                        Label("Sign Out & Switch Account", systemImage: "rectangle.portrait.and.arrow.right")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                    .controlSize(.large)
+                }
+                .padding(.horizontal, 40)
+
+                if let error = authService.errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+
+                Spacer(minLength: 24)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
         }
         .background(Color(.systemGroupedBackground))
     }
