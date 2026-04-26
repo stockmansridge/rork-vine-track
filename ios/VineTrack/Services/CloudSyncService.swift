@@ -396,15 +396,9 @@ class CloudSyncService {
                 if let pre = prefetchedRecords[vid] {
                     record = pre
                 } else {
-                    // vineyards.id is stored as TEXT in mixed/uppercase form
-                    // (iOS UUID().uuidString produces uppercase). The lookup
-                    // must be case-insensitive or it returns 0 rows for any
-                    // user who isn't the owner -- breaking shared-team
-                    // accounts (e.g. admin@stockmansridge.com.au, an
-                    // Operator on Stockmans Ridge).
                     let records: [VineyardRecord] = (try? await supabase.from("vineyards")
                         .select()
-                        .or("id.eq.\(vid),id.eq.\(vid.uppercased())")
+                        .eq("id", value: vid)
                         .execute()
                         .value) ?? []
                     record = records.first
@@ -431,7 +425,7 @@ class CloudSyncService {
                     } else {
                         let allMembers: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
                             .select()
-                            .or("vineyard_id.eq.\(vid),vineyard_id.eq.\(vid.uppercased())")
+                            .eq("vineyard_id", value: vid)
                             .execute()
                             .value) ?? []
                         let memberIds = allMembers.map { $0.user_id.lowercased() }
