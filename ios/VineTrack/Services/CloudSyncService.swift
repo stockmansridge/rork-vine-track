@@ -216,6 +216,22 @@ class CloudSyncService {
         }
     }
 
+    /// Claims access to any vineyards owned by - or shared with - another
+    /// auth.users row that has the same email as the current user. Handles
+    /// the case where a user originally signed up with email/password and
+    /// later signs in via Google or Apple, which Supabase treats as a
+    /// separate auth identity. Backed by the SECURITY DEFINER RPC
+    /// `claim_vineyards_by_email`.
+    func claimVineyardsByEmail() async {
+        guard isConfigured, currentUserId != nil else { return }
+        do {
+            try await supabase.rpc("claim_vineyards_by_email").execute()
+            print("CloudSync: claim_vineyards_by_email RPC executed")
+        } catch {
+            print("CloudSync: claim_vineyards_by_email RPC failed (run sql/claim_vineyards_by_email.sql in Supabase): \(error)")
+        }
+    }
+
     // MARK: - Full Sync
 
     func syncAllData(from store: DataStore) async {

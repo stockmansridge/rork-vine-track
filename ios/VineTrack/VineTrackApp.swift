@@ -113,6 +113,7 @@ struct VineTrackApp: App {
                         analytics.track("user_signed_in")
                         Task {
                             await authService.loadPendingInvitations()
+                            await cloudSync.claimVineyardsByEmail()
                             await cloudSync.pullAllData(for: store)
                             await cloudSync.startRealtime(for: store)
                             await adminService.checkAdminStatus()
