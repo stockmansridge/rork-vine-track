@@ -511,6 +511,33 @@ class CloudSyncService {
         }
     }
 
+    /// Pulls every data record (pins, paddocks, trips, settings, …) for a
+    /// single vineyard and replaces the local copy with the cloud copy. Used
+    /// when the user switches vineyards so the new selection always shows
+    /// the cloud-authoritative state — no stale empties from local cache,
+    /// and no risk of an empty UI silently overwriting cloud data on the
+    /// next save.
+    func pullDataForVineyard(_ vineyardId: UUID, store: DataStore) async {
+        guard isConfigured else { return }
+        do {
+            let dataRecords: [SyncRecord] = try await supabase.from("vineyard_data")
+                .select()
+                .eq("vineyard_id", value: vineyardId.uuidString)
+                .execute()
+                .value
+
+            for record in dataRecords {
+                guard let jsonData = record.data.data(using: .utf8) else { continue }
+                let remoteDate = ISO8601DateFormatter().date(from: record.updated_at) ?? Date()
+                try mergeRecord(record.data_type, jsonData: jsonData, vineyardId: vineyardId, store: store, replace: true)
+                setLocalTimestamp(remoteDate, for: vineyardId, dataType: record.data_type)
+            }
+            store.reloadCurrentVineyardData()
+        } catch {
+            print("CloudSync: pullDataForVineyard failed for \(vineyardId): \(error)")
+        }
+    }
+
     /// Refresh just the members list for a specific vineyard from Supabase
     /// and update the local vineyard record. Used by the Team & Access screen
     /// so newly-accepted invitations appear without a full re-sync.

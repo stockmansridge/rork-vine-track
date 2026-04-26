@@ -344,13 +344,23 @@ class DataStore {
 
     func selectVineyard(_ vineyard: Vineyard) {
         selectedVineyardId = vineyard.id
-        // Refresh team membership from cloud so the access role for the
-        // newly-selected vineyard reflects the signed-in user's actual
-        // permissions for THIS vineyard (not stale local data from the
-        // previously selected one).
+        // Refresh team membership AND pull all data for this vineyard from
+        // cloud so the newly-selected vineyard always shows:
+        //   1. The signed-in user's correct role for THIS vineyard
+        //      (owner/manager/operator) — not a stale role cached from the
+        //      previously selected vineyard or a previous user on this device.
+        //   2. Authoritative data from the cloud, even if the local cache for
+        //      this vineyard is empty (fresh device, after a user switch, or
+        //      after a sign-out/sign-in cycle). Without this pull, switching
+        //      to a vineyard you've never opened on this device shows an
+        //      empty Today / Blocks list even though the data exists in the
+        //      cloud.
         if let cs = cloudSync, cs.isConfigured {
             let vid = vineyard.id
-            Task { await cs.refreshMembers(for: vid, store: self) }
+            Task {
+                await cs.refreshMembers(for: vid, store: self)
+                await cs.pullDataForVineyard(vid, store: self)
+            }
         }
     }
 
