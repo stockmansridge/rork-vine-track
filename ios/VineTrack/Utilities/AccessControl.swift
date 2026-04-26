@@ -17,6 +17,12 @@ class AccessControl {
               let uuid = UUID(uuidString: userId) else {
             return .operator_
         }
+        // If the signed-in user owns this vineyard (per cloud `owner_id`),
+        // they always have Owner privileges regardless of any stale or
+        // mis-set membership row that might list them with a lower role.
+        if let ownerId = vineyard.ownerId, ownerId == uuid {
+            return .owner
+        }
         if let user = vineyard.users.first(where: { $0.id == uuid }) {
             return user.role
         }

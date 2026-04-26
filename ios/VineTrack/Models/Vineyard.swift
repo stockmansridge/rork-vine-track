@@ -7,6 +7,7 @@ nonisolated struct Vineyard: Codable, Identifiable, Sendable, Hashable {
     let createdAt: Date
     var logoData: Data?
     var country: String
+    var ownerId: UUID?
 
     init(
         id: UUID = UUID(),
@@ -14,7 +15,8 @@ nonisolated struct Vineyard: Codable, Identifiable, Sendable, Hashable {
         users: [VineyardUser] = [],
         createdAt: Date = Date(),
         logoData: Data? = nil,
-        country: String = ""
+        country: String = "",
+        ownerId: UUID? = nil
     ) {
         self.id = id
         self.name = name
@@ -22,10 +24,11 @@ nonisolated struct Vineyard: Codable, Identifiable, Sendable, Hashable {
         self.createdAt = createdAt
         self.logoData = logoData
         self.country = country
+        self.ownerId = ownerId
     }
 
     nonisolated enum CodingKeys: String, CodingKey {
-        case id, name, users, createdAt, logoData, country
+        case id, name, users, createdAt, logoData, country, ownerId
     }
 
     nonisolated init(from decoder: Decoder) throws {
@@ -36,6 +39,7 @@ nonisolated struct Vineyard: Codable, Identifiable, Sendable, Hashable {
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         logoData = try container.decodeIfPresent(Data.self, forKey: .logoData)
         country = try container.decodeIfPresent(String.self, forKey: .country) ?? ""
+        ownerId = try container.decodeIfPresent(UUID.self, forKey: .ownerId)
     }
 }
 

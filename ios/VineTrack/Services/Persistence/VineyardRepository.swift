@@ -54,6 +54,7 @@ final class VineyardRepository {
             if let index = all.firstIndex(where: { $0.id == item.id }) {
                 var existing = all[index]
                 existing.users = item.users
+                if let oid = item.ownerId { existing.ownerId = oid }
                 all[index] = existing
             } else {
                 all.append(item)

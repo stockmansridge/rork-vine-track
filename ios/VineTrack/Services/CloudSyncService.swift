@@ -420,7 +420,8 @@ class CloudSyncService {
                         users: users,
                         createdAt: ISO8601DateFormatter().date(from: record.created_at ?? "") ?? Date(),
                         logoData: logoData,
-                        country: record.country ?? ""
+                        country: record.country ?? "",
+                        ownerId: record.owner_id.flatMap { UUID(uuidString: $0) }
                     )
                     vineyards.append(vineyard)
                 }

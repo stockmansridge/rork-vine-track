@@ -49,7 +49,11 @@ struct EditVineyardSheet: View {
                 name: authService.userName.isEmpty ? authService.userEmail : authService.userName,
                 role: .owner
             )
-            let newVineyard = Vineyard(name: name, users: [currentUser])
+            let newVineyard = Vineyard(
+                name: name,
+                users: [currentUser],
+                ownerId: UUID(uuidString: authService.userId ?? "")
+            )
             store.addVineyard(newVineyard)
             store.selectVineyard(newVineyard)
         }
