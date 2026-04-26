@@ -108,6 +108,16 @@ struct VineyardListView: View {
             .padding(.horizontal, 40)
             .disabled(isRefreshing)
 
+            Button(role: .destructive) {
+                authService.signOut()
+            } label: {
+                Label("Back to Login", systemImage: "arrow.backward.square")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .padding(.horizontal, 40)
+
             if let error = authService.errorMessage {
                 Text(error)
                     .font(.caption)
