@@ -217,7 +217,8 @@ class AuthService {
                 showEmailConfirmation = true
             }
         } catch {
-            errorMessage = error.localizedDescription
+            print("[AuthService] Email sign-up failed for \(email): \(error)")
+            errorMessage = authErrorMessage(for: error, fallback: "Couldn't create account")
         }
     }
 
@@ -252,7 +253,8 @@ class AuthService {
             isSignedIn = true
             persistUserLocally()
         } catch {
-            errorMessage = error.localizedDescription
+            print("[AuthService] Email sign-in failed for \(email): \(error)")
+            errorMessage = signInErrorMessage(for: error)
         }
     }
 
@@ -1098,6 +1100,36 @@ class AuthService {
 
     private func normalizedEmailAddress(_ email: String) -> String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func signInErrorMessage(for error: Error) -> String {
+        let rawMessage = "\(error)"
+        let localizedMessage = error.localizedDescription
+        let combinedMessage = "\(localizedMessage) \(rawMessage)"
+
+        if combinedMessage.localizedCaseInsensitiveContains("Invalid login credentials") || combinedMessage.localizedCaseInsensitiveContains("invalid_credentials") {
+            return "Incorrect email or password. If this worked before, use Forgot password to reset it, or confirm this build is connected to the same cloud project your account was created in."
+        }
+
+        if combinedMessage.localizedCaseInsensitiveContains("Email not confirmed") || combinedMessage.localizedCaseInsensitiveContains("email_not_confirmed") {
+            return "Please confirm your email address before signing in. Check your inbox for the confirmation email."
+        }
+
+        return authErrorMessage(for: error, fallback: "Sign in failed")
+    }
+
+    private func authErrorMessage(for error: Error, fallback: String) -> String {
+        let localizedMessage = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !localizedMessage.isEmpty {
+            return localizedMessage
+        }
+
+        let rawMessage = "\(error)".trimmingCharacters(in: .whitespacesAndNewlines)
+        if !rawMessage.isEmpty {
+            return rawMessage
+        }
+
+        return fallback
     }
 
     private func startAuthStateListener() {

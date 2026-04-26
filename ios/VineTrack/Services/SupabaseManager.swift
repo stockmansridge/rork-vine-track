@@ -2,10 +2,7 @@ import Foundation
 import Supabase
 
 private func envValue(_ key: String) -> String {
-    if let val = Config.allValues[key], !val.isEmpty {
-        return val
-    }
-    return ProcessInfo.processInfo.environment[key] ?? ""
+    Config.allValues[key] ?? ""
 }
 
 nonisolated(unsafe) let supabase: SupabaseClient = {
