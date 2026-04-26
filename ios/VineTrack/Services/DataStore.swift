@@ -1339,6 +1339,11 @@ class DataStore {
             UserDefaults.standard.removeObject(forKey: key)
         }
         UserDefaults.standard.removeObject(forKey: selectedVineyardIdKey)
+        // Clear sync timestamps so the next pullAllData refetches everything
+        // from the cloud. Without this, stale timestamps from the previous
+        // user cause the timestamp-based merge to skip pulling pins, trips,
+        // etc., leaving the new user with an empty Today section.
+        UserDefaults.standard.removeObject(forKey: "vinetrack_sync_timestamps")
         clearInMemoryState()
     }
 
