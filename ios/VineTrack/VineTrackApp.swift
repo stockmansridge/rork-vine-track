@@ -109,12 +109,21 @@ struct VineTrackApp: App {
                             }
                             store.load()
                         }
+                        cloudSync.resetInitialSyncFlag()
                         analytics.setUser(authService.userId)
                         analytics.track("user_signed_in")
                         Task {
                             await authService.loadPendingInvitations()
                             await cloudSync.claimVineyardsByEmail()
                             await cloudSync.pullAllData(for: store)
+                            if store.vineyards.isEmpty {
+                                // Shared-device case: claim_vineyards_by_email may have
+                                // just inserted a membership row. Pull once more so the
+                                // owner's existing vineyard appears without the user
+                                // having to tap "Check for invitations".
+                                await cloudSync.claimVineyardsByEmail()
+                                await cloudSync.pullAllData(for: store)
+                            }
                             await cloudSync.startRealtime(for: store)
                             await adminService.checkAdminStatus()
                         }

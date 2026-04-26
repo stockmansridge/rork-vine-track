@@ -57,6 +57,15 @@ nonisolated enum SyncStatus: Sendable {
 class CloudSyncService {
     var syncStatus: SyncStatus = .idle
     var lastSyncDate: Date?
+    /// Becomes `true` after the first `pullAllData` call has completed for the
+    /// current sign-in (success or failure). Used by `ContentView` so we don't
+    /// flash the "Welcome / Create vineyard" screen while the cloud is still
+    /// being queried for vineyards the user already owns or is a member of.
+    var hasCompletedInitialSync: Bool = false
+
+    func resetInitialSyncFlag() {
+        hasCompletedInitialSync = false
+    }
 
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -270,8 +279,12 @@ class CloudSyncService {
     }
 
     func pullAllData(for store: DataStore) async {
-        guard isConfigured, let userId = currentUserId else { return }
+        guard isConfigured, let userId = currentUserId else {
+            hasCompletedInitialSync = true
+            return
+        }
         syncStatus = .syncing
+        defer { hasCompletedInitialSync = true }
 
         do {
             let myMemberships: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")

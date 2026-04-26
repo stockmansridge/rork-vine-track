@@ -36,6 +36,8 @@ struct ContentView: View {
                 }
             } else if store.vineyards.isEmpty && !authService.pendingInvitations.isEmpty {
                 InvitationInboxView()
+            } else if store.vineyards.isEmpty && !cloudSync.hasCompletedInitialSync && !authService.isDemoMode {
+                syncingState
             } else if store.vineyards.isEmpty {
                 VineyardListView()
             } else {
@@ -74,6 +76,18 @@ struct ContentView: View {
                 hasAcceptedDisclaimer = false
             }
         }
+    }
+
+    private var syncingState: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Loading your vineyards…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
     }
 
     private var mainTabView: some View {
