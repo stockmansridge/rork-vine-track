@@ -287,6 +287,24 @@ class CloudSyncService {
         defer { hasCompletedInitialSync = true }
 
         do {
+            nonisolated struct VineyardIdRow: Codable, Sendable {
+                let vineyard_id: String
+            }
+
+            var idSet = Set<String>()
+
+            // Primary source of truth: server-side RPC that aggregates
+            // owner / membership / same-email matches and auto-heals
+            // missing vineyard_members rows for the current uid.
+            if let rows: [VineyardIdRow] = try? await supabase
+                .rpc("get_my_vineyard_ids")
+                .execute()
+                .value {
+                for r in rows { idSet.insert(r.vineyard_id.lowercased()) }
+            } else {
+                print("CloudSync: get_my_vineyard_ids RPC not available, using fallback (run sql/get_my_vineyard_ids.sql in Supabase)")
+            }
+
             let myMemberships: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
                 .select()
                 .eq("user_id", value: userId)
@@ -299,7 +317,6 @@ class CloudSyncService {
                 .execute()
                 .value) ?? []
 
-            var idSet = Set<String>()
             for m in myMemberships { idSet.insert(m.vineyard_id.lowercased()) }
             for v in ownedVineyards { idSet.insert(v.id.lowercased()) }
             let vineyardIds = Array(idSet)
