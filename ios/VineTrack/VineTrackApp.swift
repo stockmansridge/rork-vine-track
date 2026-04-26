@@ -96,6 +96,17 @@ struct VineTrackApp: App {
                 .onChange(of: authService.isSignedIn) { oldValue, isSignedIn in
                     if isSignedIn {
                         if !authService.isDemoMode {
+                            let lastUserKey = "vinetrack_last_signed_in_user_id"
+                            let previousUserId = UserDefaults.standard.string(forKey: lastUserKey)
+                            let currentUserId = authService.userId
+                            if let currentUserId,
+                               let previousUserId,
+                               previousUserId != currentUserId {
+                                store.resetForUserSwitch()
+                            }
+                            if let currentUserId {
+                                UserDefaults.standard.set(currentUserId, forKey: lastUserKey)
+                            }
                             store.load()
                         }
                         analytics.setUser(authService.userId)

@@ -1327,6 +1327,21 @@ class DataStore {
         workTasks = []
     }
 
+    /// Wipes everything (memory + disk) when switching to a different signed-in
+    /// user. Skips the role-based permission check that `deleteAllData()` uses,
+    /// because the previously-cached role belongs to a different user and must
+    /// not gate this reset.
+    func resetForUserSwitch() {
+        let keys = [pinsKey, paddocksKey, tripsKey, repairButtonsKey, growthButtonsKey, settingsKey, vineyardsKey, customPatternsKey, sprayRecordsKey, savedChemicalsKey, savedSprayPresetsKey, savedEquipmentOptionsKey, sprayEquipmentKey, tractorsKey, fuelPurchasesKey, operatorCategoriesKey, buttonTemplatesKey, yieldSessionsKey, damageRecordsKey, historicalYieldRecordsKey, maintenanceLogsKey, workTasksKey, grapeVarietiesKey]
+        for key in keys {
+            let fileURL = Self.storageDirectory.appendingPathComponent("\(key).json")
+            try? FileManager.default.removeItem(at: fileURL)
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+        UserDefaults.standard.removeObject(forKey: selectedVineyardIdKey)
+        clearInMemoryState()
+    }
+
     func clearInMemoryState() {
         pins = []
         paddocks = []

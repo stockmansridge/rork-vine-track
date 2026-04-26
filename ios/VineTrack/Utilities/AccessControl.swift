@@ -14,19 +14,22 @@ class AccessControl {
     var currentUserRole: VineyardRole {
         guard let vineyard = store.selectedVineyard else { return .operator_ }
         guard let userId = authService.userId,
-              let uuid = UUID(uuidString: userId),
-              let user = vineyard.users.first(where: { $0.id == uuid }) else {
-            if let user = vineyard.users.first(where: {
-                $0.name.lowercased() == authService.userName.lowercased()
-            }) {
-                return user.role
-            }
-            if vineyard.users.count == 1, let only = vineyard.users.first {
-                return only.role
-            }
+              let uuid = UUID(uuidString: userId) else {
             return .operator_
         }
-        return user.role
+        if let user = vineyard.users.first(where: { $0.id == uuid }) {
+            return user.role
+        }
+        // Email match is a safe secondary lookup (the signed-in user's own
+        // email cannot belong to another member). Name-based or "only user"
+        // fallbacks are intentionally removed: with stale local data they
+        // can hand the current user the previous user's role.
+        let email = authService.userEmail.lowercased()
+        if !email.isEmpty,
+           let user = vineyard.users.first(where: { $0.email.lowercased() == email }) {
+            return user.role
+        }
+        return .operator_
     }
 
     // MARK: - Permissions
