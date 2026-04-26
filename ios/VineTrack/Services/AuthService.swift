@@ -19,6 +19,7 @@ class AuthService {
     var pendingInvitations: [TeamInvitation] = []
     var sentInvitations: [TeamInvitation] = []
     var isDeletingAccount: Bool = false
+    var isAuthenticating: Bool = false
     var showEmailConfirmation: Bool = false
     var isOfflineSession: Bool = false
     var passwordResetMessage: String?
@@ -152,6 +153,9 @@ class AuthService {
         }
         let accessToken = user.accessToken.tokenString
 
+        isAuthenticating = true
+        defer { isAuthenticating = false }
+
         do {
             let session = try await supabase.auth.signInWithIdToken(
                 credentials: OpenIDConnectCredentials(
@@ -166,7 +170,7 @@ class AuthService {
             persistUserLocally()
             await createProfileIfNeeded()
         } catch {
-            errorMessage = "Google sign-in failed: \(error.localizedDescription)"
+            errorMessage = userFriendlyAuthError(error, provider: "Google")
         }
     }
 
@@ -241,6 +245,9 @@ class AuthService {
     }
 
     private func supabaseSignIn(email: String, password: String) async {
+        isAuthenticating = true
+        defer { isAuthenticating = false }
+
         do {
             let session = try await supabase.auth.signIn(
                 email: email,
@@ -252,7 +259,7 @@ class AuthService {
             isSignedIn = true
             persistUserLocally()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = userFriendlyAuthError(error, provider: "email")
         }
     }
 
@@ -521,6 +528,9 @@ class AuthService {
             return
         }
 
+        isAuthenticating = true
+        defer { isAuthenticating = false }
+
         do {
             let session = try await supabase.auth.signInWithIdToken(
                 credentials: OpenIDConnectCredentials(
@@ -529,7 +539,7 @@ class AuthService {
                     nonce: nonce
                 )
             )
-            userId = session.user.id.uuidString
+            userId = session.user.id.uuidString.lowercased()
             userEmail = session.user.email ?? credential.email ?? ""
 
             if let fullName = credential.fullName {
@@ -548,7 +558,7 @@ class AuthService {
             persistUserLocally()
             await createProfileIfNeeded()
         } catch {
-            errorMessage = "Apple sign-in failed: \(error.localizedDescription)"
+            errorMessage = userFriendlyAuthError(error, provider: "Apple")
         }
 
         currentNonce = nil
@@ -1092,6 +1102,26 @@ class AuthService {
 
     private func normalizedEmailAddress(_ email: String) -> String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func userFriendlyAuthError(_ error: Error, provider: String) -> String {
+        let rawMessage = String(describing: error)
+        let localized = error.localizedDescription
+        let combined = "\(localized) \(rawMessage)".lowercased()
+
+        if combined.contains("invalid login credentials") || combined.contains("invalid_credentials") {
+            return "Supabase rejected the email/password for this account. Use Forgot password to reset it, or sign in with the provider originally used for this account."
+        }
+
+        if combined.contains("provider") && combined.contains("not enabled") || combined.contains("provider_disabled") {
+            return "\(provider) sign-in is currently disabled in Supabase Auth for this backend. Use email/password or Apple sign-in until the provider is re-enabled."
+        }
+
+        if combined.contains("email not confirmed") || combined.contains("email_not_confirmed") {
+            return "Please confirm your email address before signing in."
+        }
+
+        return "\(provider) sign-in failed: \(localized)"
     }
 
     private func startAuthStateListener() {

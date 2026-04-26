@@ -7,11 +7,12 @@ struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @State private var hasAcceptedDisclaimer: Bool = false
     @State private var isCheckingDisclaimer: Bool = false
+    @State private var isLoadingInitialCloudData: Bool = false
 
     var body: some View {
         Group {
-            if authService.isLoading {
-                ProgressView()
+            if authService.isLoading || authService.isAuthenticating {
+                ProgressView(authService.isAuthenticating ? "Signing in…" : "")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(.systemGroupedBackground))
             } else if !authService.isSignedIn {
@@ -36,7 +37,7 @@ struct ContentView: View {
                 }
             } else if store.vineyards.isEmpty && !authService.pendingInvitations.isEmpty {
                 InvitationInboxView()
-            } else if store.vineyards.isEmpty && !cloudSync.hasCompletedInitialSync && !authService.isDemoMode {
+            } else if isLoadingInitialCloudData && store.vineyards.isEmpty && !authService.isDemoMode {
                 syncingState
             } else if store.vineyards.isEmpty {
                 VineyardListView()
@@ -77,8 +78,11 @@ struct ContentView: View {
                         isCheckingDisclaimer = false
                     }
                 }
+                runInitialCloudLoadIfNeeded()
             } else if !isSignedIn {
                 hasAcceptedDisclaimer = false
+                isCheckingDisclaimer = false
+                isLoadingInitialCloudData = false
             }
         }
     }
@@ -90,9 +94,31 @@ struct ContentView: View {
             Text("Loading your vineyards…")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            Button("Continue") {
+                isLoadingInitialCloudData = false
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
+    }
+
+    private func runInitialCloudLoadIfNeeded() {
+        guard authService.isSignedIn, !authService.isDemoMode else { return }
+        guard !isLoadingInitialCloudData else { return }
+        isLoadingInitialCloudData = true
+        Task {
+            await authService.loadPendingInvitations()
+            await cloudSync.claimVineyardsByEmail()
+            await cloudSync.pullAllData(for: store)
+            if store.vineyards.isEmpty {
+                await cloudSync.claimVineyardsByEmail()
+                await cloudSync.pullAllData(for: store)
+            }
+            await cloudSync.startRealtime(for: store)
+            isLoadingInitialCloudData = false
+        }
     }
 
     private var mainTabView: some View {
