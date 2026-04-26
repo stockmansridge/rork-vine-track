@@ -711,7 +711,32 @@ class AuthService {
 
     func loadPendingInvitations() async {
         let normalizedEmail: String = normalizedEmailAddress(userEmail)
-        guard isSupabaseConfigured, !normalizedEmail.isEmpty else {
+        guard isSupabaseConfigured else {
+            pendingInvitations = []
+            return
+        }
+
+        // Primary path: SECURITY DEFINER RPC that resolves the current
+        // user's email from auth.users (not the JWT email claim, which is
+        // sometimes missing for Google / Apple OIDC sign-ins on a fresh
+        // device). This bypasses RLS and reliably returns every pending
+        // invitation addressed to this user, even when the direct
+        // .from("invitations").select() below would return 0 rows.
+        if let rows: [TeamInvitation] = try? await supabase
+            .rpc("get_my_pending_invitations")
+            .execute()
+            .value {
+            pendingInvitations = rows
+            if errorMessage?.contains("Couldn't load invitations") == true {
+                errorMessage = nil
+            }
+            print("[AuthService] get_my_pending_invitations RPC returned \(rows.count) invitation(s)")
+            return
+        } else {
+            print("[AuthService] get_my_pending_invitations RPC unavailable, falling back (run sql/get_my_pending_invitations.sql in Supabase)")
+        }
+
+        guard !normalizedEmail.isEmpty else {
             pendingInvitations = []
             return
         }
