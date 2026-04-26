@@ -268,6 +268,73 @@ class CloudSyncService {
         }
     }
 
+    private func vineyardRole(from rawValue: String) -> VineyardRole {
+        switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "owner":
+            return .owner
+        case "manager":
+            return .manager
+        case "supervisor":
+            return .supervisor
+        default:
+            return .operator_
+        }
+    }
+
+    private func pullAccessSnapshot(for store: DataStore) async -> Bool {
+        do {
+            let payload = try await VineyardAccessService.fetch()
+            store.authService?.pendingInvitations = payload.pendingInvitations
+
+            let membersByVineyard = Dictionary(grouping: payload.members) { row in
+                row.vineyard_id.lowercased()
+            }
+
+            let vineyards: [Vineyard] = payload.vineyards.map { record in
+                let users = (membersByVineyard[record.id.lowercased()] ?? []).map { member in
+                    VineyardUser(
+                        id: UUID(uuidString: member.user_id) ?? UUID(),
+                        name: Self.preferredName(displayName: member.display_name ?? "", email: member.email ?? ""),
+                        email: member.email ?? "",
+                        role: vineyardRole(from: member.role)
+                    )
+                }
+                let resolvedUsers = ensureCurrentUserIncluded(in: users, vineyard: record)
+                let logoData = record.logo_data.flatMap { Data(base64Encoded: $0) }
+                return Vineyard(
+                    id: UUID(uuidString: record.id) ?? UUID(),
+                    name: record.name,
+                    users: resolvedUsers,
+                    createdAt: ISO8601DateFormatter().date(from: record.created_at ?? "") ?? Date(),
+                    logoData: logoData,
+                    country: record.country ?? "",
+                    ownerId: record.owner_id.flatMap { UUID(uuidString: $0) }
+                )
+            }
+
+            if !vineyards.isEmpty {
+                store.mergeVineyards(vineyards)
+            }
+
+            for record in payload.vineyardData {
+                guard let vineyardId = UUID(uuidString: record.vineyard_id),
+                      let jsonData = record.data.data(using: .utf8) else { continue }
+                try mergeRecord(record.data_type, jsonData: jsonData, vineyardId: vineyardId, store: store, replace: true)
+                let remoteDate = ISO8601DateFormatter().date(from: record.updated_at) ?? Date()
+                setLocalTimestamp(remoteDate, for: vineyardId, dataType: record.data_type)
+            }
+
+            store.reloadCurrentVineyardData()
+            syncStatus = .synced
+            lastSyncDate = Date()
+            print("CloudSync: access snapshot loaded \(vineyards.count) vineyard(s), \(payload.pendingInvitations.count) invitation(s), \(payload.vineyardData.count) data record(s)")
+            return !vineyards.isEmpty || !payload.pendingInvitations.isEmpty || !payload.vineyardData.isEmpty
+        } catch {
+            print("CloudSync: access snapshot failed, falling back: \(error)")
+            return false
+        }
+    }
+
     // MARK: - Full Sync
 
     func syncAllData(from store: DataStore) async {
@@ -312,6 +379,10 @@ class CloudSyncService {
         }
         syncStatus = .syncing
         defer { hasCompletedInitialSync = true }
+
+        if await pullAccessSnapshot(for: store) {
+            return
+        }
 
         do {
             nonisolated struct VineyardIdRow: Codable, Sendable {
@@ -419,7 +490,7 @@ class CloudSyncService {
                                 id: UUID(uuidString: r.user_id) ?? UUID(),
                                 name: Self.preferredName(displayName: r.display_name, email: r.email),
                                 email: r.email,
-                                role: VineyardRole(rawValue: r.role) ?? .operator_
+                                role: vineyardRole(from: r.role)
                             )
                         }
                     } else {
@@ -449,7 +520,7 @@ class CloudSyncService {
                                 id: UUID(uuidString: m.user_id) ?? UUID(),
                                 name: resolvedName,
                                 email: email,
-                                role: VineyardRole(rawValue: m.role) ?? .operator_
+                                role: vineyardRole(from: m.role)
                             )
                         }
                     }

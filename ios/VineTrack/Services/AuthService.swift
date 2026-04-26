@@ -716,12 +716,18 @@ class AuthService {
             return
         }
 
-        // Primary path: SECURITY DEFINER RPC that resolves the current
-        // user's email from auth.users (not the JWT email claim, which is
-        // sometimes missing for Google / Apple OIDC sign-ins on a fresh
-        // device). This bypasses RLS and reliably returns every pending
-        // invitation addressed to this user, even when the direct
-        // .from("invitations").select() below would return 0 rows.
+        do {
+            let payload = try await VineyardAccessService.fetch()
+            pendingInvitations = payload.pendingInvitations
+            if errorMessage?.contains("Couldn't load invitations") == true {
+                errorMessage = nil
+            }
+            print("[AuthService] access snapshot returned \(payload.pendingInvitations.count) invitation(s)")
+            return
+        } catch {
+            print("[AuthService] access snapshot invitation lookup failed, falling back: \(error)")
+        }
+
         if let rows: [TeamInvitation] = try? await supabase
             .rpc("get_my_pending_invitations")
             .execute()
