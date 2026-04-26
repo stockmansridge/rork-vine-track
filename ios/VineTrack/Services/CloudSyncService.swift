@@ -519,22 +519,49 @@ class CloudSyncService {
     /// next save.
     func pullDataForVineyard(_ vineyardId: UUID, store: DataStore) async {
         guard isConfigured else { return }
-        do {
-            let dataRecords: [SyncRecord] = try await supabase.from("vineyard_data")
-                .select()
-                .eq("vineyard_id", value: vineyardId.uuidString)
-                .execute()
-                .value
+        let vidLower = vineyardId.uuidString.lowercased()
+        var lastError: Error?
+        for attempt in 1...2 {
+            do {
+                let dataRecords: [SyncRecord] = try await supabase.from("vineyard_data")
+                    .select()
+                    .eq("vineyard_id", value: vidLower)
+                    .execute()
+                    .value
 
-            for record in dataRecords {
-                guard let jsonData = record.data.data(using: .utf8) else { continue }
-                let remoteDate = ISO8601DateFormatter().date(from: record.updated_at) ?? Date()
-                try mergeRecord(record.data_type, jsonData: jsonData, vineyardId: vineyardId, store: store, replace: true)
-                setLocalTimestamp(remoteDate, for: vineyardId, dataType: record.data_type)
+                print("CloudSync: pullDataForVineyard \(vidLower) returned \(dataRecords.count) record(s) (attempt \(attempt))")
+
+                for record in dataRecords {
+                    guard let jsonData = record.data.data(using: .utf8) else { continue }
+                    let remoteDate = ISO8601DateFormatter().date(from: record.updated_at) ?? Date()
+                    do {
+                        try mergeRecord(record.data_type, jsonData: jsonData, vineyardId: vineyardId, store: store, replace: true)
+                        setLocalTimestamp(remoteDate, for: vineyardId, dataType: record.data_type)
+                    } catch {
+                        print("CloudSync: merge failed for \(record.data_type) on \(vidLower): \(error)")
+                    }
+                }
+                store.reloadCurrentVineyardData()
+                lastError = nil
+                if dataRecords.isEmpty && attempt == 1 {
+                    // Empty result on first try right after a vineyard switch is
+                    // often an RLS race (auth identity not fully propagated yet
+                    // for the vineyard_members row). Retry once after a short
+                    // delay before declaring the vineyard genuinely empty.
+                    try? await Task.sleep(for: .milliseconds(600))
+                    continue
+                }
+                return
+            } catch {
+                lastError = error
+                print("CloudSync: pullDataForVineyard failed for \(vidLower) (attempt \(attempt)): \(error)")
+                if attempt < 2 {
+                    try? await Task.sleep(for: .milliseconds(600))
+                }
             }
-            store.reloadCurrentVineyardData()
-        } catch {
-            print("CloudSync: pullDataForVineyard failed for \(vineyardId): \(error)")
+        }
+        if let lastError {
+            syncStatus = .error("Couldn't load vineyard data: \(lastError.localizedDescription)")
         }
     }
 

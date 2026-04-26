@@ -43,6 +43,10 @@ class DataStore {
     weak var authService: AuthService?
     weak var accessControl: AccessControl?
 
+    /// In-flight cloud pull triggered by `selectVineyard`. Cancelled when the
+    /// user switches again so a stale pull cannot stomp on the new selection.
+    private var vineyardSwitchTask: Task<Void, Never>?
+
     // MARK: - Repositories (Phase 1)
     // Owns persistence + merge/replace logic for their domain.
     // DataStore delegates file I/O here instead of doing it inline.
@@ -355,11 +359,22 @@ class DataStore {
         //      to a vineyard you've never opened on this device shows an
         //      empty Today / Blocks list even though the data exists in the
         //      cloud.
-        if let cs = cloudSync, cs.isConfigured {
-            let vid = vineyard.id
-            Task {
-                await cs.refreshMembers(for: vid, store: self)
-                await cs.pullDataForVineyard(vid, store: self)
+        guard let cs = cloudSync, cs.isConfigured else { return }
+        let vid = vineyard.id
+        // Cancel any previous switch's pull so a slow stale fetch can't
+        // overwrite the data we just loaded for the new selection.
+        vineyardSwitchTask?.cancel()
+        vineyardSwitchTask = Task { [weak self] in
+            guard let self else { return }
+            // Run members + data pull concurrently — the data pull no longer
+            // has to wait for an unrelated members RPC round-trip.
+            async let membersPull: Void = cs.refreshMembers(for: vid, store: self)
+            async let dataPull: Void = cs.pullDataForVineyard(vid, store: self)
+            _ = await (membersPull, dataPull)
+            // If the user has switched again while we were pulling, ignore
+            // this result so we don't briefly flash old-vineyard data.
+            if self.selectedVineyardId == vid {
+                self.reloadCurrentVineyardData()
             }
         }
     }
