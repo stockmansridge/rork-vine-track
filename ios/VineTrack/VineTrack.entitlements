@@ -6,9 +6,5 @@
 	<array>
 		<string>Default</string>
 	</array>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.app.rork.nt0v48tayl7v8noxcfe74</string>
-	</array>
 </dict>
 </plist>
