@@ -29,8 +29,8 @@ class AuthService {
     var passwordResetPendingEmail: String = ""
     var isVerifyingResetCode: Bool = false
 
-    static let passwordResetRedirectURL = URL(string: "vinetrack://auth-callback")!
-    static let emailConfirmRedirectURL = URL(string: "vinetrack://auth-callback")!
+    static let passwordResetRedirectURL = URL(string: "vinetrack://reset-password?flow=recovery")!
+    static let emailConfirmRedirectURL = URL(string: "vinetrack://auth-callback?flow=signup")!
 
     private var authStateChangesTask: Task<Void, Never>?
 
@@ -252,6 +252,7 @@ class AuthService {
             userName = session.user.userMetadata["full_name"]?.value as? String ?? email
             isSignedIn = true
             persistUserLocally()
+            await createProfileIfNeeded()
         } catch {
             print("[AuthService] Email sign-in failed for \(email): \(error)")
             errorMessage = signInErrorMessage(for: error)
@@ -277,14 +278,18 @@ class AuthService {
         }
 
         isSendingPasswordReset = true
-        print("[AuthService] resetPasswordForEmail (code flow) for: \(trimmedEmail)")
+        print("[AuthService] resetPasswordForEmail for: \(trimmedEmail)")
         Task {
             do {
-                try await supabase.auth.resetPasswordForEmail(trimmedEmail)
+                try await supabase.auth.resetPasswordForEmail(
+                    trimmedEmail,
+                    redirectTo: Self.passwordResetRedirectURL
+                )
                 passwordResetPendingEmail = trimmedEmail
-                showPasswordResetCodeEntry = true
-                passwordResetMessage = "We sent a 6-digit code to \(trimmedEmail). Enter it below to reset your password."
+                showPasswordResetCodeEntry = false
+                passwordResetMessage = "If an account exists for \(trimmedEmail), a password reset link has been sent. Open that link on this device to set a new password."
             } catch {
+                print("[AuthService] resetPasswordForEmail failed for \(trimmedEmail): \(error)")
                 errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
             }
             isSendingPasswordReset = false
@@ -1108,7 +1113,7 @@ class AuthService {
         let combinedMessage = "\(localizedMessage) \(rawMessage)"
 
         if combinedMessage.localizedCaseInsensitiveContains("Invalid login credentials") || combinedMessage.localizedCaseInsensitiveContains("invalid_credentials") {
-            return "Incorrect email or password. If this worked before, use Forgot password to reset it, or confirm this build is connected to the same cloud project your account was created in."
+            return "Incorrect email or password. Use Forgot password to send a secure reset link, then sign in with the new password."
         }
 
         if combinedMessage.localizedCaseInsensitiveContains("Email not confirmed") || combinedMessage.localizedCaseInsensitiveContains("email_not_confirmed") {
