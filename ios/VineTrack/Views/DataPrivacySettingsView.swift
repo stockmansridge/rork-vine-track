@@ -7,6 +7,9 @@ struct DataPrivacySettingsView: View {
     @State private var showDeletePinsAlert: Bool = false
     @State private var showDeleteTripsAlert: Bool = false
     @State private var isSyncing: Bool = false
+    @State private var isRestoring: Bool = false
+    @State private var showRestoreAlert: Bool = false
+    @State private var restoreCompletedMessage: String?
 
     var body: some View {
         Form {
@@ -137,7 +140,39 @@ struct DataPrivacySettingsView: View {
                 } label: {
                     Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
                 }
-                .disabled(isSyncing)
+                .disabled(isSyncing || isRestoring)
+
+                Button {
+                    showRestoreAlert = true
+                } label: {
+                    HStack {
+                        Label("Restore from Cloud", systemImage: "icloud.and.arrow.down")
+                        if isRestoring {
+                            Spacer()
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                }
+                .disabled(isSyncing || isRestoring)
+                .alert("Restore from Cloud?", isPresented: $showRestoreAlert) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Restore") {
+                        isRestoring = true
+                        Task {
+                            await cloudSync.forcePullAllData(for: store)
+                            isRestoring = false
+                            restoreCompletedMessage = "Local data has been refreshed from the cloud."
+                        }
+                    }
+                } message: {
+                    Text("This downloads the latest copy of every vineyard's data from the cloud and replaces the local copy on this device. Use this if blocks, pins or other data appear missing.")
+                }
+
+                if let restoreCompletedMessage {
+                    Text(restoreCompletedMessage)
+                        .font(.caption)
+                        .foregroundStyle(VineyardTheme.leafGreen)
+                }
             }
         } header: {
             HStack(spacing: 6) {

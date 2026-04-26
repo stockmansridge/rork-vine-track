@@ -128,6 +128,22 @@ class CloudSyncService {
         UserDefaults.standard.set(dict, forKey: syncTimestampsKey)
     }
 
+    /// Wipes all local sync timestamps so the next `pullAllData` treats the
+    /// cloud copy as authoritative for every (vineyard, data_type) pair.
+    /// Used by the "Restore from Cloud" button when the local store has
+    /// drifted out of sync (e.g. blocks appear missing even though the cloud
+    /// still holds them).
+    func clearAllLocalSyncTimestamps() {
+        UserDefaults.standard.removeObject(forKey: syncTimestampsKey)
+    }
+
+    /// Force a fresh pull from the cloud, ignoring any local timestamps.
+    /// Cloud data wins for every record returned.
+    func forcePullAllData(for store: DataStore) async {
+        clearAllLocalSyncTimestamps()
+        await pullAllData(for: store)
+    }
+
     // MARK: - Real-time Subscriptions
 
     func startRealtime(for store: DataStore) async {
@@ -220,7 +236,12 @@ class CloudSyncService {
                 let remoteDate = ISO8601DateFormatter().date(from: record.updated_at) ?? Date.distantPast
                 let localDate = localTimestamp(for: vineyardId, dataType: dataType)
 
-                if localDate == nil || remoteDate > localDate! {
+                let cloudHasContent = record.data.count > 4
+                let localIsEmpty = !store.hasLocalData(forDataType: dataType, vineyardId: vineyardId)
+                let shouldReplace = localDate == nil
+                    || remoteDate > localDate!
+                    || (cloudHasContent && localIsEmpty)
+                if shouldReplace {
                     try mergeRecord(record.data_type, jsonData: jsonData, vineyardId: vineyardId, store: store, replace: true)
                     setLocalTimestamp(remoteDate, for: vineyardId, dataType: dataType)
                 }
@@ -470,7 +491,12 @@ class CloudSyncService {
                     let remoteDate = ISO8601DateFormatter().date(from: record.updated_at) ?? Date.distantPast
                     let localDate = localTimestamp(for: vineyardUUID, dataType: record.data_type)
 
-                    if localDate == nil || remoteDate > localDate! {
+                    let cloudHasContent = record.data.count > 4
+                    let localIsEmpty = !store.hasLocalData(forDataType: record.data_type, vineyardId: vineyardUUID)
+                    let shouldReplace = localDate == nil
+                        || remoteDate > localDate!
+                        || (cloudHasContent && localIsEmpty)
+                    if shouldReplace {
                         try mergeRecord(record.data_type, jsonData: jsonData, vineyardId: vineyardUUID, store: store, replace: true)
                         setLocalTimestamp(remoteDate, for: vineyardUUID, dataType: record.data_type)
                     }
