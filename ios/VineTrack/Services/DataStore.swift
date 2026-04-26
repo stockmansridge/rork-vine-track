@@ -344,6 +344,14 @@ class DataStore {
 
     func selectVineyard(_ vineyard: Vineyard) {
         selectedVineyardId = vineyard.id
+        // Refresh team membership from cloud so the access role for the
+        // newly-selected vineyard reflects the signed-in user's actual
+        // permissions for THIS vineyard (not stale local data from the
+        // previously selected one).
+        if let cs = cloudSync, cs.isConfigured {
+            let vid = vineyard.id
+            Task { await cs.refreshMembers(for: vid, store: self) }
+        }
     }
 
     // MARK: - Pin CRUD

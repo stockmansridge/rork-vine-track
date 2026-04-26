@@ -40,6 +40,11 @@ struct ContentView: View {
                 syncingState
             } else if store.vineyards.isEmpty {
                 VineyardListView()
+            } else if store.selectedVineyard == nil {
+                // Multiple vineyards available but none selected (e.g.
+                // first sign-in on a fresh device, or after switching
+                // accounts). Let the user pick which vineyard to enter.
+                VineyardListView()
             } else {
                 mainTabView
             }

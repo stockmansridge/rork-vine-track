@@ -28,6 +28,12 @@ nonisolated struct VineyardMemberRecord: Codable, Sendable {
     let joined_at: String?
 }
 
+nonisolated struct ProfileRow: Codable, Sendable {
+    let id: String
+    let email: String?
+    let name: String?
+}
+
 nonisolated struct MemberWithEmailRow: Codable, Sendable {
     let user_id: String
     let email: String
@@ -401,15 +407,32 @@ class CloudSyncService {
                             .eq("vineyard_id", value: vid)
                             .execute()
                             .value) ?? []
+                        let memberIds = allMembers.map { $0.user_id.lowercased() }
+                        var profileById: [String: ProfileRow] = [:]
+                        if !memberIds.isEmpty {
+                            let profiles: [ProfileRow] = (try? await supabase.from("profiles")
+                                .select()
+                                .in("id", values: memberIds)
+                                .execute()
+                                .value) ?? []
+                            for p in profiles { profileById[p.id.lowercased()] = p }
+                        }
                         users = allMembers.map { m in
-                            VineyardUser(
+                            let profile = profileById[m.user_id.lowercased()]
+                            let email = profile?.email ?? ""
+                            let resolvedName = Self.preferredName(
+                                displayName: profile?.name ?? m.name,
+                                email: email
+                            )
+                            return VineyardUser(
                                 id: UUID(uuidString: m.user_id) ?? UUID(),
-                                name: m.name,
-                                email: "",
+                                name: resolvedName,
+                                email: email,
                                 role: VineyardRole(rawValue: m.role) ?? .operator_
                             )
                         }
                     }
+                    users = ensureCurrentUserIncluded(in: users, vineyard: record)
                     var logoData: Data?
                     if let logoBase64 = record.logo_data {
                         logoData = Data(base64Encoded: logoBase64)
@@ -504,15 +527,36 @@ class CloudSyncService {
                 .execute()
                 .value) ?? []
 
+            let memberIds = members.map { $0.user_id.lowercased() }
+            var profileById: [String: ProfileRow] = [:]
+            if !memberIds.isEmpty {
+                let profiles: [ProfileRow] = (try? await supabase.from("profiles")
+                    .select()
+                    .in("id", values: memberIds)
+                    .execute()
+                    .value) ?? []
+                for p in profiles { profileById[p.id.lowercased()] = p }
+            }
             users = members.map { m in
-                VineyardUser(
+                let profile = profileById[m.user_id.lowercased()]
+                let email = profile?.email ?? ""
+                let resolvedName = Self.preferredName(
+                    displayName: profile?.name ?? m.name,
+                    email: email
+                )
+                return VineyardUser(
                     id: UUID(uuidString: m.user_id) ?? UUID(),
-                    name: m.name,
-                    email: "",
+                    name: resolvedName,
+                    email: email,
                     role: VineyardRole(rawValue: m.role) ?? .operator_
                 )
             }
         }
+
+        users = ensureCurrentUserIncluded(
+            in: users,
+            vineyardOwnerId: store.vineyards.first(where: { $0.id == vineyardId })?.ownerId
+        )
 
         guard var vineyard = store.vineyards.first(where: { $0.id == vineyardId }) else { return }
 
@@ -528,6 +572,42 @@ class CloudSyncService {
 
         vineyard.users = users
         store.updateVineyardUsers(vineyard)
+    }
+
+    /// Ensures the currently signed-in user appears in the members list. If
+    /// they're missing (RPC didn't return them, RLS hid the row, or their
+    /// vineyard_members entry hasn't been written yet) we synthesise one
+    /// using AuthService data so the Team & Access screen never hides the
+    /// person who is actually viewing it. Role is inferred from cloud
+    /// owner_id when possible.
+    private func ensureCurrentUserIncluded(in users: [VineyardUser], vineyard: VineyardRecord) -> [VineyardUser] {
+        let ownerId = vineyard.owner_id.flatMap { UUID(uuidString: $0) }
+        return ensureCurrentUserIncluded(in: users, vineyardOwnerId: ownerId)
+    }
+
+    private func ensureCurrentUserIncluded(in users: [VineyardUser], vineyardOwnerId: UUID?) -> [VineyardUser] {
+        guard let uidString = currentUserId, let uuid = UUID(uuidString: uidString) else { return users }
+        let email = (supabase.auth.currentUser?.email ?? "").lowercased()
+        let name = supabase.auth.currentUser?.userMetadata["full_name"]?.value as? String
+            ?? supabase.auth.currentUser?.email
+            ?? ""
+
+        if users.contains(where: { $0.id == uuid }) { return users }
+        if !email.isEmpty,
+           let idx = users.firstIndex(where: { $0.email.lowercased() == email }) {
+            // Already represented by an alias row — leave it.
+            _ = idx
+            return users
+        }
+
+        let inferredRole: VineyardRole = (vineyardOwnerId == uuid) ? .owner : .operator_
+        let synthetic = VineyardUser(
+            id: uuid,
+            name: Self.preferredName(displayName: name, email: email),
+            email: email,
+            role: inferredRole
+        )
+        return users + [synthetic]
     }
 
     /// Update a member's role in the vineyard_members table. Called from the
