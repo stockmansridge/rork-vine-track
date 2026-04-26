@@ -292,10 +292,29 @@ class CloudSyncService {
             }
 
             var idSet = Set<String>()
+            // Vineyard records pre-fetched via SECURITY DEFINER RPC so we
+            // don't depend on the per-row RLS SELECT on `vineyards` for the
+            // current auth identity. This is critical on shared devices /
+            // fresh Google sign-ins where the just-inserted vineyard_members
+            // row hasn't yet propagated for the new uid.
+            var prefetchedRecords: [String: VineyardRecord] = [:]
 
-            // Primary source of truth: server-side RPC that aggregates
-            // owner / membership / same-email matches and auto-heals
-            // missing vineyard_members rows for the current uid.
+            if let rows: [VineyardRecord] = try? await supabase
+                .rpc("get_my_vineyards_full")
+                .execute()
+                .value {
+                for r in rows {
+                    let key = r.id.lowercased()
+                    idSet.insert(key)
+                    prefetchedRecords[key] = r
+                }
+            } else {
+                print("CloudSync: get_my_vineyards_full RPC not available, falling back (run sql/get_my_vineyards_full.sql in Supabase)")
+            }
+
+            // Fallback: server-side RPC that aggregates owner /
+            // membership / same-email matches and auto-heals missing
+            // vineyard_members rows for the current uid.
             if let rows: [VineyardIdRow] = try? await supabase
                 .rpc("get_my_vineyard_ids")
                 .execute()
@@ -318,7 +337,10 @@ class CloudSyncService {
                 .value) ?? []
 
             for m in myMemberships { idSet.insert(m.vineyard_id.lowercased()) }
-            for v in ownedVineyards { idSet.insert(v.id.lowercased()) }
+            for v in ownedVineyards {
+                idSet.insert(v.id.lowercased())
+                prefetchedRecords[v.id.lowercased()] = v
+            }
             let vineyardIds = Array(idSet)
 
             for owned in ownedVineyards where !myMemberships.contains(where: { $0.vineyard_id.lowercased() == owned.id.lowercased() }) {
@@ -343,13 +365,19 @@ class CloudSyncService {
 
             var vineyards: [Vineyard] = []
             for vid in vineyardIds {
-                let records: [VineyardRecord] = try await supabase.from("vineyards")
-                    .select()
-                    .eq("id", value: vid)
-                    .execute()
-                    .value
+                let record: VineyardRecord?
+                if let pre = prefetchedRecords[vid] {
+                    record = pre
+                } else {
+                    let records: [VineyardRecord] = (try? await supabase.from("vineyards")
+                        .select()
+                        .eq("id", value: vid)
+                        .execute()
+                        .value) ?? []
+                    record = records.first
+                }
 
-                if let record = records.first {
+                if let record {
                     nonisolated struct RPCParams: Codable, Sendable {
                         let p_vineyard_id: String
                     }
@@ -400,6 +428,8 @@ class CloudSyncService {
 
             if !vineyards.isEmpty {
                 store.mergeVineyards(vineyards)
+            } else if !vineyardIds.isEmpty {
+                print("CloudSync: \(vineyardIds.count) vineyard ids returned but no vineyard records could be loaded - check RLS / run sql/get_my_vineyards_full.sql")
             }
 
             for vid in vineyardIds {
