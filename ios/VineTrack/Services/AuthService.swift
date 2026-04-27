@@ -283,18 +283,7 @@ class AuthService {
                 passwordResetMessage = "If an account exists for \(trimmedEmail), a password reset link has been sent. Open that link on this device to set a new password."
             } catch {
                 print("[AuthService] recovery email function failed for \(trimmedEmail): \(error)")
-                do {
-                    try await supabase.auth.resetPasswordForEmail(
-                        trimmedEmail,
-                        redirectTo: Self.passwordResetRedirectURL
-                    )
-                    passwordResetPendingEmail = trimmedEmail
-                    showPasswordResetCodeEntry = false
-                    passwordResetMessage = "If an account exists for \(trimmedEmail), a password reset link has been requested. If it does not arrive, contact support because the mail service is rejecting recovery emails."
-                } catch {
-                    print("[AuthService] resetPasswordForEmail failed for \(trimmedEmail): \(error)")
-                    errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
-                }
+                errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
             }
             isSendingPasswordReset = false
         }
@@ -1174,7 +1163,15 @@ class AuthService {
 
         isOfflineSession = false
         await createProfileIfNeeded()
-        _ = try? await VineyardAccessService.fetch()
+        do {
+            let payload = try await VineyardAccessService.fetch()
+            pendingInvitations = payload.pendingInvitations
+            if errorMessage?.contains("Couldn't load invitations") == true {
+                errorMessage = nil
+            }
+        } catch {
+            print("[AuthService] access snapshot after sign-in failed: \(error)")
+        }
         isSignedIn = true
         persistUserLocally()
     }

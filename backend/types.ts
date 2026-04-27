@@ -18,13 +18,300 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      invitations: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          invited_by_name: string | null
+          role: string
+          status: string
+          vineyard_id: string | null
+          vineyard_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invited_by?: string | null
+          invited_by_name?: string | null
+          role?: string
+          status?: string
+          vineyard_id?: string | null
+          vineyard_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          invited_by_name?: string | null
+          role?: string
+          status?: string
+          vineyard_id?: string | null
+          vineyard_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_vineyard_id_fkey"
+            columns: ["vineyard_id"]
+            isOneToOne: false
+            referencedRelation: "vineyards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_admin: boolean
+          name: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          id: string
+          is_admin?: boolean
+          name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_admin?: boolean
+          name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vineyard_data: {
+        Row: {
+          data: string
+          data_type: string
+          id: string
+          updated_at: string
+          vineyard_id: string
+        }
+        Insert: {
+          data?: string
+          data_type: string
+          id: string
+          updated_at?: string
+          vineyard_id: string
+        }
+        Update: {
+          data?: string
+          data_type?: string
+          id?: string
+          updated_at?: string
+          vineyard_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vineyard_data_vineyard_id_fkey"
+            columns: ["vineyard_id"]
+            isOneToOne: false
+            referencedRelation: "vineyards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vineyard_members: {
+        Row: {
+          id: string
+          joined_at: string
+          name: string
+          role: string
+          user_id: string
+          vineyard_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          name?: string
+          role?: string
+          user_id: string
+          vineyard_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          name?: string
+          role?: string
+          user_id?: string
+          vineyard_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vineyard_members_vineyard_id_fkey"
+            columns: ["vineyard_id"]
+            isOneToOne: false
+            referencedRelation: "vineyards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vineyards: {
+        Row: {
+          country: string | null
+          created_at: string
+          id: string
+          logo_data: string | null
+          name: string
+          owner_id: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          logo_data?: string | null
+          name?: string
+          owner_id?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          logo_data?: string | null
+          name?: string
+          owner_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: {
+        Args: { p_token: string }
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          invited_by_name: string | null
+          role: string
+          status: string
+          vineyard_id: string | null
+          vineyard_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      accept_pending_invitations_for_me: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          invited_by_name: string | null
+          role: string
+          status: string
+          vineyard_id: string | null
+          vineyard_name: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "invitations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_vineyards_by_email: {
+        Args: never
+        Returns: {
+          role: string
+          vineyard_id: string
+        }[]
+      }
+      create_invitation: {
+        Args: {
+          p_email: string
+          p_invited_by_name: string
+          p_role: string
+          p_vineyard_id: string
+          p_vineyard_name: string
+        }
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          invited_by_name: string | null
+          role: string
+          status: string
+          vineyard_id: string | null
+          vineyard_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      get_my_pending_invitations: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string
+          invited_by_name: string
+          role: string
+          status: string
+          vineyard_id: string
+          vineyard_name: string
+        }[]
+      }
+      get_my_vineyard_ids: {
+        Args: never
+        Returns: {
+          vineyard_id: string
+        }[]
+      }
+      get_my_vineyards_full: {
+        Args: never
+        Returns: {
+          country: string
+          created_at: string
+          id: string
+          logo_data: string
+          name: string
+          owner_id: string
+        }[]
+      }
       get_vinetrack_access_snapshot: { Args: never; Returns: Json }
+      get_vineyard_members_with_email: {
+        Args: { p_vineyard_id: string }
+        Returns: {
+          display_name: string
+          email: string
+          joined_at: string
+          role: string
+          user_id: string
+        }[]
+      }
+      is_current_user_admin: { Args: never; Returns: boolean }
+      is_vineyard_member: { Args: { p_vineyard_id: string }; Returns: boolean }
+      is_vineyard_owner_or_manager: {
+        Args: { p_vineyard_id: string }
+        Returns: boolean
+      }
       user_id: { Args: never; Returns: string }
     }
     Enums: {
