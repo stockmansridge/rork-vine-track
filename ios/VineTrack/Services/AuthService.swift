@@ -862,82 +862,29 @@ class AuthService {
     }
 
     func acceptInvitation(_ invitation: TeamInvitation) async {
-        guard isSupabaseConfigured, let uid = userId else {
+        guard isSupabaseConfigured, userId != nil else {
             errorMessage = "You must be signed in to accept invitations."
             return
         }
-        let lowerUid = uid.lowercased()
-        var rpcError: Error?
 
-        // Primary path: SECURITY DEFINER RPC - bypasses RLS, normalizes
-        // the uuid casing, and inserts into vineyard_members atomically.
-        // The SQL function (FINAL_FIX_INVITE_CASE.sql) accepts either a
-        // token or the invitation id as p_token.
+        // Backend-only flow per Step 7. The app never inserts into
+        // vineyard_members directly. The backend resolves the user's
+        // email from auth.users and verifies the invitation matches.
         nonisolated struct AcceptParams: Codable, Sendable {
-            let p_token: String
+            let p_invitation_id: String
         }
-        let params = AcceptParams(p_token: invitation.id.uuidString.lowercased())
+        let params = AcceptParams(p_invitation_id: invitation.id.uuidString.lowercased())
+
         do {
             try await supabase.rpc("accept_invitation", params: params).execute()
             pendingInvitations.removeAll { $0.id == invitation.id }
-            print("[AuthService] accept_invitation RPC succeeded for \(invitation.id.uuidString)")
-            return
+            print("[AuthService] accept_invitation succeeded for \(invitation.id.uuidString)")
+            // Refresh the access snapshot so the accepted vineyard
+            // appears in the selector.
+            await loadPendingInvitations()
         } catch {
-            rpcError = error
-            print("[AuthService] accept_invitation RPC failed, trying bulk RPC: \(error)")
-        }
-
-        // Secondary path: bulk RPC that matches by email from auth.users,
-        // tolerant to any JWT-email claim issues. Only treat it as success
-        // if membership actually exists afterwards, so we don't silently
-        // swallow the original error when the RPC did nothing.
-        do {
-            try await supabase.rpc("accept_pending_invitations_for_me").execute()
-            let memberships: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
-                .select()
-                .eq("vineyard_id", value: invitation.vineyard_id)
-                .eq("user_id", value: lowerUid)
-                .execute()
-                .value) ?? []
-            if !memberships.isEmpty {
-                pendingInvitations.removeAll { $0.id == invitation.id }
-                print("[AuthService] accept_pending_invitations_for_me RPC succeeded and membership confirmed")
-                return
-            }
-            print("[AuthService] bulk RPC ran but no membership row found - trying direct insert")
-        } catch {
-            print("[AuthService] accept_pending_invitations_for_me RPC failed, falling back to direct insert: \(error)")
-        }
-
-        // Fallback: direct upsert. Uses the LOWERCASE uid so the RLS
-        // insert policy (auth.uid()::text = user_id) actually matches.
-        do {
-            let memberRecord = VineyardMemberRecord(
-                id: nil,
-                vineyard_id: invitation.vineyard_id,
-                user_id: lowerUid,
-                name: userName.isEmpty ? userEmail : userName,
-                role: invitation.role,
-                joined_at: nil
-            )
-            try await supabase.from("vineyard_members")
-                .upsert(memberRecord, onConflict: "vineyard_id,user_id")
-                .execute()
-
-            nonisolated struct StatusUpdate: Codable, Sendable {
-                let status: String
-            }
-            try await supabase.from("invitations")
-                .update(StatusUpdate(status: "accepted"))
-                .eq("id", value: invitation.id.uuidString)
-                .execute()
-
-            pendingInvitations.removeAll { $0.id == invitation.id }
-            print("[AuthService] accept_invitation fallback insert succeeded for \(invitation.id.uuidString)")
-        } catch {
-            print("[AuthService] accept_invitation fallback insert failed: \(error)")
-            let rpcDesc = rpcError.map { $0.localizedDescription } ?? "n/a"
-            errorMessage = "Failed to accept invitation.\nRPC: \(rpcDesc)\nInsert: \(error.localizedDescription)"
+            print("[AuthService] accept_invitation failed: \(error)")
+            errorMessage = "Failed to accept invitation: \(error.localizedDescription)"
         }
     }
 
@@ -959,66 +906,34 @@ class AuthService {
     }
 
     func inviteMember(email: String, role: VineyardRole, vineyardId: UUID, vineyardName: String) async -> Bool {
-        guard isSupabaseConfigured, let uid = userId else {
+        guard isSupabaseConfigured, userId != nil else {
             errorMessage = "You must be signed in to send invitations."
             return false
         }
-        let lowered = email.lowercased()
+        let lowered = normalizedEmailAddress(email)
         print("[AuthService] inviteMember email=\(lowered) vineyard=\(vineyardId.uuidString) role=\(role.rawValue)")
 
+        // Backend-only flow per Step 7. The backend verifies the caller is
+        // Owner or Manager for the target vineyard. The app never inserts
+        // into invitations directly.
         nonisolated struct CreateInvitationParams: Codable, Sendable {
             let p_vineyard_id: String
-            let p_vineyard_name: String
             let p_email: String
             let p_role: String
-            let p_invited_by_name: String
         }
         let params = CreateInvitationParams(
             p_vineyard_id: vineyardId.uuidString.lowercased(),
-            p_vineyard_name: vineyardName,
             p_email: lowered,
-            p_role: role.rawValue,
-            p_invited_by_name: userName
+            p_role: role.rawValue
         )
 
-        var rpcError: Error?
         do {
             try await supabase.rpc("create_invitation", params: params).execute()
-            print("[AuthService] create_invitation RPC succeeded")
+            print("[AuthService] create_invitation succeeded")
         } catch {
-            rpcError = error
-            print("[AuthService] create_invitation RPC failed: \(error)")
-        }
-
-        if rpcError != nil {
-            // Fallback: direct insert (requires invitations RLS insert policy to be in place)
-            do {
-                nonisolated struct InsertRow: Codable, Sendable {
-                    let vineyard_id: String
-                    let vineyard_name: String
-                    let email: String
-                    let role: String
-                    let invited_by: String
-                    let invited_by_name: String
-                    let status: String
-                }
-                let row = InsertRow(
-                    vineyard_id: vineyardId.uuidString.lowercased(),
-                    vineyard_name: vineyardName,
-                    email: lowered,
-                    role: role.rawValue,
-                    invited_by: uid,
-                    invited_by_name: userName,
-                    status: "pending"
-                )
-                try await supabase.from("invitations").insert(row).execute()
-                print("[AuthService] direct insert fallback succeeded")
-            } catch {
-                print("[AuthService] direct insert fallback failed: \(error)")
-                let rpcDesc = rpcError.map { "\($0)" } ?? "nil"
-                errorMessage = "Failed to save invitation.\nRPC error: \(rpcDesc)\nInsert error: \(error.localizedDescription)\nRun sql/fix_create_invitation_owner.sql in Supabase SQL Editor."
-                return false
-            }
+            print("[AuthService] create_invitation failed: \(error)")
+            errorMessage = "Failed to send invitation: \(error.localizedDescription)"
+            return false
         }
 
         await sendInvitationEmail(

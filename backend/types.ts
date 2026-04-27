@@ -192,7 +192,7 @@ export type Database = {
     }
     Functions: {
       accept_invitation: {
-        Args: { p_token: string }
+        Args: { p_invitation_id: string }
         Returns: {
           created_at: string
           email: string
@@ -239,13 +239,7 @@ export type Database = {
         }[]
       }
       create_invitation: {
-        Args: {
-          p_email: string
-          p_invited_by_name: string
-          p_role: string
-          p_vineyard_id: string
-          p_vineyard_name: string
-        }
+        Args: { p_email: string; p_role: string; p_vineyard_id: string }
         Returns: {
           created_at: string
           email: string
