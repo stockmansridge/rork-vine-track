@@ -5,10 +5,7 @@ private func envValue(_ key: String) -> String {
     Config.allValues[key] ?? ""
 }
 
-private let SUPABASE_URL_OVERRIDE = "https://vuyxofjretznwslicanv.supabase.co"
-
 private func resolvedSupabaseURL() -> String {
-    if !SUPABASE_URL_OVERRIDE.isEmpty { return SUPABASE_URL_OVERRIDE }
     return envValue("EXPO_PUBLIC_SUPABASE_URL")
 }
 
