@@ -47,6 +47,8 @@ class AccessControl {
     // MARK: - Permissions
 
     var canDelete: Bool { currentUserRole.canDelete }
+    var canDeleteVineyard: Bool { currentUserRole.canDeleteVineyard }
+    var canTransferOwnership: Bool { currentUserRole.canTransferOwnership }
     var canExport: Bool { currentUserRole.canExport }
     var canViewFinancials: Bool { currentUserRole.canViewFinancials }
     var canExportFinancialPDF: Bool { currentUserRole.canExportFinancialPDF }
@@ -62,6 +64,44 @@ class AccessControl {
     func canEdit(isFinalized: Bool) -> Bool {
         if !isFinalized { return true }
         return canReopenRecords
+    }
+
+    /// Role for an arbitrary vineyard (not just the selected one). Used by
+    /// list views that need per-row permissions. Falls back to local member
+    /// data, then to Operator if no membership is known.
+    func role(forVineyardId vineyardId: UUID) -> VineyardRole {
+        if let vineyard = store.vineyards.first(where: { $0.id == vineyardId }),
+           let role = authService.role(forVineyardId: vineyardId, ownerId: vineyard.ownerId) {
+            return role
+        }
+        if let role = authService.role(forVineyardId: vineyardId) {
+            return role
+        }
+        guard let userId = authService.userId,
+              let uuid = UUID(uuidString: userId),
+              let vineyard = store.vineyards.first(where: { $0.id == vineyardId })
+        else { return .operator_ }
+        if let user = vineyard.users.first(where: { $0.id == uuid }) {
+            return user.role
+        }
+        let email = authService.userEmail.lowercased()
+        if !email.isEmpty,
+           let user = vineyard.users.first(where: { $0.email.lowercased() == email }) {
+            return user.role
+        }
+        return .operator_
+    }
+
+    /// Whether the current user can delete the given vineyard. Only the
+    /// Owner of that specific vineyard can delete it.
+    func canDeleteVineyard(_ vineyard: Vineyard) -> Bool {
+        role(forVineyardId: vineyard.id).canDeleteVineyard
+    }
+
+    /// Whether the current user can change another user's role in the
+    /// currently selected vineyard.
+    func canManage(role targetRole: VineyardRole) -> Bool {
+        currentUserRole.canManage(role: targetRole)
     }
 }
 

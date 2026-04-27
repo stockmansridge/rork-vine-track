@@ -133,4 +133,26 @@ nonisolated enum VineyardRole: String, Codable, Sendable, Hashable, CaseIterable
 
     /// Supervisors and above can finalise/lock records.
     var canFinalizeRecords: Bool { canDelete }
+
+    /// Only the Owner can delete the vineyard itself. Managers can delete
+    /// records but not the vineyard.
+    var canDeleteVineyard: Bool { self == .owner }
+
+    /// Only the Owner can transfer ownership to another user.
+    var canTransferOwnership: Bool { self == .owner }
+
+    /// Whether this role is allowed to manage (edit/remove/change role of)
+    /// a user with the given target role. Owners can manage anyone except
+    /// themselves; Managers can manage users below Owner level; Supervisors
+    /// and Operators cannot manage users at all.
+    func canManage(role targetRole: VineyardRole) -> Bool {
+        switch self {
+        case .owner:
+            return true
+        case .manager:
+            return targetRole != .owner
+        case .supervisor, .operator_:
+            return false
+        }
+    }
 }
