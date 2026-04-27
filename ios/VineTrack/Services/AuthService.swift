@@ -711,8 +711,10 @@ class AuthService {
         }
     }
 
+    /// Reloads the access snapshot — the single source of truth for the
+    /// signed-in user's vineyards, memberships, roles, and pending
+    /// invitations. No fallback paths (Step 13).
     func loadPendingInvitations() async {
-        let normalizedEmail: String = normalizedEmailAddress(userEmail)
         guard isSupabaseConfigured else {
             pendingInvitations = []
             return
@@ -726,44 +728,8 @@ class AuthService {
                 errorMessage = nil
             }
             print("[AuthService] access snapshot returned \(payload.pendingInvitations.count) invitation(s)")
-            return
         } catch {
-            print("[AuthService] access snapshot invitation lookup failed, falling back: \(error)")
-        }
-
-        if let rows: [TeamInvitation] = try? await supabase
-            .rpc("get_my_pending_invitations")
-            .execute()
-            .value {
-            pendingInvitations = rows
-            if errorMessage?.contains("Couldn't load invitations") == true {
-                errorMessage = nil
-            }
-            print("[AuthService] get_my_pending_invitations RPC returned \(rows.count) invitation(s)")
-            return
-        } else {
-            print("[AuthService] get_my_pending_invitations RPC unavailable, falling back (run sql/get_my_pending_invitations.sql in Supabase)")
-        }
-
-        guard !normalizedEmail.isEmpty else {
-            pendingInvitations = []
-            return
-        }
-
-        do {
-            let invitations: [TeamInvitation] = try await supabase.from("invitations")
-                .select()
-                .eq("status", value: "pending")
-                .ilike("email", pattern: "%\(normalizedEmail)%")
-                .order("created_at", ascending: false)
-                .execute()
-                .value
-            pendingInvitations = invitations.filter { normalizedEmailAddress($0.email) == normalizedEmail }
-            if errorMessage?.contains("Couldn't load invitations") == true {
-                errorMessage = nil
-            }
-        } catch {
-            pendingInvitations = []
+            print("[AuthService] access snapshot failed: \(error)")
             errorMessage = "Couldn't load invitations: \(error.localizedDescription)"
         }
     }
@@ -1116,13 +1082,13 @@ class AuthService {
     /// falling back to vineyard ownership. Returns nil if no membership
     /// or ownership relationship exists.
     func role(forVineyardId vineyardId: UUID, ownerId: UUID? = nil) -> VineyardRole? {
-        if let row = membership(forVineyardId: vineyardId) {
-            return VineyardRole(rawValue: row.role) ?? .operator_
-        }
-        if let ownerId, let uid = userId, let userUUID = UUID(uuidString: uid), userUUID == ownerId {
-            return .owner
-        }
-        return nil
+        // Per Step 13: membership rows are the single source of truth.
+        // Vineyard access is no longer derived from owner_id alone — the
+        // backend RPC must include an Owner membership row for vineyard
+        // owners.
+        _ = ownerId
+        guard let row = membership(forVineyardId: vineyardId) else { return nil }
+        return VineyardRole(rawValue: row.role) ?? .operator_
     }
 
     private func persistUserLocally() {

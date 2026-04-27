@@ -77,7 +77,6 @@ struct VineyardListView: View {
         isRefreshing = true
         defer { isRefreshing = false }
         await authService.loadPendingInvitations()
-        await cloudSync.claimVineyardsByEmail()
         await cloudSync.pullAllData(for: store)
         switch cloudSync.syncStatus {
         case .error(let msg):

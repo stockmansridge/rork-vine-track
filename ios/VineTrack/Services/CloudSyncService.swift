@@ -252,22 +252,6 @@ class CloudSyncService {
         }
     }
 
-    /// Claims access to any vineyards owned by - or shared with - another
-    /// auth.users row that has the same email as the current user. Handles
-    /// the case where a user originally signed up with email/password and
-    /// later signs in via Google or Apple, which Supabase treats as a
-    /// separate auth identity. Backed by the SECURITY DEFINER RPC
-    /// `claim_vineyards_by_email`.
-    func claimVineyardsByEmail() async {
-        guard isConfigured, currentUserId != nil else { return }
-        do {
-            try await supabase.rpc("claim_vineyards_by_email").execute()
-            print("CloudSync: claim_vineyards_by_email RPC executed")
-        } catch {
-            print("CloudSync: claim_vineyards_by_email RPC failed (run sql/claim_vineyards_by_email.sql in Supabase): \(error)")
-        }
-    }
-
     private func vineyardRole(from rawValue: String) -> VineyardRole {
         switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "owner":
@@ -300,12 +284,11 @@ class CloudSyncService {
                         role: vineyardRole(from: member.role)
                     )
                 }
-                let resolvedUsers = ensureCurrentUserIncluded(in: users, vineyard: record)
                 let logoData = record.logo_data.flatMap { Data(base64Encoded: $0) }
                 return Vineyard(
                     id: UUID(uuidString: record.id) ?? UUID(),
                     name: record.name,
-                    users: resolvedUsers,
+                    users: users,
                     createdAt: ISO8601DateFormatter().date(from: record.created_at ?? "") ?? Date(),
                     logoData: logoData,
                     country: record.country ?? "",
@@ -509,11 +492,6 @@ class CloudSyncService {
             }
         }
 
-        users = ensureCurrentUserIncluded(
-            in: users,
-            vineyardOwnerId: store.vineyards.first(where: { $0.id == vineyardId })?.ownerId
-        )
-
         guard var vineyard = store.vineyards.first(where: { $0.id == vineyardId }) else { return }
 
         // Preserve the operatorCategoryId we already have locally, since the
@@ -528,42 +506,6 @@ class CloudSyncService {
 
         vineyard.users = users
         store.updateVineyardUsers(vineyard)
-    }
-
-    /// Ensures the currently signed-in user appears in the members list. If
-    /// they're missing (RPC didn't return them, RLS hid the row, or their
-    /// vineyard_members entry hasn't been written yet) we synthesise one
-    /// using AuthService data so the Team & Access screen never hides the
-    /// person who is actually viewing it. Role is inferred from cloud
-    /// owner_id when possible.
-    private func ensureCurrentUserIncluded(in users: [VineyardUser], vineyard: VineyardRecord) -> [VineyardUser] {
-        let ownerId = vineyard.owner_id.flatMap { UUID(uuidString: $0) }
-        return ensureCurrentUserIncluded(in: users, vineyardOwnerId: ownerId)
-    }
-
-    private func ensureCurrentUserIncluded(in users: [VineyardUser], vineyardOwnerId: UUID?) -> [VineyardUser] {
-        guard let uidString = currentUserId, let uuid = UUID(uuidString: uidString) else { return users }
-        let email = (supabase.auth.currentUser?.email ?? "").lowercased()
-        let name = supabase.auth.currentUser?.userMetadata["full_name"]?.value as? String
-            ?? supabase.auth.currentUser?.email
-            ?? ""
-
-        if users.contains(where: { $0.id == uuid }) { return users }
-        if !email.isEmpty,
-           let idx = users.firstIndex(where: { $0.email.lowercased() == email }) {
-            // Already represented by an alias row — leave it.
-            _ = idx
-            return users
-        }
-
-        let inferredRole: VineyardRole = (vineyardOwnerId == uuid) ? .owner : .operator_
-        let synthetic = VineyardUser(
-            id: uuid,
-            name: Self.preferredName(displayName: name, email: email),
-            email: email,
-            role: inferredRole
-        )
-        return users + [synthetic]
     }
 
     /// Update a member's role in the vineyard_members table. Called from the

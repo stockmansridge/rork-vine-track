@@ -19,13 +19,14 @@ class AccessControl {
         return authService.membership(forVineyardId: vid)
     }
 
-    /// Role for the currently selected vineyard. Prefers the access
-    /// snapshot, falls back to vineyard ownership, then to local member
-    /// data (offline cache), then to Operator as a safe default.
+    /// Role for the currently selected vineyard, sourced from the access
+    /// snapshot. Per-vineyard — there is no global role. Falls back to the
+    /// local cached membership (offline) and finally Operator as a safe
+    /// default (Step 13).
     var currentUserRole: VineyardRole {
         guard let vineyard = store.selectedVineyard else { return .operator_ }
 
-        if let role = authService.role(forVineyardId: vineyard.id, ownerId: vineyard.ownerId) {
+        if let role = authService.role(forVineyardId: vineyard.id) {
             return role
         }
 
@@ -34,11 +35,6 @@ class AccessControl {
             return .operator_
         }
         if let user = vineyard.users.first(where: { $0.id == uuid }) {
-            return user.role
-        }
-        let email = authService.userEmail.lowercased()
-        if !email.isEmpty,
-           let user = vineyard.users.first(where: { $0.email.lowercased() == email }) {
             return user.role
         }
         return .operator_
@@ -70,10 +66,6 @@ class AccessControl {
     /// list views that need per-row permissions. Falls back to local member
     /// data, then to Operator if no membership is known.
     func role(forVineyardId vineyardId: UUID) -> VineyardRole {
-        if let vineyard = store.vineyards.first(where: { $0.id == vineyardId }),
-           let role = authService.role(forVineyardId: vineyardId, ownerId: vineyard.ownerId) {
-            return role
-        }
         if let role = authService.role(forVineyardId: vineyardId) {
             return role
         }
@@ -82,11 +74,6 @@ class AccessControl {
               let vineyard = store.vineyards.first(where: { $0.id == vineyardId })
         else { return .operator_ }
         if let user = vineyard.users.first(where: { $0.id == uuid }) {
-            return user.role
-        }
-        let email = authService.userEmail.lowercased()
-        if !email.isEmpty,
-           let user = vineyard.users.first(where: { $0.email.lowercased() == email }) {
             return user.role
         }
         return .operator_
