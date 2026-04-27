@@ -90,6 +90,16 @@ struct DisclaimerView: View {
         errorMessage = nil
 
         let displayName = authService.userName.isEmpty ? authService.userEmail : authService.userName
+        let acceptedKey = "vinetrack_disclaimer_accepted_\(userId)"
+        let pendingKey = "vinetrack_disclaimer_pending_\(userId)"
+
+        if !isSupabaseConfigured || authService.isOfflineSession {
+            UserDefaults.standard.set(true, forKey: acceptedKey)
+            UserDefaults.standard.set(true, forKey: pendingKey)
+            print("[Disclaimer] Saved locally (offline) for user \(userId)")
+            onAccepted()
+            return
+        }
 
         Task {
             do {
@@ -102,12 +112,14 @@ struct DisclaimerView: View {
                     .insert(record)
                     .execute()
 
-                UserDefaults.standard.set(true, forKey: "vinetrack_disclaimer_accepted_\(userId)")
+                UserDefaults.standard.set(true, forKey: acceptedKey)
+                UserDefaults.standard.removeObject(forKey: pendingKey)
                 onAccepted()
             } catch {
                 print("[Disclaimer] Insert failed for user \(userId): \(error)")
-                errorMessage = "Failed to save acceptance: \(error.localizedDescription)"
-                isSubmitting = false
+                UserDefaults.standard.set(true, forKey: acceptedKey)
+                UserDefaults.standard.set(true, forKey: pendingKey)
+                onAccepted()
             }
         }
     }

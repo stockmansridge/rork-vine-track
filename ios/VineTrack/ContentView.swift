@@ -7,6 +7,7 @@ struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @State private var hasAcceptedDisclaimer: Bool = false
     @State private var isCheckingDisclaimer: Bool = false
+    @State private var disclaimerCheckedForUserId: String?
 
     var body: some View {
         Group {
@@ -55,24 +56,65 @@ struct ContentView: View {
             }
         }
         .onChange(of: authService.isSignedIn) { _, isSignedIn in
-            if isSignedIn, !authService.isDemoMode, let userId = authService.userId {
-                let localKey = "vinetrack_disclaimer_accepted_\(userId)"
-                if UserDefaults.standard.bool(forKey: localKey) {
-                    hasAcceptedDisclaimer = true
-                } else {
-                    isCheckingDisclaimer = true
-                    Task {
-                        let accepted = await AdminService().checkDisclaimerAccepted(userId: userId)
-                        if accepted {
-                            UserDefaults.standard.set(true, forKey: localKey)
-                        }
-                        hasAcceptedDisclaimer = accepted
-                        isCheckingDisclaimer = false
-                    }
-                }
+            if isSignedIn, !authService.isDemoMode {
+                evaluateDisclaimer()
             } else if !isSignedIn {
                 hasAcceptedDisclaimer = false
+                disclaimerCheckedForUserId = nil
             }
+        }
+        .onChange(of: authService.userId) { _, _ in
+            if authService.isSignedIn, !authService.isDemoMode {
+                evaluateDisclaimer()
+            }
+        }
+        .task {
+            if authService.isSignedIn, !authService.isDemoMode {
+                evaluateDisclaimer()
+            }
+            await syncPendingDisclaimerAcceptance()
+        }
+    }
+
+    private func evaluateDisclaimer() {
+        guard let userId = authService.userId else { return }
+        if disclaimerCheckedForUserId == userId, hasAcceptedDisclaimer { return }
+
+        let localKey = "vinetrack_disclaimer_accepted_\(userId)"
+        if UserDefaults.standard.bool(forKey: localKey) {
+            hasAcceptedDisclaimer = true
+            disclaimerCheckedForUserId = userId
+            Task { await syncPendingDisclaimerAcceptance() }
+            return
+        }
+
+        isCheckingDisclaimer = true
+        Task {
+            let accepted = await AdminService().checkDisclaimerAccepted(userId: userId)
+            if accepted {
+                UserDefaults.standard.set(true, forKey: localKey)
+            }
+            if authService.userId == userId {
+                hasAcceptedDisclaimer = accepted
+                disclaimerCheckedForUserId = userId
+                isCheckingDisclaimer = false
+            }
+        }
+    }
+
+    private func syncPendingDisclaimerAcceptance() async {
+        guard let userId = authService.userId else { return }
+        let pendingKey = "vinetrack_disclaimer_pending_\(userId)"
+        guard UserDefaults.standard.bool(forKey: pendingKey) else { return }
+        let displayName = authService.userName.isEmpty ? authService.userEmail : authService.userName
+        let synced = await AdminService().syncPendingDisclaimer(
+            userId: userId,
+            userName: displayName,
+            userEmail: authService.userEmail
+        )
+        if synced {
+            UserDefaults.standard.removeObject(forKey: pendingKey)
+            print("[Disclaimer] Synced pending acceptance for user \(userId)")
         }
     }
 

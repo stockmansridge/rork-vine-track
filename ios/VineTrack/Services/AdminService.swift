@@ -130,6 +130,32 @@ class AdminService {
         isLoadingDisclaimers = false
     }
 
+    func syncPendingDisclaimer(userId: String, userName: String, userEmail: String) async -> Bool {
+        guard isSupabaseConfigured else { return false }
+        do {
+            let existing: [DisclaimerAcceptance] = try await supabase.from("disclaimer_acceptances")
+                .select()
+                .eq("user_id", value: userId)
+                .limit(1)
+                .execute()
+                .value
+            if !existing.isEmpty { return true }
+
+            let record = DisclaimerInsert(
+                user_id: userId,
+                user_name: userName,
+                user_email: userEmail
+            )
+            try await supabase.from("disclaimer_acceptances")
+                .insert(record)
+                .execute()
+            return true
+        } catch {
+            print("[Disclaimer] Sync pending failed for user \(userId): \(error)")
+            return false
+        }
+    }
+
     func checkDisclaimerAccepted(userId: String) async -> Bool {
         guard isSupabaseConfigured else {
             print("[Disclaimer] Supabase not configured, skipping check")
