@@ -274,16 +274,19 @@ class AuthService {
         }
 
         isSendingPasswordReset = true
-        print("[AuthService] resetPasswordForEmail for: \(trimmedEmail)")
+        print("[AuthService] Requesting password reset passcode for: \(trimmedEmail)")
         Task {
             do {
-                try await sendPasswordRecoveryEmail(trimmedEmail)
+                try await supabase.auth.signInWithOTP(
+                    email: trimmedEmail,
+                    shouldCreateUser: false
+                )
                 passwordResetPendingEmail = trimmedEmail
-                showPasswordResetCodeEntry = false
-                passwordResetMessage = "If an account exists for \(trimmedEmail), a password reset link has been sent. Open that link on this device to set a new password."
+                showPasswordResetCodeEntry = true
+                passwordResetMessage = "Enter the passcode sent to \(trimmedEmail) to set a new password."
             } catch {
-                print("[AuthService] password recovery request failed for \(trimmedEmail): \(error)")
-                errorMessage = "Couldn't send reset email: \(authErrorMessage(for: error, fallback: "Password reset failed"))"
+                print("[AuthService] password reset passcode request failed for \(trimmedEmail): \(error)")
+                errorMessage = "Couldn't send passcode: \(authErrorMessage(for: error, fallback: "Password reset failed"))"
             }
             isSendingPasswordReset = false
         }
@@ -316,9 +319,9 @@ class AuthService {
         defer { isVerifyingResetCode = false }
 
         do {
-            _ = try await supabase.auth.verifyOTP(email: trimmedEmail, token: trimmedCode, type: .recovery)
+            _ = try await supabase.auth.verifyOTP(email: trimmedEmail, token: trimmedCode, type: .email)
         } catch {
-            errorMessage = "Invalid or expired code. Please request a new one."
+            errorMessage = "Invalid or expired passcode. Please request a new one."
             return false
         }
 
@@ -1101,7 +1104,7 @@ class AuthService {
         let combinedMessage = "\(localizedMessage) \(rawMessage)"
 
         if combinedMessage.localizedCaseInsensitiveContains("Invalid login credentials") || combinedMessage.localizedCaseInsensitiveContains("invalid_credentials") {
-            return "Incorrect email or password. Use Forgot password to send a secure reset link, then sign in with the new password."
+            return "Incorrect email or password. Use Forgot password to send a passcode, then set a new password."
         }
 
         if combinedMessage.localizedCaseInsensitiveContains("Email not confirmed") || combinedMessage.localizedCaseInsensitiveContains("email_not_confirmed") {
@@ -1174,62 +1177,6 @@ class AuthService {
         }
         isSignedIn = true
         persistUserLocally()
-    }
-
-    private func sendPasswordRecoveryEmail(_ email: String) async throws {
-        do {
-            try await supabase.auth.resetPasswordForEmail(
-                email,
-                redirectTo: Self.passwordResetRedirectURL
-            )
-        } catch {
-            print("[AuthService] Supabase SDK resetPasswordForEmail failed, trying recover endpoint: \(error)")
-            try await sendPasswordRecoveryEmailViaRecoverEndpoint(email)
-        }
-    }
-
-    private func sendPasswordRecoveryEmailViaRecoverEndpoint(_ email: String) async throws {
-        nonisolated struct RecoveryPayload: Encodable, Sendable {
-            let email: String
-        }
-        nonisolated struct RecoveryErrorResponse: Decodable, Sendable {
-            let msg: String?
-            let error: String?
-            let error_description: String?
-        }
-
-        guard let baseURL = URL(string: Config.EXPO_PUBLIC_SUPABASE_URL),
-              !Config.EXPO_PUBLIC_SUPABASE_ANON_KEY.isEmpty,
-              var components = URLComponents(url: baseURL.appendingPathComponent("auth/v1/recover"), resolvingAgainstBaseURL: false) else {
-            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Recovery service is not configured"])
-        }
-
-        components.queryItems = [
-            URLQueryItem(name: "redirect_to", value: Self.passwordResetRedirectURL.absoluteString)
-        ]
-
-        guard let url = components.url else {
-            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid recovery URL"])
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(Config.EXPO_PUBLIC_SUPABASE_ANON_KEY, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(Config.EXPO_PUBLIC_SUPABASE_ANON_KEY)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(RecoveryPayload(email: email))
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid recovery response"])
-        }
-
-        guard (200..<300).contains(http.statusCode) else {
-            let decoded = try? JSONDecoder().decode(RecoveryErrorResponse.self, from: data)
-            let body = String(data: data, encoding: .utf8) ?? ""
-            let message = decoded?.msg ?? decoded?.error_description ?? decoded?.error ?? (body.isEmpty ? "Password recovery failed" : body)
-            throw NSError(domain: "AuthService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: message])
-        }
     }
 
     private func persistUserLocally() {
