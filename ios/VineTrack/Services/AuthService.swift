@@ -282,8 +282,8 @@ class AuthService {
                 showPasswordResetCodeEntry = false
                 passwordResetMessage = "If an account exists for \(trimmedEmail), a password reset link has been sent. Open that link on this device to set a new password."
             } catch {
-                print("[AuthService] recovery email function failed for \(trimmedEmail): \(error)")
-                errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
+                print("[AuthService] password recovery request failed for \(trimmedEmail): \(error)")
+                errorMessage = "Couldn't send reset email: \(authErrorMessage(for: error, fallback: "Password reset failed"))"
             }
             isSendingPasswordReset = false
         }
@@ -1177,45 +1177,58 @@ class AuthService {
     }
 
     private func sendPasswordRecoveryEmail(_ email: String) async throws {
+        do {
+            try await supabase.auth.resetPasswordForEmail(
+                email,
+                redirectTo: Self.passwordResetRedirectURL
+            )
+        } catch {
+            print("[AuthService] Supabase SDK resetPasswordForEmail failed, trying recover endpoint: \(error)")
+            try await sendPasswordRecoveryEmailViaRecoverEndpoint(email)
+        }
+    }
+
+    private func sendPasswordRecoveryEmailViaRecoverEndpoint(_ email: String) async throws {
         nonisolated struct RecoveryPayload: Encodable, Sendable {
             let email: String
-            let redirect_to: String
         }
-        nonisolated struct RecoveryResponse: Decodable, Sendable {
-            let ok: Bool?
+        nonisolated struct RecoveryErrorResponse: Decodable, Sendable {
+            let msg: String?
             let error: String?
+            let error_description: String?
         }
 
         guard let baseURL = URL(string: Config.EXPO_PUBLIC_SUPABASE_URL),
               !Config.EXPO_PUBLIC_SUPABASE_ANON_KEY.isEmpty,
-              let url = URL(string: "/functions/v1/send-password-recovery-email", relativeTo: baseURL) else {
+              var components = URLComponents(url: baseURL.appendingPathComponent("auth/v1/recover"), resolvingAgainstBaseURL: false) else {
             throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Recovery service is not configured"])
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "redirect_to", value: Self.passwordResetRedirectURL.absoluteString)
+        ]
+
+        guard let url = components.url else {
+            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid recovery URL"])
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(Config.EXPO_PUBLIC_SUPABASE_ANON_KEY)", forHTTPHeaderField: "Authorization")
         request.setValue(Config.EXPO_PUBLIC_SUPABASE_ANON_KEY, forHTTPHeaderField: "apikey")
-        request.httpBody = try JSONEncoder().encode(RecoveryPayload(
-            email: email,
-            redirect_to: Self.passwordResetRedirectURL.absoluteString
-        ))
+        request.setValue("Bearer \(Config.EXPO_PUBLIC_SUPABASE_ANON_KEY)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(RecoveryPayload(email: email))
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid recovery response"])
         }
 
-        if !(200..<300).contains(http.statusCode) {
-            let decoded = try? JSONDecoder().decode(RecoveryResponse.self, from: data)
+        guard (200..<300).contains(http.statusCode) else {
+            let decoded = try? JSONDecoder().decode(RecoveryErrorResponse.self, from: data)
             let body = String(data: data, encoding: .utf8) ?? ""
-            let message = decoded?.error ?? (body.isEmpty ? "Recovery service failed" : body)
+            let message = decoded?.msg ?? decoded?.error_description ?? decoded?.error ?? (body.isEmpty ? "Password recovery failed" : body)
             throw NSError(domain: "AuthService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: message])
-        }
-
-        if let decoded = try? JSONDecoder().decode(RecoveryResponse.self, from: data), decoded.ok == false {
-            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: decoded.error ?? "Recovery service failed"])
         }
     }
 
