@@ -274,19 +274,16 @@ class AuthService {
         }
 
         isSendingPasswordReset = true
-        print("[AuthService] Requesting password reset passcode for: \(trimmedEmail)")
+        print("[AuthService] Requesting password reset code for: \(trimmedEmail)")
         Task {
             do {
-                try await supabase.auth.signInWithOTP(
-                    email: trimmedEmail,
-                    shouldCreateUser: false
-                )
+                try await supabase.auth.resetPasswordForEmail(trimmedEmail)
                 passwordResetPendingEmail = trimmedEmail
                 showPasswordResetCodeEntry = true
-                passwordResetMessage = "Enter the passcode sent to \(trimmedEmail) to set a new password."
+                passwordResetMessage = "Enter the code sent to \(trimmedEmail) to set a new password."
             } catch {
-                print("[AuthService] password reset passcode request failed for \(trimmedEmail): \(error)")
-                errorMessage = "Couldn't send passcode: \(authErrorMessage(for: error, fallback: "Password reset failed"))"
+                print("[AuthService] password reset request failed for \(trimmedEmail): \(error)")
+                errorMessage = "Couldn't send reset code: \(authErrorMessage(for: error, fallback: "Password reset failed"))"
             }
             isSendingPasswordReset = false
         }
@@ -319,9 +316,10 @@ class AuthService {
         defer { isVerifyingResetCode = false }
 
         do {
-            _ = try await supabase.auth.verifyOTP(email: trimmedEmail, token: trimmedCode, type: .email)
+            _ = try await supabase.auth.verifyOTP(email: trimmedEmail, token: trimmedCode, type: .recovery)
         } catch {
-            errorMessage = "Invalid or expired passcode. Please request a new one."
+            print("[AuthService] verifyOTP(.recovery) failed for \(trimmedEmail): \(error)")
+            errorMessage = "Invalid or expired code. Please request a new one."
             return false
         }
 
