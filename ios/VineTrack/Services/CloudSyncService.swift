@@ -284,9 +284,10 @@ class CloudSyncService {
     private func pullAccessSnapshot(for store: DataStore) async -> Bool {
         do {
             let payload = try await VineyardAccessService.fetch()
+            store.authService?.accessSnapshot = payload
             store.authService?.pendingInvitations = payload.pendingInvitations
 
-            let membersByVineyard = Dictionary(grouping: payload.members) { row in
+            let membersByVineyard = Dictionary(grouping: payload.memberships) { row in
                 row.vineyard_id.lowercased()
             }
 
@@ -373,213 +374,17 @@ class CloudSyncService {
     }
 
     func pullAllData(for store: DataStore) async {
-        guard isConfigured, let userId = currentUserId else {
+        guard isConfigured, currentUserId != nil else {
             hasCompletedInitialSync = true
             return
         }
         syncStatus = .syncing
         defer { hasCompletedInitialSync = true }
 
-        if await pullAccessSnapshot(for: store) {
-            return
-        }
-
-        do {
-            nonisolated struct VineyardIdRow: Codable, Sendable {
-                let vineyard_id: String
-            }
-
-            var idSet = Set<String>()
-            // Vineyard records pre-fetched via SECURITY DEFINER RPC so we
-            // don't depend on the per-row RLS SELECT on `vineyards` for the
-            // current auth identity. This is critical on shared devices /
-            // fresh Google sign-ins where the just-inserted vineyard_members
-            // row hasn't yet propagated for the new uid.
-            var prefetchedRecords: [String: VineyardRecord] = [:]
-
-            if let rows: [VineyardRecord] = try? await supabase
-                .rpc("get_my_vineyards_full")
-                .execute()
-                .value {
-                for r in rows {
-                    let key = r.id.lowercased()
-                    idSet.insert(key)
-                    prefetchedRecords[key] = r
-                }
-            } else {
-                print("CloudSync: get_my_vineyards_full RPC not available, falling back (run sql/get_my_vineyards_full.sql in Supabase)")
-            }
-
-            // Fallback: server-side RPC that aggregates owner /
-            // membership / same-email matches and auto-heals missing
-            // vineyard_members rows for the current uid.
-            if let rows: [VineyardIdRow] = try? await supabase
-                .rpc("get_my_vineyard_ids")
-                .execute()
-                .value {
-                for r in rows { idSet.insert(r.vineyard_id.lowercased()) }
-            } else {
-                print("CloudSync: get_my_vineyard_ids RPC not available, using fallback (run sql/get_my_vineyard_ids.sql in Supabase)")
-            }
-
-            let myMemberships: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
-                .select()
-                .eq("user_id", value: userId)
-                .execute()
-                .value) ?? []
-
-            let ownedVineyards: [VineyardRecord] = (try? await supabase.from("vineyards")
-                .select()
-                .eq("owner_id", value: userId)
-                .execute()
-                .value) ?? []
-
-            for m in myMemberships { idSet.insert(m.vineyard_id.lowercased()) }
-            for v in ownedVineyards {
-                idSet.insert(v.id.lowercased())
-                prefetchedRecords[v.id.lowercased()] = v
-            }
-            let vineyardIds = Array(idSet)
-
-            for owned in ownedVineyards where !myMemberships.contains(where: { $0.vineyard_id.lowercased() == owned.id.lowercased() }) {
-                let memberRecord = VineyardMemberRecord(
-                    id: nil,
-                    vineyard_id: owned.id,
-                    user_id: userId,
-                    name: supabase.auth.currentUser?.email ?? "",
-                    role: VineyardRole.owner.rawValue,
-                    joined_at: nil
-                )
-                _ = try? await supabase.from("vineyard_members")
-                    .upsert(memberRecord, onConflict: "vineyard_id,user_id")
-                    .execute()
-            }
-
-            guard !vineyardIds.isEmpty else {
-                syncStatus = .synced
-                lastSyncDate = Date()
-                return
-            }
-
-            var vineyards: [Vineyard] = []
-            for vid in vineyardIds {
-                let record: VineyardRecord?
-                if let pre = prefetchedRecords[vid] {
-                    record = pre
-                } else {
-                    let records: [VineyardRecord] = (try? await supabase.from("vineyards")
-                        .select()
-                        .eq("id", value: vid)
-                        .execute()
-                        .value) ?? []
-                    record = records.first
-                }
-
-                if let record {
-                    nonisolated struct RPCParams: Codable, Sendable {
-                        let p_vineyard_id: String
-                    }
-                    let rpcParams = RPCParams(p_vineyard_id: vid.lowercased())
-                    var users: [VineyardUser] = []
-                    if let rows: [MemberWithEmailRow] = try? await supabase.rpc(
-                        "get_vineyard_members_with_email",
-                        params: rpcParams
-                    ).execute().value {
-                        users = rows.map { r in
-                            VineyardUser(
-                                id: UUID(uuidString: r.user_id) ?? UUID(),
-                                name: Self.preferredName(displayName: r.display_name, email: r.email),
-                                email: r.email,
-                                role: vineyardRole(from: r.role)
-                            )
-                        }
-                    } else {
-                        let allMembers: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
-                            .select()
-                            .eq("vineyard_id", value: vid)
-                            .execute()
-                            .value) ?? []
-                        let memberIds = allMembers.map { $0.user_id.lowercased() }
-                        var profileById: [String: ProfileRow] = [:]
-                        if !memberIds.isEmpty {
-                            let profiles: [ProfileRow] = (try? await supabase.from("profiles")
-                                .select()
-                                .in("id", values: memberIds)
-                                .execute()
-                                .value) ?? []
-                            for p in profiles { profileById[p.id.lowercased()] = p }
-                        }
-                        users = allMembers.map { m in
-                            let profile = profileById[m.user_id.lowercased()]
-                            let email = profile?.email ?? ""
-                            let resolvedName = Self.preferredName(
-                                displayName: profile?.name ?? m.name,
-                                email: email
-                            )
-                            return VineyardUser(
-                                id: UUID(uuidString: m.user_id) ?? UUID(),
-                                name: resolvedName,
-                                email: email,
-                                role: vineyardRole(from: m.role)
-                            )
-                        }
-                    }
-                    users = ensureCurrentUserIncluded(in: users, vineyard: record)
-                    var logoData: Data?
-                    if let logoBase64 = record.logo_data {
-                        logoData = Data(base64Encoded: logoBase64)
-                    }
-                    let vineyard = Vineyard(
-                        id: UUID(uuidString: record.id) ?? UUID(),
-                        name: record.name,
-                        users: users,
-                        createdAt: ISO8601DateFormatter().date(from: record.created_at ?? "") ?? Date(),
-                        logoData: logoData,
-                        country: record.country ?? "",
-                        ownerId: record.owner_id.flatMap { UUID(uuidString: $0) }
-                    )
-                    vineyards.append(vineyard)
-                }
-            }
-
-            if !vineyards.isEmpty {
-                store.mergeVineyards(vineyards)
-            } else if !vineyardIds.isEmpty {
-                print("CloudSync: \(vineyardIds.count) vineyard ids returned but no vineyard records could be loaded - check RLS / run sql/get_my_vineyards_full.sql")
-            }
-
-            for vid in vineyardIds {
-                let dataRecords: [SyncRecord] = try await supabase.from("vineyard_data")
-                    .select()
-                    .eq("vineyard_id", value: vid)
-                    .execute()
-                    .value
-
-                guard let vineyardUUID = UUID(uuidString: vid) else { continue }
-
-                for record in dataRecords {
-                    guard let jsonData = record.data.data(using: .utf8) else { continue }
-                    let remoteDate = ISO8601DateFormatter().date(from: record.updated_at) ?? Date.distantPast
-                    let localDate = localTimestamp(for: vineyardUUID, dataType: record.data_type)
-
-                    let cloudHasContent = record.data.count > 4
-                    let localIsEmpty = !store.hasLocalData(forDataType: record.data_type, vineyardId: vineyardUUID)
-                    let shouldReplace = localDate == nil
-                        || remoteDate > localDate!
-                        || (cloudHasContent && localIsEmpty)
-                    if shouldReplace {
-                        try mergeRecord(record.data_type, jsonData: jsonData, vineyardId: vineyardUUID, store: store, replace: true)
-                        setLocalTimestamp(remoteDate, for: vineyardUUID, dataType: record.data_type)
-                    }
-                }
-            }
-
-            store.reloadCurrentVineyardData()
-            syncStatus = .synced
-            lastSyncDate = Date()
-        } catch {
-            syncStatus = .error(error.localizedDescription)
-        }
+        // Single source of truth: trust get_my_access_snapshot. We no longer
+        // chain owner_id / same-email / synthesized fallbacks here — if the
+        // user lacks access, the snapshot says so and the UI reflects that.
+        _ = await pullAccessSnapshot(for: store)
     }
 
     /// Pulls every data record (pins, paddocks, trips, settings, …) for a

@@ -29,6 +29,11 @@ class AuthService {
     var passwordResetPendingEmail: String = ""
     var isVerifyingResetCode: Bool = false
 
+    /// Single source of truth for the signed-in user's vineyard access.
+    /// Populated after every successful authentication and after invitation
+    /// changes. Per-vineyard membership and role are derived from this.
+    var accessSnapshot: VineyardAccessPayload?
+
     static let passwordResetRedirectURL = URL(string: "vinetrack://reset-password?flow=recovery")!
     static let emailConfirmRedirectURL = URL(string: "vinetrack://auth-callback?flow=signup")!
 
@@ -384,6 +389,7 @@ class AuthService {
         userId = nil
         pendingInvitations = []
         sentInvitations = []
+        accessSnapshot = nil
         errorMessage = nil
         let defaults = UserDefaults.standard
         defaults.set(false, forKey: signedInKey)
@@ -714,6 +720,7 @@ class AuthService {
 
         do {
             let payload = try await VineyardAccessService.fetch()
+            accessSnapshot = payload
             pendingInvitations = payload.pendingInvitations
             if errorMessage?.contains("Couldn't load invitations") == true {
                 errorMessage = nil
@@ -1166,6 +1173,7 @@ class AuthService {
         await createProfileIfNeeded()
         do {
             let payload = try await VineyardAccessService.fetch()
+            accessSnapshot = payload
             pendingInvitations = payload.pendingInvitations
             if errorMessage?.contains("Couldn't load invitations") == true {
                 errorMessage = nil
@@ -1175,6 +1183,31 @@ class AuthService {
         }
         isSignedIn = true
         persistUserLocally()
+    }
+
+    /// Returns the membership row for the given vineyard from the
+    /// authoritative access snapshot. The snapshot is the single source
+    /// of truth — a user's role is per-vineyard, not global.
+    func membership(forVineyardId vineyardId: UUID) -> VineyardAccessMemberRecord? {
+        guard let snapshot = accessSnapshot, let uid = userId else { return nil }
+        let vid = vineyardId.uuidString.lowercased()
+        let normalizedUid = uid.lowercased()
+        return snapshot.memberships.first { row in
+            row.vineyard_id.lowercased() == vid && row.user_id.lowercased() == normalizedUid
+        }
+    }
+
+    /// Returns the role for the given vineyard from the access snapshot,
+    /// falling back to vineyard ownership. Returns nil if no membership
+    /// or ownership relationship exists.
+    func role(forVineyardId vineyardId: UUID, ownerId: UUID? = nil) -> VineyardRole? {
+        if let row = membership(forVineyardId: vineyardId) {
+            return VineyardRole(rawValue: row.role) ?? .operator_
+        }
+        if let ownerId, let uid = userId, let userUUID = UUID(uuidString: uid), userUUID == ownerId {
+            return .owner
+        }
+        return nil
     }
 
     private func persistUserLocally() {

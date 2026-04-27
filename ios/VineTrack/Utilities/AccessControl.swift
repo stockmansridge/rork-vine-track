@@ -11,25 +11,31 @@ class AccessControl {
         self.authService = authService
     }
 
+    /// Membership for the currently selected vineyard, sourced from the
+    /// authoritative access snapshot. A user has a separate role per
+    /// vineyard — there is no global role.
+    var currentMembership: VineyardAccessMemberRecord? {
+        guard let vid = store.selectedVineyardId else { return nil }
+        return authService.membership(forVineyardId: vid)
+    }
+
+    /// Role for the currently selected vineyard. Prefers the access
+    /// snapshot, falls back to vineyard ownership, then to local member
+    /// data (offline cache), then to Operator as a safe default.
     var currentUserRole: VineyardRole {
         guard let vineyard = store.selectedVineyard else { return .operator_ }
+
+        if let role = authService.role(forVineyardId: vineyard.id, ownerId: vineyard.ownerId) {
+            return role
+        }
+
         guard let userId = authService.userId,
               let uuid = UUID(uuidString: userId) else {
             return .operator_
         }
-        // If the signed-in user owns this vineyard (per cloud `owner_id`),
-        // they always have Owner privileges regardless of any stale or
-        // mis-set membership row that might list them with a lower role.
-        if let ownerId = vineyard.ownerId, ownerId == uuid {
-            return .owner
-        }
         if let user = vineyard.users.first(where: { $0.id == uuid }) {
             return user.role
         }
-        // Email match is a safe secondary lookup (the signed-in user's own
-        // email cannot belong to another member). Name-based or "only user"
-        // fallbacks are intentionally removed: with stale local data they
-        // can hand the current user the previous user's role.
         let email = authService.userEmail.lowercased()
         if !email.isEmpty,
            let user = vineyard.users.first(where: { $0.email.lowercased() == email }) {
