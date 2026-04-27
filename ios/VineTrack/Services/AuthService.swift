@@ -82,7 +82,7 @@ class AuthService {
         }
         do {
             let session = try await supabase.auth.session
-            applySession(session)
+            await completeSignedInSession(session)
             isLoading = false
         } catch {
             if tryRestoreOfflineSession() {
@@ -160,11 +160,12 @@ class AuthService {
                     accessToken: accessToken
                 )
             )
-            userId = session.user.id.uuidString.lowercased()
-            updateGoogleUser(user)
-            isSignedIn = true
-            persistUserLocally()
-            await createProfileIfNeeded()
+            await completeSignedInSession(
+                session,
+                preferredEmail: user.profile?.email,
+                preferredName: user.profile?.name
+            )
+            userProfileURL = user.profile?.imageURL(withDimension: 120)
         } catch {
             errorMessage = "Google sign-in failed: \(error.localizedDescription)"
         }
@@ -206,13 +207,8 @@ class AuthService {
                 data: ["full_name": .string(name)],
                 redirectTo: Self.emailConfirmRedirectURL
             )
-            if result.session != nil {
-                userId = result.user.id.uuidString.lowercased()
-                userName = name
-                userEmail = email
-                isSignedIn = true
-                persistUserLocally()
-                await createProfileIfNeeded()
+            if let session = result.session {
+                await completeSignedInSession(session, preferredEmail: email, preferredName: name)
             } else {
                 showEmailConfirmation = true
             }
@@ -247,12 +243,12 @@ class AuthService {
                 email: email,
                 password: password
             )
-            userId = session.user.id.uuidString.lowercased()
-            userEmail = email
-            userName = session.user.userMetadata["full_name"]?.value as? String ?? email
-            isSignedIn = true
-            persistUserLocally()
-            await createProfileIfNeeded()
+            let metadataName = session.user.userMetadata["full_name"]?.value as? String
+            await completeSignedInSession(
+                session,
+                preferredEmail: email,
+                preferredName: metadataName ?? email
+            )
         } catch {
             print("[AuthService] Email sign-in failed for \(email): \(error)")
             errorMessage = signInErrorMessage(for: error)
@@ -281,16 +277,24 @@ class AuthService {
         print("[AuthService] resetPasswordForEmail for: \(trimmedEmail)")
         Task {
             do {
-                try await supabase.auth.resetPasswordForEmail(
-                    trimmedEmail,
-                    redirectTo: Self.passwordResetRedirectURL
-                )
+                try await sendPasswordRecoveryEmail(trimmedEmail)
                 passwordResetPendingEmail = trimmedEmail
                 showPasswordResetCodeEntry = false
                 passwordResetMessage = "If an account exists for \(trimmedEmail), a password reset link has been sent. Open that link on this device to set a new password."
             } catch {
-                print("[AuthService] resetPasswordForEmail failed for \(trimmedEmail): \(error)")
-                errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
+                print("[AuthService] recovery email function failed for \(trimmedEmail): \(error)")
+                do {
+                    try await supabase.auth.resetPasswordForEmail(
+                        trimmedEmail,
+                        redirectTo: Self.passwordResetRedirectURL
+                    )
+                    passwordResetPendingEmail = trimmedEmail
+                    showPasswordResetCodeEntry = false
+                    passwordResetMessage = "If an account exists for \(trimmedEmail), a password reset link has been requested. If it does not arrive, contact support because the mail service is rejecting recovery emails."
+                } catch {
+                    print("[AuthService] resetPasswordForEmail failed for \(trimmedEmail): \(error)")
+                    errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
+                }
             }
             isSendingPasswordReset = false
         }
@@ -536,24 +540,19 @@ class AuthService {
                     nonce: nonce
                 )
             )
-            userId = session.user.id.uuidString
-            userEmail = session.user.email ?? credential.email ?? ""
-
-            if let fullName = credential.fullName {
+            let appleName: String? = {
+                guard let fullName = credential.fullName else { return nil }
                 let name = [fullName.givenName, fullName.familyName]
                     .compactMap { $0 }
                     .joined(separator: " ")
-                if !name.isEmpty {
-                    userName = name
-                }
-            }
-            if userName.isEmpty {
-                userName = session.user.userMetadata["full_name"]?.value as? String ?? ""
-            }
-
-            isSignedIn = true
-            persistUserLocally()
-            await createProfileIfNeeded()
+                return name.isEmpty ? nil : name
+            }()
+            let metadataName = session.user.userMetadata["full_name"]?.value as? String
+            await completeSignedInSession(
+                session,
+                preferredEmail: session.user.email ?? credential.email,
+                preferredName: appleName ?? metadataName
+            )
         } catch {
             errorMessage = "Apple sign-in failed: \(error.localizedDescription)"
         }
@@ -1149,7 +1148,7 @@ class AuthService {
                 guard state.event == .passwordRecovery else { continue }
 
                 if let session = state.session {
-                    self.applySession(session)
+                    await self.completeSignedInSession(session)
                 }
 
                 self.passwordResetMessage = nil
@@ -1160,21 +1159,65 @@ class AuthService {
         }
     }
 
-    private func applySession(_ session: Session) {
+    private func completeSignedInSession(_ session: Session, preferredEmail: String? = nil, preferredName: String? = nil) async {
         let user = session.user
         userId = user.id.uuidString.lowercased()
-        userEmail = user.email ?? userEmail
+        userEmail = normalizedEmailAddress(preferredEmail ?? user.email ?? userEmail)
 
-        if let fullName = user.userMetadata["full_name"]?.value as? String,
-           !fullName.isEmpty {
-            userName = fullName
+        let metadataName = user.userMetadata["full_name"]?.value as? String
+        let resolvedName = preferredName ?? metadataName ?? userName
+        if !resolvedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            userName = resolvedName
         } else if userName.isEmpty {
-            userName = UserDefaults.standard.string(forKey: userNameKey) ?? ""
+            userName = UserDefaults.standard.string(forKey: userNameKey) ?? userEmail
         }
 
-        isSignedIn = true
         isOfflineSession = false
+        await createProfileIfNeeded()
+        _ = try? await VineyardAccessService.fetch()
+        isSignedIn = true
         persistUserLocally()
+    }
+
+    private func sendPasswordRecoveryEmail(_ email: String) async throws {
+        nonisolated struct RecoveryPayload: Encodable, Sendable {
+            let email: String
+            let redirect_to: String
+        }
+        nonisolated struct RecoveryResponse: Decodable, Sendable {
+            let ok: Bool?
+            let error: String?
+        }
+
+        guard let baseURL = URL(string: Config.EXPO_PUBLIC_SUPABASE_URL),
+              !Config.EXPO_PUBLIC_SUPABASE_ANON_KEY.isEmpty,
+              let url = URL(string: "/functions/v1/send-password-recovery-email", relativeTo: baseURL) else {
+            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Recovery service is not configured"])
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(Config.EXPO_PUBLIC_SUPABASE_ANON_KEY)", forHTTPHeaderField: "Authorization")
+        request.setValue(Config.EXPO_PUBLIC_SUPABASE_ANON_KEY, forHTTPHeaderField: "apikey")
+        request.httpBody = try JSONEncoder().encode(RecoveryPayload(
+            email: email,
+            redirect_to: Self.passwordResetRedirectURL.absoluteString
+        ))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid recovery response"])
+        }
+
+        if !(200..<300).contains(http.statusCode) {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw NSError(domain: "AuthService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: body.isEmpty ? "Recovery service failed" : body])
+        }
+
+        if let decoded = try? JSONDecoder().decode(RecoveryResponse.self, from: data), decoded.ok == false {
+            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: decoded.error ?? "Recovery service failed"])
+        }
     }
 
     private func persistUserLocally() {
