@@ -18,6 +18,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      _diag_results: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          id: number
+          info: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          id?: number
+          info?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          id?: number
+          info?: string | null
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           created_at: string
