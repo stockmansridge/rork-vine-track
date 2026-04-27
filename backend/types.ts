@@ -302,6 +302,7 @@ export type Database = {
       }
       is_current_user_admin: { Args: never; Returns: boolean }
       is_vineyard_member: { Args: { p_vineyard_id: string }; Returns: boolean }
+      is_vineyard_oms: { Args: { p_vineyard_id: string }; Returns: boolean }
       is_vineyard_owner_or_manager: {
         Args: { p_vineyard_id: string }
         Returns: boolean
@@ -327,6 +328,10 @@ export type Database = {
         }
       }
       user_id: { Args: never; Returns: string }
+      vineyard_role_of_current_user: {
+        Args: { p_vineyard_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
