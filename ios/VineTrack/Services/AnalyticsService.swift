@@ -38,9 +38,9 @@ class AnalyticsService {
         }
 
         let event = AnalyticsEvent(
-            id: UUID().uuidString.lowercased(),
+            id: UUID().uuidString,
             user_id: userId,
-            vineyard_id: vineyardId?.uuidString.lowercased(),
+            vineyard_id: vineyardId?.uuidString,
             event_name: eventName,
             event_data: eventDataString,
             created_at: ISO8601DateFormatter().string(from: Date())

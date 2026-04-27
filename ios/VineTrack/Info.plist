@@ -4,14 +4,6 @@
 <dict>
 	<key>GIDClientID</key>
 	<string>177871980811-vtdnvaq3b9jdouacbi5gjavu5rga3icr.apps.googleusercontent.com</string>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	<key>NSCameraUsageDescription</key>
-	<string>VineTrack uses the camera to take photos of pin locations.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>VineTrack uses your location in the background to continue tracking your trip path when the app is not in the foreground.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>VineTrack uses your location to drop pins at your current position and track your path through vineyard rows.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -37,6 +29,7 @@
 	<array>
 		<string>location</string>
 		<string>fetch</string>
+		<string>processing</string>
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>

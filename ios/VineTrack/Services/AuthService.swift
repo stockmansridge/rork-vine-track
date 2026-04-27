@@ -29,13 +29,8 @@ class AuthService {
     var passwordResetPendingEmail: String = ""
     var isVerifyingResetCode: Bool = false
 
-    /// Single source of truth for the signed-in user's vineyard access.
-    /// Populated after every successful authentication and after invitation
-    /// changes. Per-vineyard membership and role are derived from this.
-    var accessSnapshot: VineyardAccessPayload?
-
-    static let passwordResetRedirectURL = URL(string: "vinetrack://reset-password?flow=recovery")!
-    static let emailConfirmRedirectURL = URL(string: "vinetrack://auth-callback?flow=signup")!
+    static let passwordResetRedirectURL = URL(string: "vinetrack://auth-callback")!
+    static let emailConfirmRedirectURL = URL(string: "vinetrack://auth-callback")!
 
     private var authStateChangesTask: Task<Void, Never>?
 
@@ -87,7 +82,7 @@ class AuthService {
         }
         do {
             let session = try await supabase.auth.session
-            await completeSignedInSession(session)
+            applySession(session)
             isLoading = false
         } catch {
             if tryRestoreOfflineSession() {
@@ -165,12 +160,11 @@ class AuthService {
                     accessToken: accessToken
                 )
             )
-            await completeSignedInSession(
-                session,
-                preferredEmail: user.profile?.email,
-                preferredName: user.profile?.name
-            )
-            userProfileURL = user.profile?.imageURL(withDimension: 120)
+            userId = session.user.id.uuidString.lowercased()
+            updateGoogleUser(user)
+            isSignedIn = true
+            persistUserLocally()
+            await createProfileIfNeeded()
         } catch {
             errorMessage = "Google sign-in failed: \(error.localizedDescription)"
         }
@@ -212,14 +206,18 @@ class AuthService {
                 data: ["full_name": .string(name)],
                 redirectTo: Self.emailConfirmRedirectURL
             )
-            if let session = result.session {
-                await completeSignedInSession(session, preferredEmail: email, preferredName: name)
+            if result.session != nil {
+                userId = result.user.id.uuidString.lowercased()
+                userName = name
+                userEmail = email
+                isSignedIn = true
+                persistUserLocally()
+                await createProfileIfNeeded()
             } else {
                 showEmailConfirmation = true
             }
         } catch {
-            print("[AuthService] Email sign-up failed for \(email): \(error)")
-            errorMessage = authErrorMessage(for: error, fallback: "Couldn't create account")
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -248,15 +246,13 @@ class AuthService {
                 email: email,
                 password: password
             )
-            let metadataName = session.user.userMetadata["full_name"]?.value as? String
-            await completeSignedInSession(
-                session,
-                preferredEmail: email,
-                preferredName: metadataName ?? email
-            )
+            userId = session.user.id.uuidString.lowercased()
+            userEmail = email
+            userName = session.user.userMetadata["full_name"]?.value as? String ?? email
+            isSignedIn = true
+            persistUserLocally()
         } catch {
-            print("[AuthService] Email sign-in failed for \(email): \(error)")
-            errorMessage = signInErrorMessage(for: error)
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -279,16 +275,15 @@ class AuthService {
         }
 
         isSendingPasswordReset = true
-        print("[AuthService] Requesting password reset code for: \(trimmedEmail)")
+        print("[AuthService] resetPasswordForEmail (code flow) for: \(trimmedEmail)")
         Task {
             do {
                 try await supabase.auth.resetPasswordForEmail(trimmedEmail)
                 passwordResetPendingEmail = trimmedEmail
                 showPasswordResetCodeEntry = true
-                passwordResetMessage = "Enter the code sent to \(trimmedEmail) to set a new password."
+                passwordResetMessage = "We sent a 6-digit code to \(trimmedEmail). Enter it below to reset your password."
             } catch {
-                print("[AuthService] password reset request failed for \(trimmedEmail): \(error)")
-                errorMessage = "Couldn't send reset code: \(authErrorMessage(for: error, fallback: "Password reset failed"))"
+                errorMessage = "Couldn't send reset email: \(error.localizedDescription)"
             }
             isSendingPasswordReset = false
         }
@@ -323,7 +318,6 @@ class AuthService {
         do {
             _ = try await supabase.auth.verifyOTP(email: trimmedEmail, token: trimmedCode, type: .recovery)
         } catch {
-            print("[AuthService] verifyOTP(.recovery) failed for \(trimmedEmail): \(error)")
             errorMessage = "Invalid or expired code. Please request a new one."
             return false
         }
@@ -389,7 +383,6 @@ class AuthService {
         userId = nil
         pendingInvitations = []
         sentInvitations = []
-        accessSnapshot = nil
         errorMessage = nil
         let defaults = UserDefaults.standard
         defaults.set(false, forKey: signedInKey)
@@ -536,19 +529,24 @@ class AuthService {
                     nonce: nonce
                 )
             )
-            let appleName: String? = {
-                guard let fullName = credential.fullName else { return nil }
+            userId = session.user.id.uuidString
+            userEmail = session.user.email ?? credential.email ?? ""
+
+            if let fullName = credential.fullName {
                 let name = [fullName.givenName, fullName.familyName]
                     .compactMap { $0 }
                     .joined(separator: " ")
-                return name.isEmpty ? nil : name
-            }()
-            let metadataName = session.user.userMetadata["full_name"]?.value as? String
-            await completeSignedInSession(
-                session,
-                preferredEmail: session.user.email ?? credential.email,
-                preferredName: appleName ?? metadataName
-            )
+                if !name.isEmpty {
+                    userName = name
+                }
+            }
+            if userName.isEmpty {
+                userName = session.user.userMetadata["full_name"]?.value as? String ?? ""
+            }
+
+            isSignedIn = true
+            persistUserLocally()
+            await createProfileIfNeeded()
         } catch {
             errorMessage = "Apple sign-in failed: \(error.localizedDescription)"
         }
@@ -711,25 +709,27 @@ class AuthService {
         }
     }
 
-    /// Reloads the access snapshot — the single source of truth for the
-    /// signed-in user's vineyards, memberships, roles, and pending
-    /// invitations. No fallback paths (Step 13).
     func loadPendingInvitations() async {
-        guard isSupabaseConfigured else {
+        let normalizedEmail: String = normalizedEmailAddress(userEmail)
+        guard isSupabaseConfigured, !normalizedEmail.isEmpty else {
             pendingInvitations = []
             return
         }
 
         do {
-            let payload = try await VineyardAccessService.fetch()
-            accessSnapshot = payload
-            pendingInvitations = payload.pendingInvitations
+            let invitations: [TeamInvitation] = try await supabase.from("invitations")
+                .select()
+                .eq("status", value: "pending")
+                .ilike("email", pattern: "%\(normalizedEmail)%")
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            pendingInvitations = invitations.filter { normalizedEmailAddress($0.email) == normalizedEmail }
             if errorMessage?.contains("Couldn't load invitations") == true {
                 errorMessage = nil
             }
-            print("[AuthService] access snapshot returned \(payload.pendingInvitations.count) invitation(s)")
         } catch {
-            print("[AuthService] access snapshot failed: \(error)")
+            pendingInvitations = []
             errorMessage = "Couldn't load invitations: \(error.localizedDescription)"
         }
     }
@@ -786,7 +786,7 @@ class AuthService {
             let update = ResendUpdate(status: "pending", created_at: iso)
             try await supabase.from("invitations")
                 .update(update)
-                .eq("id", value: invitation.id.uuidString.lowercased())
+                .eq("id", value: invitation.id.uuidString)
                 .execute()
             if let idx = sentInvitations.firstIndex(where: { $0.id == invitation.id }) {
                 sentInvitations[idx].status = "pending"
@@ -813,11 +813,11 @@ class AuthService {
             }
             try await supabase.from("invitations")
                 .update(StatusUpdate(status: "cancelled"))
-                .eq("id", value: invitation.id.uuidString.lowercased())
+                .eq("id", value: invitation.id.uuidString)
                 .execute()
             try? await supabase.from("invitations")
                 .delete()
-                .eq("id", value: invitation.id.uuidString.lowercased())
+                .eq("id", value: invitation.id.uuidString)
                 .execute()
             sentInvitations.removeAll { $0.id == invitation.id }
             return true
@@ -828,29 +828,82 @@ class AuthService {
     }
 
     func acceptInvitation(_ invitation: TeamInvitation) async {
-        guard isSupabaseConfigured, userId != nil else {
+        guard isSupabaseConfigured, let uid = userId else {
             errorMessage = "You must be signed in to accept invitations."
             return
         }
+        let lowerUid = uid.lowercased()
+        var rpcError: Error?
 
-        // Backend-only flow per Step 7. The app never inserts into
-        // vineyard_members directly. The backend resolves the user's
-        // email from auth.users and verifies the invitation matches.
+        // Primary path: SECURITY DEFINER RPC - bypasses RLS, normalizes
+        // the uuid casing, and inserts into vineyard_members atomically.
+        // The SQL function (FINAL_FIX_INVITE_CASE.sql) accepts either a
+        // token or the invitation id as p_token.
         nonisolated struct AcceptParams: Codable, Sendable {
-            let p_invitation_id: String
+            let p_token: String
         }
-        let params = AcceptParams(p_invitation_id: invitation.id.uuidString.lowercased())
-
+        let params = AcceptParams(p_token: invitation.id.uuidString.lowercased())
         do {
             try await supabase.rpc("accept_invitation", params: params).execute()
             pendingInvitations.removeAll { $0.id == invitation.id }
-            print("[AuthService] accept_invitation succeeded for \(invitation.id.uuidString)")
-            // Refresh the access snapshot so the accepted vineyard
-            // appears in the selector.
-            await loadPendingInvitations()
+            print("[AuthService] accept_invitation RPC succeeded for \(invitation.id.uuidString)")
+            return
         } catch {
-            print("[AuthService] accept_invitation failed: \(error)")
-            errorMessage = "Failed to accept invitation: \(error.localizedDescription)"
+            rpcError = error
+            print("[AuthService] accept_invitation RPC failed, trying bulk RPC: \(error)")
+        }
+
+        // Secondary path: bulk RPC that matches by email from auth.users,
+        // tolerant to any JWT-email claim issues. Only treat it as success
+        // if membership actually exists afterwards, so we don't silently
+        // swallow the original error when the RPC did nothing.
+        do {
+            try await supabase.rpc("accept_pending_invitations_for_me").execute()
+            let memberships: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
+                .select()
+                .eq("vineyard_id", value: invitation.vineyard_id)
+                .eq("user_id", value: lowerUid)
+                .execute()
+                .value) ?? []
+            if !memberships.isEmpty {
+                pendingInvitations.removeAll { $0.id == invitation.id }
+                print("[AuthService] accept_pending_invitations_for_me RPC succeeded and membership confirmed")
+                return
+            }
+            print("[AuthService] bulk RPC ran but no membership row found - trying direct insert")
+        } catch {
+            print("[AuthService] accept_pending_invitations_for_me RPC failed, falling back to direct insert: \(error)")
+        }
+
+        // Fallback: direct upsert. Uses the LOWERCASE uid so the RLS
+        // insert policy (auth.uid()::text = user_id) actually matches.
+        do {
+            let memberRecord = VineyardMemberRecord(
+                id: nil,
+                vineyard_id: invitation.vineyard_id,
+                user_id: lowerUid,
+                name: userName.isEmpty ? userEmail : userName,
+                role: invitation.role,
+                joined_at: nil
+            )
+            try await supabase.from("vineyard_members")
+                .upsert(memberRecord, onConflict: "vineyard_id,user_id")
+                .execute()
+
+            nonisolated struct StatusUpdate: Codable, Sendable {
+                let status: String
+            }
+            try await supabase.from("invitations")
+                .update(StatusUpdate(status: "accepted"))
+                .eq("id", value: invitation.id.uuidString)
+                .execute()
+
+            pendingInvitations.removeAll { $0.id == invitation.id }
+            print("[AuthService] accept_invitation fallback insert succeeded for \(invitation.id.uuidString)")
+        } catch {
+            print("[AuthService] accept_invitation fallback insert failed: \(error)")
+            let rpcDesc = rpcError.map { $0.localizedDescription } ?? "n/a"
+            errorMessage = "Failed to accept invitation.\nRPC: \(rpcDesc)\nInsert: \(error.localizedDescription)"
         }
     }
 
@@ -862,7 +915,7 @@ class AuthService {
             }
             try await supabase.from("invitations")
                 .update(StatusUpdate(status: "declined"))
-                .eq("id", value: invitation.id.uuidString.lowercased())
+                .eq("id", value: invitation.id.uuidString)
                 .execute()
 
             pendingInvitations.removeAll { $0.id == invitation.id }
@@ -872,34 +925,66 @@ class AuthService {
     }
 
     func inviteMember(email: String, role: VineyardRole, vineyardId: UUID, vineyardName: String) async -> Bool {
-        guard isSupabaseConfigured, userId != nil else {
+        guard isSupabaseConfigured, let uid = userId else {
             errorMessage = "You must be signed in to send invitations."
             return false
         }
-        let lowered = normalizedEmailAddress(email)
+        let lowered = email.lowercased()
         print("[AuthService] inviteMember email=\(lowered) vineyard=\(vineyardId.uuidString) role=\(role.rawValue)")
 
-        // Backend-only flow per Step 7. The backend verifies the caller is
-        // Owner or Manager for the target vineyard. The app never inserts
-        // into invitations directly.
         nonisolated struct CreateInvitationParams: Codable, Sendable {
             let p_vineyard_id: String
+            let p_vineyard_name: String
             let p_email: String
             let p_role: String
+            let p_invited_by_name: String
         }
         let params = CreateInvitationParams(
             p_vineyard_id: vineyardId.uuidString.lowercased(),
+            p_vineyard_name: vineyardName,
             p_email: lowered,
-            p_role: role.rawValue
+            p_role: role.rawValue,
+            p_invited_by_name: userName
         )
 
+        var rpcError: Error?
         do {
             try await supabase.rpc("create_invitation", params: params).execute()
-            print("[AuthService] create_invitation succeeded")
+            print("[AuthService] create_invitation RPC succeeded")
         } catch {
-            print("[AuthService] create_invitation failed: \(error)")
-            errorMessage = "Failed to send invitation: \(error.localizedDescription)"
-            return false
+            rpcError = error
+            print("[AuthService] create_invitation RPC failed: \(error)")
+        }
+
+        if rpcError != nil {
+            // Fallback: direct insert (requires invitations RLS insert policy to be in place)
+            do {
+                nonisolated struct InsertRow: Codable, Sendable {
+                    let vineyard_id: String
+                    let vineyard_name: String
+                    let email: String
+                    let role: String
+                    let invited_by: String
+                    let invited_by_name: String
+                    let status: String
+                }
+                let row = InsertRow(
+                    vineyard_id: vineyardId.uuidString.lowercased(),
+                    vineyard_name: vineyardName,
+                    email: lowered,
+                    role: role.rawValue,
+                    invited_by: uid,
+                    invited_by_name: userName,
+                    status: "pending"
+                )
+                try await supabase.from("invitations").insert(row).execute()
+                print("[AuthService] direct insert fallback succeeded")
+            } catch {
+                print("[AuthService] direct insert fallback failed: \(error)")
+                let rpcDesc = rpcError.map { "\($0)" } ?? "nil"
+                errorMessage = "Failed to save invitation.\nRPC error: \(rpcDesc)\nInsert error: \(error.localizedDescription)\nRun sql/fix_create_invitation_owner.sql in Supabase SQL Editor."
+                return false
+            }
         }
 
         await sendInvitationEmail(
@@ -984,36 +1069,6 @@ class AuthService {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private func signInErrorMessage(for error: Error) -> String {
-        let rawMessage = "\(error)"
-        let localizedMessage = error.localizedDescription
-        let combinedMessage = "\(localizedMessage) \(rawMessage)"
-
-        if combinedMessage.localizedCaseInsensitiveContains("Invalid login credentials") || combinedMessage.localizedCaseInsensitiveContains("invalid_credentials") {
-            return "Incorrect email or password. Use Forgot password to send a passcode, then set a new password."
-        }
-
-        if combinedMessage.localizedCaseInsensitiveContains("Email not confirmed") || combinedMessage.localizedCaseInsensitiveContains("email_not_confirmed") {
-            return "Please confirm your email address before signing in. Check your inbox for the confirmation email."
-        }
-
-        return authErrorMessage(for: error, fallback: "Sign in failed")
-    }
-
-    private func authErrorMessage(for error: Error, fallback: String) -> String {
-        let localizedMessage = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !localizedMessage.isEmpty {
-            return localizedMessage
-        }
-
-        let rawMessage = "\(error)".trimmingCharacters(in: .whitespacesAndNewlines)
-        if !rawMessage.isEmpty {
-            return rawMessage
-        }
-
-        return fallback
-    }
-
     private func startAuthStateListener() {
         guard isSupabaseConfigured else { return }
 
@@ -1026,7 +1081,7 @@ class AuthService {
                 guard state.event == .passwordRecovery else { continue }
 
                 if let session = state.session {
-                    await self.completeSignedInSession(session)
+                    self.applySession(session)
                 }
 
                 self.passwordResetMessage = nil
@@ -1037,58 +1092,21 @@ class AuthService {
         }
     }
 
-    private func completeSignedInSession(_ session: Session, preferredEmail: String? = nil, preferredName: String? = nil) async {
+    private func applySession(_ session: Session) {
         let user = session.user
         userId = user.id.uuidString.lowercased()
-        userEmail = normalizedEmailAddress(preferredEmail ?? user.email ?? userEmail)
+        userEmail = user.email ?? userEmail
 
-        let metadataName = user.userMetadata["full_name"]?.value as? String
-        let resolvedName = preferredName ?? metadataName ?? userName
-        if !resolvedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            userName = resolvedName
+        if let fullName = user.userMetadata["full_name"]?.value as? String,
+           !fullName.isEmpty {
+            userName = fullName
         } else if userName.isEmpty {
-            userName = UserDefaults.standard.string(forKey: userNameKey) ?? userEmail
+            userName = UserDefaults.standard.string(forKey: userNameKey) ?? ""
         }
 
-        isOfflineSession = false
-        await createProfileIfNeeded()
-        do {
-            let payload = try await VineyardAccessService.fetch()
-            accessSnapshot = payload
-            pendingInvitations = payload.pendingInvitations
-            if errorMessage?.contains("Couldn't load invitations") == true {
-                errorMessage = nil
-            }
-        } catch {
-            print("[AuthService] access snapshot after sign-in failed: \(error)")
-        }
         isSignedIn = true
+        isOfflineSession = false
         persistUserLocally()
-    }
-
-    /// Returns the membership row for the given vineyard from the
-    /// authoritative access snapshot. The snapshot is the single source
-    /// of truth — a user's role is per-vineyard, not global.
-    func membership(forVineyardId vineyardId: UUID) -> VineyardAccessMemberRecord? {
-        guard let snapshot = accessSnapshot, let uid = userId else { return nil }
-        let vid = vineyardId.uuidString.lowercased()
-        let normalizedUid = uid.lowercased()
-        return snapshot.memberships.first { row in
-            row.vineyard_id.lowercased() == vid && row.user_id.lowercased() == normalizedUid
-        }
-    }
-
-    /// Returns the role for the given vineyard from the access snapshot,
-    /// falling back to vineyard ownership. Returns nil if no membership
-    /// or ownership relationship exists.
-    func role(forVineyardId vineyardId: UUID, ownerId: UUID? = nil) -> VineyardRole? {
-        // Per Step 13: membership rows are the single source of truth.
-        // Vineyard access is no longer derived from owner_id alone — the
-        // backend RPC must include an Owner membership row for vineyard
-        // owners.
-        _ = ownerId
-        guard let row = membership(forVineyardId: vineyardId) else { return nil }
-        return VineyardRole(rawValue: row.role) ?? .operator_
     }
 
     private func persistUserLocally() {

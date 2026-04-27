@@ -25,7 +25,7 @@ struct PasswordResetCodeView: View {
                         .autocorrectionDisabled()
                         .focused($focused, equals: .email)
 
-                    TextField("Passcode", text: $code)
+                    TextField("Verification code", text: $code)
                         .textContentType(.oneTimeCode)
                         .keyboardType(.numberPad)
                         .focused($focused, equals: .code)
@@ -37,7 +37,7 @@ struct PasswordResetCodeView: View {
                 } header: {
                     Text("Verification")
                 } footer: {
-                    Text("Enter the passcode sent to your email. No reset link is required.")
+                    Text("Enter the code from the Supabase password reset email. If you don't see it, check spam.")
                 }
 
                 Section {
@@ -85,7 +85,7 @@ struct PasswordResetCodeView: View {
                             if authService.isVerifyingResetCode {
                                 ProgressView()
                             }
-                            Text("Set new password")
+                            Text("Reset password")
                                 .frame(maxWidth: .infinity)
                         }
                     }
@@ -99,14 +99,14 @@ struct PasswordResetCodeView: View {
                                 ProgressView()
                                     .controlSize(.small)
                             }
-                            Text("Resend passcode")
+                            Text("Resend code")
                                 .frame(maxWidth: .infinity)
                         }
                     }
                     .disabled(authService.isSendingPasswordReset || email.isEmpty)
                 }
             }
-            .navigationTitle("Enter Passcode")
+            .navigationTitle("Reset Password")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

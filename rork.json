@@ -5,11 +5,6 @@
       "name": "Vine Track",
       "path": "ios",
       "framework": "swift"
-    },
-    {
-      "name": "Backend",
-      "path": "backend",
-      "framework": "supabase"
     }
   ]
 }

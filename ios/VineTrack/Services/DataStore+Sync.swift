@@ -6,16 +6,8 @@ extension DataStore {
 
     func mergeVineyards(_ remote: [Vineyard]) {
         vineyards = vineyardRepository.merge(remote)
-        // Clear any stale selection that points to a vineyard the current
-        // user no longer has access to (e.g. after switching accounts on a
-        // shared device). When the user has multiple vineyards we leave the
-        // selection nil so the picker is shown; with exactly one vineyard
-        // we auto-select it for convenience.
-        if let sel = selectedVineyardId, !vineyards.contains(where: { $0.id == sel }) {
-            selectedVineyardId = nil
-        }
-        if selectedVineyardId == nil, vineyards.count == 1, let only = vineyards.first {
-            selectedVineyardId = only.id
+        if selectedVineyardId == nil, let first = vineyards.first {
+            selectedVineyardId = first.id
         }
     }
 

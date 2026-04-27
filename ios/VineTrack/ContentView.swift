@@ -36,14 +36,7 @@ struct ContentView: View {
                 }
             } else if store.vineyards.isEmpty && !authService.pendingInvitations.isEmpty {
                 InvitationInboxView()
-            } else if store.vineyards.isEmpty && !cloudSync.hasCompletedInitialSync && !authService.isDemoMode {
-                syncingState
             } else if store.vineyards.isEmpty {
-                VineyardListView()
-            } else if store.selectedVineyard == nil {
-                // Multiple vineyards available but none selected (e.g.
-                // first sign-in on a fresh device, or after switching
-                // accounts). Let the user pick which vineyard to enter.
                 VineyardListView()
             } else {
                 mainTabView
@@ -81,18 +74,6 @@ struct ContentView: View {
                 hasAcceptedDisclaimer = false
             }
         }
-    }
-
-    private var syncingState: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .controlSize(.large)
-            Text("Loading your vineyards…")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground))
     }
 
     private var mainTabView: some View {

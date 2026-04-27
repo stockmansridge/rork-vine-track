@@ -406,7 +406,7 @@ struct VineyardDetailSheet: View {
 
     @ViewBuilder
     private var dangerSection: some View {
-        if accessControl?.canDeleteVineyard(vineyard) ?? false {
+        if accessControl?.canDelete ?? false {
             Section {
                 Button(role: .destructive) {
                     vineyardPendingDeletion = vineyard

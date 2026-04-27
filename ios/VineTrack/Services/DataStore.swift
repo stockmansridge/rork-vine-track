@@ -43,10 +43,6 @@ class DataStore {
     weak var authService: AuthService?
     weak var accessControl: AccessControl?
 
-    /// In-flight cloud pull triggered by `selectVineyard`. Cancelled when the
-    /// user switches again so a stale pull cannot stomp on the new selection.
-    private var vineyardSwitchTask: Task<Void, Never>?
-
     // MARK: - Repositories (Phase 1)
     // Owns persistence + merge/replace logic for their domain.
     // DataStore delegates file I/O here instead of doing it inline.
@@ -348,35 +344,6 @@ class DataStore {
 
     func selectVineyard(_ vineyard: Vineyard) {
         selectedVineyardId = vineyard.id
-        // Refresh team membership AND pull all data for this vineyard from
-        // cloud so the newly-selected vineyard always shows:
-        //   1. The signed-in user's correct role for THIS vineyard
-        //      (owner/manager/operator) — not a stale role cached from the
-        //      previously selected vineyard or a previous user on this device.
-        //   2. Authoritative data from the cloud, even if the local cache for
-        //      this vineyard is empty (fresh device, after a user switch, or
-        //      after a sign-out/sign-in cycle). Without this pull, switching
-        //      to a vineyard you've never opened on this device shows an
-        //      empty Today / Blocks list even though the data exists in the
-        //      cloud.
-        guard let cs = cloudSync, cs.isConfigured else { return }
-        let vid = vineyard.id
-        // Cancel any previous switch's pull so a slow stale fetch can't
-        // overwrite the data we just loaded for the new selection.
-        vineyardSwitchTask?.cancel()
-        vineyardSwitchTask = Task { [weak self] in
-            guard let self else { return }
-            // Run members + data pull concurrently — the data pull no longer
-            // has to wait for an unrelated members RPC round-trip.
-            async let membersPull: Void = cs.refreshMembers(for: vid, store: self)
-            async let dataPull: Void = cs.pullDataForVineyard(vid, store: self)
-            _ = await (membersPull, dataPull)
-            // If the user has switched again while we were pulling, ignore
-            // this result so we don't briefly flash old-vineyard data.
-            if self.selectedVineyardId == vid {
-                self.reloadCurrentVineyardData()
-            }
-        }
     }
 
     // MARK: - Pin CRUD
@@ -1372,11 +1339,6 @@ class DataStore {
             UserDefaults.standard.removeObject(forKey: key)
         }
         UserDefaults.standard.removeObject(forKey: selectedVineyardIdKey)
-        // Clear sync timestamps so the next pullAllData refetches everything
-        // from the cloud. Without this, stale timestamps from the previous
-        // user cause the timestamp-based merge to skip pulling pins, trips,
-        // etc., leaving the new user with an empty Today section.
-        UserDefaults.standard.removeObject(forKey: "vinetrack_sync_timestamps")
         clearInMemoryState()
     }
 
