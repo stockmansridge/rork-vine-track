@@ -98,7 +98,14 @@ Deno.serve(async (req: Request) => {
   const fromEmail = Deno.env.get("PASSWORD_RESET_FROM_EMAIL") ?? Deno.env.get("INVITE_FROM_EMAIL");
 
   if (!supabaseUrl || !serviceRoleKey || !resendApiKey || !fromEmail) {
-    return json({ error: "Password recovery email service is not configured" }, 503);
+    const missing = [
+      !supabaseUrl ? "SUPABASE_URL" : null,
+      !serviceRoleKey ? "SUPABASE_SERVICE_ROLE_KEY" : null,
+      !resendApiKey ? "RESEND_API_KEY" : null,
+      !fromEmail ? "PASSWORD_RESET_FROM_EMAIL or INVITE_FROM_EMAIL" : null,
+    ].filter((value): value is string => value !== null);
+    console.error("[send-password-recovery-email] missing configuration", missing);
+    return json({ error: "Password recovery email service is not configured", missing }, 503);
   }
 
   const redirectTo = payload.redirect_to ?? "vinetrack://reset-password?flow=recovery";

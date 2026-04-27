@@ -1208,8 +1208,10 @@ class AuthService {
         }
 
         if !(200..<300).contains(http.statusCode) {
+            let decoded = try? JSONDecoder().decode(RecoveryResponse.self, from: data)
             let body = String(data: data, encoding: .utf8) ?? ""
-            throw NSError(domain: "AuthService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: body.isEmpty ? "Recovery service failed" : body])
+            let message = decoded?.error ?? (body.isEmpty ? "Recovery service failed" : body)
+            throw NSError(domain: "AuthService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: message])
         }
 
         if let decoded = try? JSONDecoder().decode(RecoveryResponse.self, from: data), decoded.ok == false {

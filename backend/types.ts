@@ -312,6 +312,26 @@ export type Database = {
         Args: { p_vineyard_id: string }
         Returns: boolean
       }
+      list_invitations_for_vineyard: {
+        Args: { p_vineyard_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          invited_by_name: string | null
+          role: string
+          status: string
+          vineyard_id: string | null
+          vineyard_name: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "invitations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       user_id: { Args: never; Returns: string }
     }
     Enums: {
