@@ -226,7 +226,7 @@ class CloudSyncService {
         do {
             let records: [SyncRecord] = try await supabase.from("vineyard_data")
                 .select()
-                .eq("vineyard_id", value: vineyardId.uuidString)
+                .eq("vineyard_id", value: vineyardId.uuidString.lowercased())
                 .eq("data_type", value: dataType)
                 .execute()
                 .value
@@ -354,8 +354,8 @@ class CloudSyncService {
                 let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
                 let timestamp = ISO8601DateFormatter().string(from: now)
                 let record = SyncRecord(
-                    id: "\(vineyardId.uuidString)_\(dataType)",
-                    vineyard_id: vineyardId.uuidString,
+                    id: "\(vineyardId.uuidString.lowercased())_\(dataType)",
+                    vineyard_id: vineyardId.uuidString.lowercased(),
                     data_type: dataType,
                     data: jsonString,
                     updated_at: timestamp
@@ -479,7 +479,7 @@ class CloudSyncService {
 
             let members: [VineyardMemberRecord] = (try? await supabase.from("vineyard_members")
                 .select()
-                .eq("vineyard_id", value: vineyardId.uuidString)
+                .eq("vineyard_id", value: vineyardId.uuidString.lowercased())
                 .execute()
                 .value) ?? []
 
@@ -604,7 +604,7 @@ class CloudSyncService {
 
         let logoBase64 = vineyard.logoData?.base64EncodedString()
         let record = VineyardRecord(
-            id: vineyard.id.uuidString,
+            id: vineyard.id.uuidString.lowercased(),
             name: vineyard.name,
             owner_id: userId,
             logo_data: logoBase64,
@@ -617,7 +617,7 @@ class CloudSyncService {
 
         let memberRecord = VineyardMemberRecord(
             id: nil,
-            vineyard_id: vineyard.id.uuidString,
+            vineyard_id: vineyard.id.uuidString.lowercased(),
             user_id: userId,
             name: supabase.auth.currentUser?.email ?? "",
             role: VineyardRole.owner.rawValue,
@@ -636,8 +636,8 @@ class CloudSyncService {
             let now = Date()
             let timestamp = ISO8601DateFormatter().string(from: now)
             let record = SyncRecord(
-                id: "\(vineyardId.uuidString)_\(dataType)",
-                vineyard_id: vineyardId.uuidString,
+                id: "\(vineyardId.uuidString.lowercased())_\(dataType)",
+                vineyard_id: vineyardId.uuidString.lowercased(),
                 data_type: dataType,
                 data: jsonString,
                 updated_at: timestamp
@@ -681,15 +681,15 @@ class CloudSyncService {
         do {
             try await supabase.from("vineyard_data")
                 .delete()
-                .eq("vineyard_id", value: vineyardId.uuidString)
+                .eq("vineyard_id", value: vineyardId.uuidString.lowercased())
                 .execute()
             try await supabase.from("vineyard_members")
                 .delete()
-                .eq("vineyard_id", value: vineyardId.uuidString)
+                .eq("vineyard_id", value: vineyardId.uuidString.lowercased())
                 .execute()
             try await supabase.from("vineyards")
                 .delete()
-                .eq("id", value: vineyardId.uuidString)
+                .eq("id", value: vineyardId.uuidString.lowercased())
                 .execute()
         } catch {
             print("CloudSync: Failed to delete vineyard: \(error)")

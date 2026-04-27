@@ -93,8 +93,8 @@ class AuditService {
             let created_at: String
         }
         let row = Row(
-            id: entry.id.uuidString,
-            vineyard_id: entry.vineyardId.uuidString,
+            id: entry.id.uuidString.lowercased(),
+            vineyard_id: entry.vineyardId.uuidString.lowercased(),
             user_id: entry.userId,
             user_name: entry.userName,
             user_role: entry.userRole,

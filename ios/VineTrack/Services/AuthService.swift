@@ -820,7 +820,7 @@ class AuthService {
             let update = ResendUpdate(status: "pending", created_at: iso)
             try await supabase.from("invitations")
                 .update(update)
-                .eq("id", value: invitation.id.uuidString)
+                .eq("id", value: invitation.id.uuidString.lowercased())
                 .execute()
             if let idx = sentInvitations.firstIndex(where: { $0.id == invitation.id }) {
                 sentInvitations[idx].status = "pending"
@@ -847,11 +847,11 @@ class AuthService {
             }
             try await supabase.from("invitations")
                 .update(StatusUpdate(status: "cancelled"))
-                .eq("id", value: invitation.id.uuidString)
+                .eq("id", value: invitation.id.uuidString.lowercased())
                 .execute()
             try? await supabase.from("invitations")
                 .delete()
-                .eq("id", value: invitation.id.uuidString)
+                .eq("id", value: invitation.id.uuidString.lowercased())
                 .execute()
             sentInvitations.removeAll { $0.id == invitation.id }
             return true
@@ -896,7 +896,7 @@ class AuthService {
             }
             try await supabase.from("invitations")
                 .update(StatusUpdate(status: "declined"))
-                .eq("id", value: invitation.id.uuidString)
+                .eq("id", value: invitation.id.uuidString.lowercased())
                 .execute()
 
             pendingInvitations.removeAll { $0.id == invitation.id }
