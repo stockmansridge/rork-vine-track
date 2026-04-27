@@ -84,7 +84,7 @@ struct VineyardListView: View {
             lastSyncMessage = "Sync failed: \(msg)"
         case .synced:
             if store.vineyards.isEmpty && authService.pendingInvitations.isEmpty {
-                lastSyncMessage = "No vineyards or invitations were found for \(authService.userEmail). If you own a vineyard under a different email, sign out and sign in with that account."
+                lastSyncMessage = "No vineyards or pending invitations were found for this account. If you own a vineyard under a different email, sign out and sign in with that account."
             } else {
                 lastSyncMessage = nil
             }
@@ -95,24 +95,38 @@ struct VineyardListView: View {
 
     private var emptyState: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 24) {
                 Spacer(minLength: 24)
 
-                GrapeLeafIcon(size: 64)
-                    .foregroundStyle(VineyardTheme.leafGreen.opacity(0.6))
+                Image(systemName: "person.badge.key")
+                    .font(.system(size: 56, weight: .regular))
+                    .foregroundStyle(VineyardTheme.leafGreen.opacity(0.7))
 
-                VStack(spacing: 8) {
-                    Text("Welcome to VineTrack")
+                VStack(spacing: 10) {
+                    Text("No vineyard access yet")
                         .font(.title2.weight(.semibold))
-                    Text("Create your first vineyard to get started, or check for a pending invitation below.")
+                        .multilineTextAlignment(.center)
+
+                    Text("You're signed in, but this email address has not been allocated to a vineyard yet.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, 32)
+
+                    Text("Ask your vineyard owner or manager to invite this email address:")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+
                     if !authService.userEmail.isEmpty {
-                        Text("Signed in as \(authService.userEmail)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                        Text(authService.userEmail)
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                            .textSelection(.enabled)
                     }
                 }
 
@@ -130,17 +144,6 @@ struct VineyardListView: View {
 
                 VStack(spacing: 12) {
                     Button {
-                        showAddVineyard = true
-                    } label: {
-                        Label("Create Vineyard", systemImage: "plus")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(VineyardTheme.olive)
-                    .controlSize(.large)
-
-                    Button {
                         Task { await refreshInvitations() }
                     } label: {
                         if isRefreshing {
@@ -148,12 +151,23 @@ struct VineyardListView: View {
                                 .frame(maxWidth: .infinity)
                         } else {
                             Label("Check for invitations", systemImage: "envelope.badge")
+                                .font(.headline)
                                 .frame(maxWidth: .infinity)
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .tint(VineyardTheme.olive)
                     .controlSize(.large)
                     .disabled(isRefreshing)
+
+                    Button {
+                        showAddVineyard = true
+                    } label: {
+                        Label("Create a Vineyard", systemImage: "plus")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
 
                     Button {
                         showSignOutConfirm = true
@@ -165,7 +179,7 @@ struct VineyardListView: View {
                     .tint(.red)
                     .controlSize(.large)
                 }
-                .padding(.horizontal, 40)
+                .padding(.horizontal, 32)
 
                 if let error = authService.errorMessage {
                     Text(error)
